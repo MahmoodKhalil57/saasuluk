@@ -15,6 +15,8 @@ import { auth, ensureAuthTables } from "./auth";
 import { buildContract, costs } from "./contract";
 import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
+import { mountOperations } from "./operations";
+import { db } from "./db";
 
 export async function createApp() {
   await ensureAuthTables();
@@ -44,6 +46,7 @@ export async function createApp() {
     principalOf: (c) => c.req.header("x-user") || undefined,
   }));
   mount(app, routes);                                                                            // contract-derived CRUD
+  mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
   app.get("/scalar", () => scalarResponse(document));                                            // docs (cost + auth shown)
   app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
   app.get("/cost", (c) => c.json(summarize(sink.events())));                                     // raw cost ledger

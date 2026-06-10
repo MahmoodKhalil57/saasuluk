@@ -7405,6 +7405,397 @@
           }
         }
       }
+    },
+    "checkout": {
+      "requests": {
+        "checkout": {
+          "method": "post",
+          "summary": "Create an order from a cart (apply discount, total)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object"
+          },
+          "responses": {
+            "ok": {
+              "status": 201,
+              "description": "Create an order from a cart (apply discount, total)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 80
+              }
+            ],
+            "estimateMicroUsd": 180
+          }
+        }
+      }
+    },
+    "discount/validate": {
+      "requests": {
+        "validateDiscount": {
+          "method": "post",
+          "summary": "Validate a discount code",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object"
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Validate a discount code",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 10
+              }
+            ],
+            "estimateMicroUsd": 10
+          }
+        }
+      }
+    },
+    "search": {
+      "requests": {
+        "search": {
+          "method": "get",
+          "summary": "Search products + blog posts",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "q": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Search products + blog posts",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 14
+              }
+            ],
+            "estimateMicroUsd": 14
+          }
+        }
+      }
+    },
+    "review/{id}/helpful": {
+      "requests": {
+        "markReviewHelpful": {
+          "method": "post",
+          "summary": "Mark a review helpful (+1)",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Mark a review helpful (+1)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 120
+          }
+        }
+      }
+    },
+    "analytics/summary": {
+      "requests": {
+        "analyticsSummary": {
+          "method": "get",
+          "summary": "Store summary (orders, revenue, customers)",
+          "tags": [
+            "Operations"
+          ],
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Store summary (orders, revenue, customers)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 20
+          }
+        }
+      }
+    },
+    "analytics/revenue": {
+      "requests": {
+        "analyticsRevenue": {
+          "method": "get",
+          "summary": "Revenue per day (last 30d)",
+          "tags": [
+            "Operations"
+          ],
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Revenue per day (last 30d)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 20
+          }
+        }
+      }
+    },
+    "analytics/top-products": {
+      "requests": {
+        "analyticsTopProducts": {
+          "method": "get",
+          "summary": "Best-selling products",
+          "tags": [
+            "Operations"
+          ],
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Best-selling products",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 24
+              }
+            ],
+            "estimateMicroUsd": 24
+          }
+        }
+      }
+    },
+    "recommendations/{productId}": {
+      "requests": {
+        "recommendRelated": {
+          "method": "get",
+          "summary": "Related products",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "productId"
+              ]
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Related products",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 16
+              }
+            ],
+            "estimateMicroUsd": 16
+          }
+        }
+      }
+    },
+    "newsletter/subscribe": {
+      "requests": {
+        "subscribeNewsletter": {
+          "method": "post",
+          "summary": "Subscribe to the newsletter (idempotent)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "email"
+            ]
+          },
+          "responses": {
+            "ok": {
+              "status": 201,
+              "description": "Subscribe to the newsletter (idempotent)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 120
+          }
+        }
+      }
+    },
+    "avatar": {
+      "requests": {
+        "generateAvatar": {
+          "method": "get",
+          "summary": "Deterministic identicon SVG",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Deterministic identicon SVG",
+              "contentType": "image/svg+xml",
+              "contentSchema": {
+                "type": "string"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 2
+              }
+            ],
+            "estimateMicroUsd": 2
+          }
+        }
+      }
     }
   },
   "components": {

@@ -8,10 +8,12 @@ import { tableComponents } from "@suluk/drizzle";
 import { buildApp } from "@suluk/builder";
 import { annotateCosts } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
-import { entitySchemas, costs, allTables } from "../src/server/domain";
+import { entitySchemas, costs as domainCosts, allTables } from "../src/server/domain";
+import { OPERATION_PATHS, OPERATION_COSTS } from "../src/server/operations";
 
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API", version: "0.1.0" } });
-let doc = annotateCosts(built.backend.document, costs);
+built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
+let doc = annotateCosts(built.backend.document, { ...domainCosts, ...OPERATION_COSTS });
 doc.components = { ...(doc.components ?? {}), schemas: { ...(doc.components?.schemas ?? {}), ...tableComponents(allTables) } };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
 doc = mergeAuth(doc, {}, { securitySchemes });

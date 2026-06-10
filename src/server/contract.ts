@@ -9,16 +9,19 @@ import { buildApp, type BuiltApp } from "@suluk/builder";
 import { annotateCosts } from "@suluk/cost";
 import { authSecuritySchemes, ingestAuthOpenAPI, mergeAuth } from "@suluk/better-auth";
 import type { OpenAPIv4Document } from "@suluk/core";
-import { entitySchemas, costs } from "./domain";
+import { entitySchemas, costs as domainCosts } from "./domain";
+import { OPERATION_PATHS, OPERATION_COSTS } from "./operations";
 import { auth } from "./auth";
 
-export { costs } from "./domain"; // re-exported so the cost meter (api.ts) uses the same per-op model as the docs
+// the cost meter (api.ts) and the docs share ONE model: CRUD costs (domain) + the custom-operation costs.
+export const costs = { ...domainCosts, ...OPERATION_COSTS };
 
 export interface Contract { built: BuiltApp; document: OpenAPIv4Document }
 
-/** Assemble the full v4 contract (domain + cost + auth). Async because Better Auth's schema is generated. */
+/** Assemble the full v4 contract (domain CRUD + custom operations + cost + auth). Async because Better Auth's schema is generated. */
 export async function buildContract(): Promise<Contract> {
   const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API", version: "0.1.0" } });
+  built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
   let document = annotateCosts(built.backend.document, costs);
 
   const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });

@@ -41,6 +41,38 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(cost.byAction["add-product"]).toBeGreaterThan(0);
   });
 
+  test("custom operations: checkout applies a discount, validate previews it, and both are in the contract + metered", async () => {
+    const doc = await (await app.request("/openapi.json")).json() as any;
+    for (const [path, op] of [["checkout", "checkout"], ["discount/validate", "validateDiscount"], ["search", "search"], ["analytics/summary", "analyticsSummary"]] as const) {
+      expect(doc.paths[path]?.requests[op]["x-suluk-cost"], `op not costed: ${op}`).toBeDefined();
+    }
+    await post("/product", { name: "Pro", slug: "pro", priceCents: 5000, status: "published", categoryId: 1 }, { "x-user": "c1" });
+    await post("/discountCode", { code: "SAVE10", discountType: "percent", discountValue: 10, isActive: true }, {});
+    const co = await (await post("/checkout", { items: [{ productId: 1, qty: 2, priceCents: 5000 }], discountCode: "SAVE10" }, { "x-user": "c1", "x-suluk-action": "checkout-btn" })).json();
+    expect(co.subtotalCents).toBe(10000);
+    expect(co.totalCents).toBe(9000); // 10% off
+    expect(co.discountApplied).toBe(true);
+    expect(co.order.customerId).toBe("c1");
+    const v = await (await post("/discount/validate", { code: "SAVE10", subtotalCents: 10000 }, {})).json();
+    expect(v.valid).toBe(true); expect(v.newTotalCents).toBe(9000);
+    const v2 = await post("/discount/validate", { code: "NOPE" }, {});
+    expect(v2.status).toBe(422);
+    const cost = await (await app.request("/cost")).json() as any;
+    expect(cost.byAction["checkout-btn"]).toBeGreaterThan(0);
+  });
+
+  test("custom operations: search, analytics, newsletter (idempotent), avatar (derived SVG)", async () => {
+    await post("/product", { name: "Findable", slug: "find", priceCents: 100, status: "published" }, {});
+    expect((await (await app.request("/search?q=Findable")).json()).products.length).toBeGreaterThan(0);
+    expect((await (await app.request("/analytics/summary")).json()).products).toBeGreaterThan(0);
+    expect((await (await app.request("/analytics/top-products")).json()).topProducts).toBeDefined();
+    const n1 = await post("/newsletter/subscribe", { email: "x@y.com" }, {}); expect(n1.status).toBe(201);
+    const n2 = await (await post("/newsletter/subscribe", { email: "x@y.com" }, {})).json(); expect(n2.already).toBe(true); // idempotent
+    const av = await app.request("/avatar?seed=alice");
+    expect(av.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await av.text()).toContain("<svg");
+  });
+
   test("Scalar renders the docs", async () => {
     expect(await (await app.request("/scalar")).text()).toContain("Scalar.createApiReference");
   });

@@ -20,9 +20,12 @@ import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
-import { entitySchemas, costs, tableByEntity } from "../src/server/domain";
+import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations } from "../src/server/operations";
 
+const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
+built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
 const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes });
 const ada = buildAda(document);
@@ -73,6 +76,7 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
   return { ...r, handler: h[verb as keyof D1Handlers] as unknown as RouteContract["handler"] };
 });
 mount(app, routes);
+mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
 app.get("/scalar", () => scalarResponse(document));
 app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
