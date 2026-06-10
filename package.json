@@ -11,7 +11,9 @@
     "dev:api": "bun --hot src/server/main.ts",
     "test": "bun test",
     "preview": "bun dist/server/entry.mjs",
-    "gen:openapi": "bun run scripts/gen-openapi.ts"
+    "gen:openapi": "bun run scripts/gen-openapi.ts",
+    "build:worker": "bun build worker/worker.ts --outfile worker/dist/worker.js --format esm --target node",
+    "deploy": "bun run build && bun run build:worker && wrangler deploy"
   },
   "dependencies": {
     "@astrojs/node": "^10.1.4",

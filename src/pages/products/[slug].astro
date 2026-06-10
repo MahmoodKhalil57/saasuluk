@@ -1,0 +1,57 @@
+---
+import Layout from "../../layouts/Layout.astro";
+const { slug } = Astro.params;
+---
+<Layout title={`${slug} — saasuluk`}>
+  <p style="margin-bottom:10px"><a href="/products" class="pill">← Products</a></p>
+  <div id="product"><p style="color:var(--muted)">Loading…</p></div>
+  <h2>Reviews</h2>
+  <div id="reviews"></div>
+  <form id="review" style="margin-top:12px; display:grid; gap:8px; max-width:480px">
+    <div style="display:flex; gap:8px"><input name="title" placeholder="Review title" required style="flex:1" /><select name="rating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+    <textarea name="body" placeholder="Your thoughts…" rows="3"></textarea>
+    <button class="btn" type="submit" style="justify-self:start">Submit review</button>
+  </form>
+  <h2>You might also like</h2>
+  <div class="grid" id="related"></div>
+  <script is:inline>
+    const slug = location.pathname.split("/").filter(Boolean).pop();
+    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
+    let product;
+    async function load() {
+      const all = await (await fetch("/product")).json();
+      product = all.find((p) => p.slug === slug);
+      if (!product) { document.getElementById("product").innerHTML = "<p>Not found.</p>"; return; }
+      document.getElementById("product").innerHTML = `
+        <div style="display:flex; gap:20px; flex-wrap:wrap">
+          <img src="${product.imageUrl || `/avatar?seed=${encodeURIComponent(slug)}`}" alt="" style="width:240px;height:200px;object-fit:cover;border-radius:10px;background:#0b0e14" />
+          <div style="flex:1; min-width:240px">
+            <h1 style="font-size:30px">${product.name}</h1>
+            <p class="tag">${product.description || ""}</p>
+            <p style="font-size:24px; color:var(--accent); margin:10px 0">${money(product.priceCents)}</p>
+            <button class="btn" id="add">Add to cart</button> <a class="btn ghost" href="/checkout">Checkout →</a>
+          </div>
+        </div>`;
+      document.getElementById("add").addEventListener("click", () => {
+        const c = cart(); const ex = c.find((i) => i.productId === product.id);
+        if (ex) ex.qty++; else c.push({ productId: product.id, qty: 1, priceCents: product.priceCents, name: product.name });
+        localStorage.setItem("cart", JSON.stringify(c)); document.getElementById("add").textContent = "Added ✓";
+      });
+      loadReviews();
+      const rel = await (await fetch(`/recommendations/${product.id}`)).json();
+      document.getElementById("related").innerHTML = (rel.related || []).map((p) => `<div class="card"><a href="/products/${p.slug}"><b style="font-family:inherit">${p.name}</b></a><p>${money(p.priceCents)}</p></div>`).join("") || `<p style="color:var(--muted)">—</p>`;
+    }
+    async function loadReviews() {
+      const rs = (await (await fetch("/review")).json()).filter((r) => r.productId === product.id);
+      document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${r.title}</b><p>${r.body || ""}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div>`).join("") : `<p style="color:var(--muted)">No reviews yet.</p>`;
+      document.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" }); loadReviews(); }));
+    }
+    document.getElementById("review").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await fetch("/review", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user" }, body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value, status: "published" }) });
+      e.target.reset(); loadReviews();
+    });
+    load();
+  </script>
+</Layout>

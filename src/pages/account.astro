@@ -1,0 +1,42 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Account — saasuluk">
+  <div style="display:flex; gap:14px; align-items:center">
+    <img id="avatar" alt="" width="56" height="56" style="border-radius:50%;border:1px solid var(--line)" />
+    <div><h1 style="font-size:28px;margin:0">Your account</h1><p class="tag" style="font-size:14px">Signed in as <b id="who">demo-user</b> · <a href="/api/auth/reference">Better Auth</a></p></div>
+  </div>
+  <h2>Orders</h2>
+  <table><thead><tr><th>#</th><th>Status</th><th>Total</th><th>Placed</th></tr></thead><tbody id="orders"></tbody></table>
+  <h2>Wishlist</h2>
+  <div class="grid" id="wishlist"></div>
+  <h2>API tokens (developer)</h2>
+  <form id="tok" style="display:flex; gap:8px; margin-bottom:8px"><input name="name" placeholder="Token name" required /><button class="btn" type="submit">+ Create</button></form>
+  <table><thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th></th></tr></thead><tbody id="tokens"></tbody></table>
+  <script is:inline>
+    const USER = "demo-user";
+    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "—";
+    document.getElementById("avatar").src = `/avatar?seed=${USER}`;
+    async function load() {
+      const orders = (await (await fetch("/order")).json()).filter((o) => o.customerId === USER);
+      document.getElementById("orders").innerHTML = orders.length ? orders.map((o) => `<tr><td>#${o.id}</td><td><span class="pill">${o.status}</span></td><td>${money(o.totalCents)}</td><td>${when(o.createdAt)}</td></tr>`).join("") : `<tr><td colspan="4" style="color:var(--muted)">No orders yet — <a href="/products">shop</a>.</td></tr>`;
+      const wl = (await (await fetch("/wishlistItem")).json()).filter((w) => w.customerId === USER);
+      const products = await (await fetch("/product")).json();
+      document.getElementById("wishlist").innerHTML = wl.length ? wl.map((w) => { const p = products.find((x) => x.id === w.productId) || {}; return `<div class="card"><b style="font-family:inherit">${p.name || "#" + w.productId}</b><p>${money(p.priceCents)}</p></div>`; }).join("") : `<p style="color:var(--muted)">Empty.</p>`;
+      loadTokens();
+    }
+    async function loadTokens() {
+      const ts = (await (await fetch("/apiToken")).json()).filter((t) => t.userId === USER && !t.revokedAt);
+      document.getElementById("tokens").innerHTML = ts.length ? ts.map((t) => `<tr><td>${t.name}</td><td><code>${t.prefix}…</code></td><td>${when(t.createdAt)}</td><td><button class="pill" data-r="${t.id}" style="cursor:pointer;border:0">revoke</button></td></tr>`).join("") : `<tr><td colspan="4" style="color:var(--muted)">No tokens.</td></tr>`;
+      document.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/apiToken/${b.dataset.r}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ revokedAt: Date.now() }) }); loadTokens(); }));
+    }
+    document.getElementById("tok").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const prefix = "sk_" + Math.random().toString(36).slice(2, 8);
+      await fetch("/apiToken", { method: "POST", headers: { "content-type": "application/json", "x-user": USER }, body: JSON.stringify({ name: e.target.name.value, prefix, hashedKey: "demo-" + prefix, createdAt: Date.now() }) });
+      e.target.reset(); loadTokens();
+    });
+    load();
+  </script>
+</Layout>

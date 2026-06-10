@@ -1,0 +1,21 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Blog — saasuluk">
+  <h1>Blog</h1>
+  <p class="tag">Posts are a <b>Post</b> entity — authored in <a href="/superadmin">/superadmin</a>, served by the contract, rendered here.</p>
+  <div id="posts" style="margin-top:18px"></div>
+  <script is:inline>
+    const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "";
+    async function load() {
+      const posts = (await (await fetch("/post")).json()).filter((p) => p.status === "published").sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+      document.getElementById("posts").innerHTML = posts.length ? posts.map((p) => `
+        <article class="card" style="margin-bottom:12px">
+          <a href="/blogs/${p.slug}"><b style="font-family:inherit;font-size:18px">${p.title}</b></a>
+          <p style="color:var(--muted);font-size:12px;margin:3px 0">${when(p.publishedAt)}</p>
+          <p>${p.excerpt || ""}</p><a href="/blogs/${p.slug}">Read more →</a>
+        </article>`).join("") : `<p style="color:var(--muted)">No posts yet.</p>`;
+    }
+    load();
+  </script>
+</Layout>

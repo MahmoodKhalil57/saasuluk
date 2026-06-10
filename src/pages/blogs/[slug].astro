@@ -1,0 +1,23 @@
+---
+import Layout from "../../layouts/Layout.astro";
+const { slug } = Astro.params;
+---
+<Layout title={`${slug} — saasuluk blog`}>
+  <p style="margin-bottom:10px"><a href="/blogs" class="pill">← Blog</a></p>
+  <article id="post"><p style="color:var(--muted)">Loading…</p></article>
+  <script is:inline>
+    const slug = location.pathname.split("/").filter(Boolean).pop();
+    const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "";
+    const esc = (s) => String(s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    async function load() {
+      const post = (await (await fetch("/post")).json()).find((p) => p.slug === slug);
+      document.getElementById("post").innerHTML = post ? `
+        <h1>${esc(post.title)}</h1>
+        <p style="color:var(--muted);font-size:13px">${when(post.publishedAt)}</p>
+        ${post.coverImageUrl ? `<img src="${post.coverImageUrl}" alt="" style="width:100%;border-radius:10px;margin:14px 0" />` : ""}
+        <p class="tag" style="font-size:16px">${esc(post.excerpt)}</p>
+        <div style="margin-top:16px;white-space:pre-wrap;line-height:1.8">${esc(post.body)}</div>` : "<p>Post not found.</p>";
+    }
+    load();
+  </script>
+</Layout>

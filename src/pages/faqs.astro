@@ -1,0 +1,15 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="FAQ — saasuluk">
+  <h1>Frequently asked questions</h1>
+  <p class="tag">Each FAQ is a <b>Faq</b> entity, sorted by <code>sortOrder</code>, served from the contract.</p>
+  <div id="faqs" style="margin-top:18px"></div>
+  <script is:inline>
+    async function load() {
+      const faqs = (await (await fetch("/faq")).json()).filter((f) => f.isActive).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      document.getElementById("faqs").innerHTML = faqs.length ? faqs.map((f) => `<details class="card" style="margin-bottom:8px"><summary style="cursor:pointer;color:var(--fg);font-weight:600">${f.question}</summary><p style="margin-top:8px">${f.answer}</p></details>`).join("") : `<p style="color:var(--muted)">No FAQs yet — add some in <a href="/superadmin">/superadmin</a>.</p>`;
+    }
+    load();
+  </script>
+</Layout>

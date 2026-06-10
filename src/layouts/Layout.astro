@@ -1,6 +1,7 @@
 ---
 const { title = "saasuluk — SaaS on Suluk" } = Astro.props;
-const nav = [["/", "Home"], ["/dashboard", "Dashboard"], ["/pricing", "Pricing"], ["/scalar", "API Docs"], ["/superadmin", "Admin"]];
+const nav = [["/", "Home"], ["/products", "Products"], ["/blogs", "Blog"], ["/pricing", "Pricing"], ["/dashboard", "Dashboard"], ["/account", "Account"]];
+const footer = [["/faqs", "FAQ"], ["/contact", "Contact"], ["/about", "About"], ["/metrics", "Metrics"], ["/scalar", "API Docs"], ["/superadmin", "Admin"], ["/privacy", "Privacy"], ["/terms", "Terms"], ["/license", "License"]];
 const path = Astro.url.pathname;
 ---
 <html lang="en">
@@ -29,5 +30,11 @@ const path = Astro.url.pathname;
       <nav>{nav.map(([href, label]) => <a href={href} class={path === href ? "on" : ""}>{label}</a>)}</nav>
     </header>
     <main><slot /></main>
+    <footer style="border-top:1px solid var(--line); margin-top:40px">
+      <div style="max-width:920px; margin:0 auto; padding:20px 22px; display:flex; flex-wrap:wrap; gap:14px; align-items:center">
+        <span style="color:var(--muted); font-size:13px">saasuluk — every layer from one contract.</span>
+        <nav style="margin-left:auto; flex-wrap:wrap">{footer.map(([href, label]) => <a href={href} class={path === href ? "on" : ""} style="font-size:13px">{label}</a>)}</nav>
+      </div>
+    </footer>
   </body>
 </html>

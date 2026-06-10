@@ -1,0 +1,42 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Checkout — saasuluk">
+  <h1>Checkout</h1>
+  <p class="tag">Your cart → an <b>Order</b> via the <code>/checkout</code> operation: it resolves the discount, computes the total, and is metered like everything else.</p>
+  <table style="margin-top:16px"><thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody id="lines"></tbody></table>
+  <div style="display:flex; gap:8px; margin:14px 0; align-items:center; flex-wrap:wrap">
+    <input id="code" placeholder="Discount code (try SAVE10)" />
+    <button class="btn ghost" id="apply">Apply</button>
+    <span id="discMsg" style="color:var(--muted); font-size:13px"></span>
+  </div>
+  <p style="font-size:20px">Total: <b style="color:var(--accent)" id="total">$0.00</b></p>
+  <button class="btn" id="pay">Place order</button>
+  <p id="result" style="margin-top:14px"></p>
+  <script is:inline>
+    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
+    let discount = null;
+    function subtotal() { return cart().reduce((s, i) => s + i.priceCents * i.qty, 0); }
+    function applyLocal(sub) { if (!discount?.valid) return sub; return discount.discountType === "percent" ? Math.max(0, Math.round(sub * (100 - discount.discountValue) / 100)) : Math.max(0, sub - discount.discountValue); }
+    function render() {
+      const c = cart();
+      document.getElementById("lines").innerHTML = c.length ? c.map((i) => `<tr><td>${i.name || "#" + i.productId}</td><td>${i.qty}</td><td>${money(i.priceCents * i.qty)}</td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">Cart is empty — <a href="/products">browse products</a>.</td></tr>`;
+      document.getElementById("total").textContent = money(applyLocal(subtotal()));
+    }
+    document.getElementById("apply").addEventListener("click", async () => {
+      const code = document.getElementById("code").value.trim();
+      const r = await (await fetch("/discount/validate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, subtotalCents: subtotal() }) })).json();
+      discount = r.valid ? { ...r, code } : null;
+      document.getElementById("discMsg").textContent = r.valid ? `✓ ${r.discountType === "percent" ? r.discountValue + "% off" : money(r.discountValue) + " off"}` : `✗ ${r.reason || "invalid"}`;
+      render();
+    });
+    document.getElementById("pay").addEventListener("click", async () => {
+      const c = cart(); if (!c.length) return;
+      const r = await (await fetch("/checkout", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "place-order" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
+      localStorage.removeItem("cart"); discount = null; render();
+      document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
+    });
+    render();
+  </script>
+</Layout>

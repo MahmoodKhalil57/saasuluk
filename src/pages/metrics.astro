@@ -1,0 +1,28 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Metrics — saasuluk">
+  <h1>Metrics</h1>
+  <p class="tag">Store analytics — derived from <b>Order</b> rows by the <code>/analytics/*</code> operations, plus the live <code>/cost</code> ledger. (saastarter wires Recharts + admin routes; here it is three contract operations.)</p>
+  <div class="grid" id="summary" style="margin-top:18px"></div>
+  <h2>Revenue (last 30 days)</h2>
+  <div id="revenue" class="card"></div>
+  <h2>Top products</h2>
+  <table><thead><tr><th>Product</th><th>Units</th><th>Price</th></tr></thead><tbody id="top"></tbody></table>
+  <h2>Cost ledger (what the app spent)</h2>
+  <pre id="cost" class="card" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12.5px"></pre>
+  <script is:inline>
+    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    async function load() {
+      const s = await (await fetch("/analytics/summary")).json();
+      document.getElementById("summary").innerHTML = [["Orders", s.orders], ["Paid", s.paidOrders], ["Revenue", money(s.revenueCents)], ["Customers", s.customers], ["Products", s.products]].map(([k, v]) => `<div class="card"><p style="margin:0;font-size:12px">${k}</p><b style="font-family:inherit;font-size:22px">${v}</b></div>`).join("");
+      const rev = (await (await fetch("/analytics/revenue")).json()).series || [];
+      const max = Math.max(1, ...rev.map((d) => d.revenueCents));
+      document.getElementById("revenue").innerHTML = rev.length ? rev.map((d) => `<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:84px;color:var(--muted);font-size:12px">${d.date}</span><span style="height:14px;background:var(--accent);border-radius:3px;width:${Math.round((d.revenueCents / max) * 260)}px"></span><span style="font-size:12px">${money(d.revenueCents)}</span></div>`).join("") : `<span style="color:var(--muted)">No paid orders yet.</span>`;
+      const top = (await (await fetch("/analytics/top-products")).json()).topProducts || [];
+      document.getElementById("top").innerHTML = top.length ? top.map((p) => `<tr><td>${p.name}</td><td>${p.qty}</td><td>${money(p.priceCents)}</td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">No sales yet.</td></tr>`;
+      document.getElementById("cost").textContent = JSON.stringify(await (await fetch("/cost")).json(), null, 2);
+    }
+    load();
+  </script>
+</Layout>

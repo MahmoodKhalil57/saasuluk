@@ -1,0 +1,36 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Contact — saasuluk">
+  <h1>Contact us</h1>
+  <p class="tag">Submissions become a <b>ContactSubmission</b> entity (visible in <a href="/superadmin">/superadmin</a>). The newsletter is its own entity too.</p>
+  <form id="contact" style="display:grid; gap:10px; max-width:520px; margin-top:18px">
+    <input name="name" placeholder="Your name" required />
+    <input name="email" type="email" placeholder="you@example.com" required />
+    <input name="subject" placeholder="Subject" required />
+    <textarea name="message" placeholder="How can we help?" rows="5" required></textarea>
+    <button class="btn" type="submit" style="justify-self:start">Send message</button>
+    <p id="cmsg"></p>
+  </form>
+  <h2>Newsletter</h2>
+  <form id="news" style="display:flex; gap:8px; max-width:520px">
+    <input name="email" type="email" placeholder="you@example.com" required style="flex:1" />
+    <button class="btn ghost" type="submit">Subscribe</button>
+  </form>
+  <p id="nmsg" style="color:var(--muted);font-size:13px;margin-top:6px"></p>
+  <script is:inline>
+    document.getElementById("contact").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const r = await fetch("/contactSubmission", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "contact-form" }, body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }) });
+      document.getElementById("cmsg").innerHTML = r.ok ? `<span class="card" style="display:inline-block">✓ Thanks — we'll be in touch.</span>` : "Something went wrong.";
+      if (r.ok) f.reset();
+    });
+    document.getElementById("news").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const r = await (await fetch("/newsletter/subscribe", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "newsletter" }, body: JSON.stringify({ email: e.target.email.value }) })).json();
+      document.getElementById("nmsg").textContent = r.subscribed ? (r.already ? "You're already subscribed ✓" : "Subscribed ✓") : "Enter a valid email.";
+      if (r.subscribed) e.target.reset();
+    });
+  </script>
+</Layout>
