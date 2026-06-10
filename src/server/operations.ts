@@ -217,7 +217,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const existing = await dz.select().from(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).get();
     if (existing) return c.json({ subscribed: true, already: true });
     await dz.insert(newsletterSubscriber).values({ email, subscribedAt: Date.now() }).run();
-    sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", "<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p>") });
+    sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", "<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p>") }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
     return c.json({ subscribed: true, already: false }, 201);
   };
 

@@ -6,10 +6,12 @@
  * template; here it is one small function.
  */
 export interface SendEmail { to: string; subject: string; html: string }
+/** On Cloudflare the secret comes from the Worker env, not process.env — callers pass it through explicitly. */
+export interface EmailOpts { apiKey?: string; from?: string }
 
-export async function sendEmail({ to, subject, html }: SendEmail): Promise<{ sent: boolean; dev?: boolean }> {
-  const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "saasuluk <onboarding@resend.dev>";
+export async function sendEmail({ to, subject, html }: SendEmail, opts: EmailOpts = {}): Promise<{ sent: boolean; dev?: boolean }> {
+  const key = opts.apiKey || process.env.RESEND_API_KEY;
+  const from = opts.from || process.env.EMAIL_FROM || "saasuluk <onboarding@resend.dev>";
   if (!key) { console.log(`[email:dev] → ${to} · ${subject}`); return { sent: false, dev: true }; }
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -35,6 +37,6 @@ export function brandedEmail(title: string, bodyHtml: string): string {
 }
 
 /** Fire-and-forget: send without blocking the response, swallowing errors (transactional mail is best-effort). */
-export function sendEmailAsync(msg: SendEmail): void {
-  void sendEmail(msg).catch(() => { /* best-effort */ });
+export function sendEmailAsync(msg: SendEmail, opts: EmailOpts = {}): void {
+  void sendEmail(msg, opts).catch(() => { /* best-effort */ });
 }

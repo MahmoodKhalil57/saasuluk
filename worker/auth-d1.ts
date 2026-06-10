@@ -11,6 +11,8 @@ export interface AuthEnv {
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
 }
 const cache = new WeakMap<object, ReturnType<typeof betterAuth>>();
 
@@ -32,7 +34,10 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
       openAPI(),
       magicLink({
         sendMagicLink: async ({ email, url }) => {
-          sendEmailAsync({ to: email, subject: "Your saasuluk sign-in link", html: brandedEmail("Sign in to saasuluk", `<p>Click to sign in — this link expires shortly.</p><p><a href="${url}" style="color:#6366f1">${url}</a></p>`) });
+          sendEmailAsync(
+            { to: email, subject: "Your saasuluk sign-in link", html: brandedEmail("Sign in to saasuluk", `<p>Click to sign in — this link expires shortly.</p><p><a href="${url}" style="color:#6366f1">${url}</a></p>`) },
+            { apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM }, // the Worker secret (process.env may be empty on Workers)
+          );
         },
       }),
     ],
