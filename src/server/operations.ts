@@ -6,7 +6,7 @@
  * call is awaited, so it works whether the driver is synchronous (bun) or asynchronous (D1). saastarter
  * hand-writes each of these as a Next.js route + an Effect program; here they project from the same single source.
  */
-import { and, eq, gte, like, lt, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, like, lt, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
 import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
@@ -27,6 +27,37 @@ export const principal = (c: Context): string | null => (c.get("tokenUser") as s
 /** Read a secret/var from the Worker env (c.env) or the dev process.env — so one handler works in both runtimes. */
 const secret = (c: Context, name: string): string | undefined =>
   ((c.env as Record<string, string> | undefined)?.[name]) ?? (typeof process !== "undefined" ? process.env?.[name] : undefined);
+
+/**
+ * Report a principal's NEW accrued cost to the Stripe Billing Meter — DELTA-based + idempotent: it meters only
+ * (total cost so far − already-reported), then stores the new total. So re-running (the button, or the cron)
+ * never double-counts. Shared by the manual /billing/report op and the scheduled sweep.
+ */
+export async function reportPrincipalUsage(
+  dz: Dz,
+  opts: { key: string; eventName: string; principal: string },
+): Promise<{ reported: boolean; deltaMicroUsd?: number; totalMicroUsd?: number; customerId?: string; reason?: string }> {
+  const acct = await dz.select().from(billingAccount).where(eq(billingAccount.principal, opts.principal)).get();
+  if (!acct?.stripeCustomerId) return { reported: false, reason: "not connected" };
+  const rows = await dz.select().from(costEvent).where(eq(costEvent.principal, opts.principal)).all();
+  const total = (rows as { totalMicroUsd: number }[]).reduce((s, r) => s + Number(r.totalMicroUsd), 0);
+  const delta = total - Number(acct.lastReportedMicroUsd ?? 0);
+  if (delta <= 0) return { reported: false, reason: "no new usage", totalMicroUsd: total, customerId: acct.stripeCustomerId };
+  await restStripe(opts.key).billing.meterEvents.create(meterEventParams({ eventName: opts.eventName, customerId: acct.stripeCustomerId, value: delta }));
+  await dz.update(billingAccount).set({ lastReportedMicroUsd: total, lastReportedAt: Date.now() }).where(eq(billingAccount.id, acct.id)).run();
+  return { reported: true, deltaMicroUsd: delta, totalMicroUsd: total, customerId: acct.stripeCustomerId };
+}
+
+/** Sweep every connected billing account and report its delta — the scheduled (Cron) twin of the button. */
+export async function sweepBillingUsage(dz: Dz, key: string, eventName: string): Promise<{ swept: number; reported: number }> {
+  const accts = (await dz.select().from(billingAccount).all()) as { principal: string; stripeCustomerId?: string }[];
+  let reported = 0;
+  for (const a of accts) {
+    if (!a.stripeCustomerId) continue;
+    try { if ((await reportPrincipalUsage(dz, { key, eventName, principal: a.principal })).reported) reported++; } catch { /* skip one bad account */ }
+  }
+  return { swept: accts.length, reported };
+}
 
 /** Resolve an `Authorization: Bearer sk_…` header to the owning userId via the api_token table (or null). */
 export async function verifyApiToken(dz: { select: (...a: unknown[]) => any }, authHeader: string | undefined): Promise<string | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -269,10 +300,24 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     form.set("cancel_url", `${origin}/checkout`);
     form.set("client_reference_id", String(orderId));
     form.set("metadata[orderId]", String(orderId));
-    form.set("line_items[0][quantity]", "1");
-    form.set("line_items[0][price_data][currency]", "usd");
-    form.set("line_items[0][price_data][unit_amount]", String(total));
-    form.set("line_items[0][price_data][product_data][name]", `saasuluk order #${orderId}${codeUsed ? ` · ${codeUsed} applied` : ""}`);
+    // Use the REAL Stripe catalog Prices (per item) when there's no discount AND every product has one — so the
+    // Stripe page shows the actual products. With a discount (or a missing catalog price) fall back to a single
+    // line item charging the discounted total (a one-time Price can't carry our discount per item).
+    const ids = [...new Set(items.map((i) => i.productId).filter((x): x is number => typeof x === "number"))];
+    const catalog = ids.length ? await dz.select().from(product).where(inArray(product.id, ids)).all() : [];
+    const priceOf = new Map((catalog as { id: number; stripePriceId?: string }[]).map((p) => [p.id, p.stripePriceId]));
+    const useCatalog = !disc.valid && items.length > 0 && items.every((i) => i.productId != null && priceOf.get(i.productId));
+    if (useCatalog) {
+      items.forEach((it, idx) => {
+        form.set(`line_items[${idx}][price]`, priceOf.get(it.productId as number) as string);
+        form.set(`line_items[${idx}][quantity]`, String(Math.max(1, Number(it.qty) || 1)));
+      });
+    } else {
+      form.set("line_items[0][quantity]", "1");
+      form.set("line_items[0][price_data][currency]", "usd");
+      form.set("line_items[0][price_data][unit_amount]", String(total));
+      form.set("line_items[0][price_data][product_data][name]", `saasuluk order #${orderId}${codeUsed ? ` · ${codeUsed} applied` : ""}`);
+    }
     const r = await fetch("https://api.stripe.com/v1/checkout/sessions", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body: form.toString() });
     const session = (await r.json().catch(() => ({}))) as { id?: string; url?: string; error?: { message?: string } };
     if (!r.ok || !session.url) return c.json({ error: session.error?.message ?? "Stripe error", orderId }, 502);
@@ -321,16 +366,9 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (!key) return c.json({ error: "Stripe is not configured." }, 503);
     const who = principal(c);
     if (!who) return c.json({ error: "Sign in first." }, 401);
-    const dz = dbFor(c);
-    const acct = await dz.select().from(billingAccount).where(eq(billingAccount.principal, who)).get();
-    if (!acct?.stripeCustomerId) return c.json({ error: "Connect usage billing first.", connected: false }, 409);
-    // sum this principal's metered cost from the durable ledger and report it as ONE meter event
-    const rows = await dz.select().from(costEvent).where(eq(costEvent.principal, who)).all();
-    const totalMicroUsd = (rows as { totalMicroUsd: number }[]).reduce((s, r) => s + Number(r.totalMicroUsd), 0);
-    if (totalMicroUsd <= 0) return c.json({ reported: false, reason: "no metered usage yet" });
-    await restStripe(key).billing.meterEvents.create(meterEventParams({ eventName, customerId: acct.stripeCustomerId, value: totalMicroUsd }));
-    await dz.update(billingAccount).set({ lastReportedMicroUsd: totalMicroUsd, lastReportedAt: Date.now() }).where(eq(billingAccount.id, acct.id)).run();
-    return c.json({ reported: true, valueMicroUsd: totalMicroUsd, customerId: acct.stripeCustomerId, eventName });
+    const r = await reportPrincipalUsage(dbFor(c), { key, eventName, principal: who });
+    if (r.reason === "not connected") return c.json({ error: "Connect usage billing first.", connected: false }, 409);
+    return c.json({ ...r, valueMicroUsd: r.deltaMicroUsd, eventName }); // delta = only the NEW usage since last report
   };
 
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.

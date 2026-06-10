@@ -22,7 +22,7 @@ import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
 import { order } from "../src/server/schema";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage } from "../src/server/operations";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
@@ -131,4 +131,13 @@ app.notFound(async (c) => {
   }
   return c.json({ error: "not found" }, 404);
 });
-export default app;
+
+// The Worker exports BOTH the fetch handler (the app) AND a scheduled handler (the Cron Trigger that auto-reports
+// usage). One cron per the `triggers.crons` schedule in wrangler.jsonc.
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<unknown>) => void }) {
+    if (!env.STRIPE_SECRET_KEY) return;
+    ctx.waitUntil(sweepBillingUsage(drizzle(env.DB), env.STRIPE_SECRET_KEY, env.STRIPE_METER_EVENT_NAME ?? "saasuluk_cost").catch(() => ({ swept: 0, reported: 0 })));
+  },
+};

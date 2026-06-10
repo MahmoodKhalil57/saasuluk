@@ -28,6 +28,7 @@ export const product = sqliteTable("product", {
   inventory: integer("inventory").notNull().default(0),
   imageUrl: text("image_url"),
   status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+  stripePriceId: text("stripe_price_id"), // set by scripts/sync-catalog.ts — the real Stripe Price for checkout
 });
 
 export const variant = sqliteTable("variant", {
@@ -182,7 +183,7 @@ export const project = sqliteTable("project", {
  */
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS category (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, status TEXT NOT NULL DEFAULT 'draft');
+CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
 CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, price_cents INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, max_uses INTEGER, expires_at INTEGER);
 CREATE TABLE IF NOT EXISTS cart (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', discount_code TEXT, status TEXT NOT NULL DEFAULT 'active');

@@ -397,6 +397,16 @@
                         "draft",
                         "published"
                       ]
+                    },
+                    "stripePriceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -492,6 +502,16 @@
                       "draft",
                       "published"
                     ]
+                  },
+                  "stripePriceId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -568,6 +588,16 @@
                 "enum": [
                   "draft",
                   "published"
+                ]
+              },
+              "stripePriceId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
@@ -665,6 +695,16 @@
                     "enum": [
                       "draft",
                       "published"
+                    ]
+                  },
+                  "stripePriceId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   }
                 },
@@ -778,6 +818,16 @@
                       "draft",
                       "published"
                     ]
+                  },
+                  "stripePriceId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -854,6 +904,16 @@
                 "enum": [
                   "draft",
                   "published"
+                ]
+              },
+              "stripePriceId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
@@ -8767,6 +8827,16 @@
               "draft",
               "published"
             ]
+          },
+          "stripePriceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -8778,7 +8848,8 @@
           "categoryId",
           "inventory",
           "imageUrl",
-          "status"
+          "status",
+          "stripePriceId"
         ],
         "additionalProperties": false
       },
