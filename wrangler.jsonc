@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "saasuluk",
+  "main": "worker/dist/worker.js",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "saasuluk-db", "database_id": "c190f7e4-85f7-4e77-be49-091b8927d9de" }
+  ],
+  "routes": [
+    { "pattern": "saasuluk.saastemly.com", "custom_domain": true }
+  ],
+  "observability": { "enabled": true }
+}
