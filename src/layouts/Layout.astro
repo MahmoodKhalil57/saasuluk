@@ -1,25 +1,34 @@
 ---
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
-const { title = "saasuluk — SaaS on Suluk" } = Astro.props;
-// The frontend is static (prerendered / Cloudflare assets), so locale + theme are applied CLIENT-SIDE. We render
-// the English chrome with a data-i18n key on each label; the inline script below swaps it to the stored locale
-// and sets <html lang/dir> (RTL for Arabic). One dictionary (src/i18n.ts), shared by render + client.
+const { title = "saasuluk — the SaaS that ships itself", description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk." } = Astro.props;
+// The frontend is static (Cloudflare assets), so locale + theme are applied CLIENT-SIDE. We render the English
+// chrome with a data-i18n key on each label; the inline script swaps it to the stored locale and sets <html
+// lang/dir> (RTL for Arabic). One dictionary (src/i18n.ts) feeds both the render and the client.
 type Key = Parameters<typeof t>[1];
-const nav: [string, Key][] = [["/", "home"], ["/products", "products"], ["/blogs", "blog"], ["/pricing", "pricing"], ["/dashboard", "dashboard"], ["/account", "account"]];
-const footer: [string, Key][] = [["/faqs", "faq"], ["/contact", "contact"], ["/about", "about"], ["/metrics", "metrics"], ["/scalar", "docs"], ["/superadmin", "admin"], ["/privacy", "privacy"], ["/terms", "terms"], ["/license", "license"]];
+const nav: [string, Key][] = [["/products", "products"], ["/pricing", "pricing"], ["/blogs", "blog"], ["/about", "about"], ["/scalar", "docs"]];
+const footerCols: { head: string; links: [string, Key | string][] }[] = [
+  { head: "Product", links: [["/products", "products"], ["/pricing", "pricing"], ["/metrics", "metrics"], ["/dashboard", "dashboard"]] },
+  { head: "Resources", links: [["/blogs", "blog"], ["/faqs", "faq"], ["/about", "about"], ["/contact", "contact"]] },
+  { head: "Developers", links: [["/scalar", "docs"], ["/openapi.json", "OpenAPI Spec"], ["/superadmin", "admin"], ["/cost", "Cost ledger"]] },
+  { head: "Legal", links: [["/terms", "terms"], ["/privacy", "privacy"], ["/license", "license"]] },
+];
 const path = Astro.url.pathname;
+const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k : t("en", k as Key));
 ---
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    <meta name="theme-color" content="#0b0e14" />
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} /><meta property="og:description" content={description} /><meta property="og:type" content="website" />
+    <meta name="theme-color" content="#ffffff" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    {/* apply theme + locale before paint to avoid a flash */}
+    <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script is:inline define:vars={{ DICT, RTL }}>
       (function () {
-        try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}
+        try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "light"; } catch (e) {}
         function curLang() { try { return localStorage.getItem("lang") || (document.cookie.match(/(?:^|; )lang=(\w+)/) || [])[1] || "en"; } catch (e) { return "en"; } }
         window.__applyLang = function (l) {
           var d = document.documentElement; d.lang = l; d.dir = (RTL.indexOf(l) >= 0 ? "rtl" : "ltr");
@@ -31,42 +40,123 @@ const path = Astro.url.pathname;
       })();
     </script>
     <style is:global>
-      :root, html[data-theme="dark"] { color-scheme: dark; --bg:#0b0e14; --panel:#11141c; --line:#1e2433; --fg:#cdd6f4; --muted:#9399b2; --accent:#f5a97f; --link:#8aadf4; }
-      html[data-theme="light"] { color-scheme: light; --bg:#f7f8fc; --panel:#ffffff; --line:#e3e6ef; --fg:#1a1d29; --muted:#5b6276; --accent:#d9762f; --link:#3b5bdb; }
-      * { box-sizing: border-box; } body { margin:0; font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); }
+      :root, html[data-theme="light"] {
+        color-scheme: light;
+        --bg:#ffffff; --bg-soft:#f7f7fb; --panel:#ffffff; --line:#ececf1; --fg:#0b0b12; --muted:#646474;
+        --accent:#6366f1; --accent-2:#8b5cf6; --link:#4f46e5; --on-accent:#ffffff;
+        --shadow:0 1px 2px rgba(16,16,40,.04), 0 10px 30px rgba(16,16,40,.06);
+        --glow:radial-gradient(60% 50% at 50% 0%, rgba(139,92,246,.14), transparent 70%);
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg:#09090c; --bg-soft:#0d0d12; --panel:#131319; --line:#23232c; --fg:#ededf2; --muted:#8c8c99;
+        --accent:#818cf8; --accent-2:#a78bfa; --link:#a5b4fc; --on-accent:#0b0b12;
+        --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px rgba(0,0,0,.45);
+        --glow:radial-gradient(60% 50% at 50% 0%, rgba(129,140,248,.16), transparent 70%);
+      }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; }
+      body { margin:0; font:400 16px/1.6 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); -webkit-font-smoothing:antialiased; font-feature-settings:"cv02","cv03","cv04","ss01"; }
       a { color:var(--link); text-decoration:none; } a:hover { text-decoration:underline; }
-      header { position:sticky; top:0; z-index:10; display:flex; gap:18px; align-items:center; padding:13px 22px; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(6px); }
-      header .brand { color:var(--accent); font-weight:700; letter-spacing:.04em; } nav { display:flex; gap:16px; } nav a { color:var(--muted); font-size:14px; } nav a.on { color:var(--accent); }
-      main { max-width:920px; margin:0 auto; padding:28px 22px 64px; }
-      h1 { font-size:40px; margin:0 0 8px; letter-spacing:-.01em; } .tag { font-size:18px; color:var(--muted); max-width:62ch; }
-      .btn { display:inline-block; background:var(--accent); color:var(--bg); padding:8px 16px; border-radius:8px; font-weight:600; cursor:pointer; border:0; } .btn.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); }
-      .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:18px; }
-      .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; } .card b { color:var(--accent); font-family:ui-monospace,monospace; font-size:13px; } .card p { color:var(--muted); font-size:13.5px; margin:5px 0 0; }
-      h2 { color:var(--accent); font-size:13px; text-transform:uppercase; letter-spacing:.07em; margin:30px 0 8px; }
-      input,select,textarea { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:6px 9px; font:inherit; } table { width:100%; border-collapse:collapse; } th,td { text-align:start; padding:7px 9px; border-bottom:1px solid var(--line); } th { color:var(--muted); }
-      .pill { background:var(--line); color:var(--muted); border-radius:99px; padding:1px 8px; font-size:11px; }
+      ::selection { background:color-mix(in srgb, var(--accent) 28%, transparent); }
+      .wrap { max-width:1080px; margin:0 auto; padding-inline:24px; }
+      main { min-height:60vh; }
+      /* header */
+      header.site { position:sticky; top:0; z-index:30; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(12px) saturate(1.4); }
+      header.site .wrap { display:flex; align-items:center; gap:22px; height:60px; }
+      .brand { display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-.02em; color:var(--fg); font-size:17px; }
+      .brand .dot { width:22px; height:22px; border-radius:7px; background:linear-gradient(135deg,var(--accent-2),var(--accent)); display:grid; place-items:center; color:#fff; font-size:13px; box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent); }
+      nav.main { display:flex; gap:4px; } nav.main a { color:var(--muted); font-size:14.5px; font-weight:500; padding:7px 11px; border-radius:8px; } nav.main a:hover { color:var(--fg); background:var(--bg-soft); text-decoration:none; } nav.main a.on { color:var(--fg); }
       .chrome { margin-inline-start:auto; display:flex; gap:8px; align-items:center; }
-      .chrome select, .chrome button { font-size:13px; padding:4px 8px; }
+      .chrome select, .iconbtn { font:inherit; font-size:13px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:6px 9px; cursor:pointer; }
+      .iconbtn:hover { background:var(--bg-soft); }
+      @media (max-width:760px){ nav.main{display:none} }
+      /* type */
+      h1 { font-size:clamp(34px,5vw,52px); font-weight:800; letter-spacing:-.025em; line-height:1.05; margin:0 0 12px; }
+      h2 { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin:40px 0 14px; }
+      h3 { font-size:19px; font-weight:700; letter-spacing:-.01em; margin:0 0 6px; }
+      .tag { font-size:18px; color:var(--muted); max-width:64ch; line-height:1.6; }
+      main > .wrap { padding-top:34px; padding-bottom:72px; }
+      .gradient { background:linear-gradient(115deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+      /* buttons */
+      .btn { display:inline-flex; align-items:center; gap:7px; background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff; padding:11px 19px; border-radius:11px; font-weight:600; font-size:15px; border:0; cursor:pointer; box-shadow:0 1px 2px rgba(16,16,40,.12); transition:transform .15s ease, box-shadow .15s ease, opacity .15s; }
+      .btn:hover { transform:translateY(-1px); box-shadow:0 8px 26px color-mix(in srgb,var(--accent) 38%,transparent); text-decoration:none; color:#fff; }
+      .btn:active { transform:translateY(0); }
+      .btn.ghost { background:var(--panel); color:var(--fg); border:1px solid var(--line); box-shadow:var(--shadow); }
+      .btn.ghost:hover { color:var(--fg); border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); box-shadow:0 6px 18px rgba(16,16,40,.08); }
+      .btn.sm { padding:7px 13px; font-size:13.5px; border-radius:9px; }
+      /* cards + grid */
+      .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:16px; margin-top:18px; }
+      .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px; box-shadow:var(--shadow); transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+      .card:hover { transform:translateY(-2px); border-color:color-mix(in srgb,var(--accent) 26%,var(--line)); box-shadow:0 14px 40px rgba(16,16,40,.10); }
+      .card b { color:var(--accent); font-family:ui-monospace,"SFMono-Regular",monospace; font-size:13px; }
+      .card p { color:var(--muted); font-size:14px; margin:6px 0 0; }
+      .pill { display:inline-block; background:var(--bg-soft); color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 11px; font-size:12px; font-weight:500; }
+      .pill.accent { background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); border-color:color-mix(in srgb,var(--accent) 24%,transparent); }
+      /* forms + tables */
+      input,select,textarea { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; font-size:15px; transition:border-color .15s, box-shadow .15s; }
+      input:focus,select:focus,textarea:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
+      table { width:100%; border-collapse:collapse; } th,td { text-align:start; padding:11px 12px; border-bottom:1px solid var(--line); font-size:14.5px; } th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+      /* hero */
+      .hero { text-align:center; padding:72px 0 32px; position:relative; }
+      .hero::before { content:""; position:absolute; inset:-40px 0 auto; height:520px; background:var(--glow); z-index:-1; }
+      .hero h1 { font-size:clamp(40px,7vw,72px); }
+      .hero .tag { margin:0 auto; font-size:clamp(17px,2.4vw,21px); }
+      .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:26px; }
+      .badges { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:30px; }
+      .section { padding:30px 0; }
+      .center { text-align:center; }
+      /* pricing */
+      .tiers { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; margin-top:22px; align-items:stretch; }
+      .tier { display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:24px; box-shadow:var(--shadow); transition:transform .16s, box-shadow .16s; position:relative; }
+      .tier:hover { transform:translateY(-3px); box-shadow:0 18px 50px rgba(16,16,40,.12); }
+      .tier.popular { border-color:color-mix(in srgb,var(--accent) 55%,var(--line)); box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent), 0 20px 60px color-mix(in srgb,var(--accent) 18%,transparent); }
+      .tier .price { font-size:38px; font-weight:800; letter-spacing:-.03em; margin:8px 0 2px; }
+      .tier ul { list-style:none; padding:0; margin:16px 0 0; display:grid; gap:9px; }
+      .tier li { color:var(--muted); font-size:14.5px; padding-inline-start:24px; position:relative; }
+      .tier li::before { content:"✓"; position:absolute; inset-inline-start:0; color:var(--accent); font-weight:700; }
+      .tier .badge { position:absolute; top:-11px; inset-inline-end:20px; background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; letter-spacing:.03em; text-transform:uppercase; }
+      .spacer { flex:1; }
+      /* footer */
+      footer.site { border-top:1px solid var(--line); background:var(--bg-soft); margin-top:60px; }
+      footer.site .cols { display:grid; grid-template-columns:1.4fr repeat(4,1fr); gap:24px; padding:46px 0 30px; }
+      @media (max-width:760px){ footer.site .cols{grid-template-columns:1fr 1fr} }
+      footer.site h4 { font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:0 0 12px; }
+      footer.site a { display:block; color:var(--muted); font-size:14px; padding:4px 0; } footer.site a:hover { color:var(--fg); }
+      footer.site .bottom { border-top:1px solid var(--line); padding:18px 0; display:flex; gap:14px; flex-wrap:wrap; align-items:center; color:var(--muted); font-size:13px; }
     </style>
   </head>
   <body>
-    <header>
-      <a class="brand" href="/">saasuluk</a>
-      <nav>{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""}>{t("en", key)}</a>)}</nav>
-      <div class="chrome">
-        <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
-        <button id="theme" class="btn ghost" aria-label="Toggle theme">◐</button>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
+        <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""}>{t("en", key)}</a>)}</nav>
+        <div class="chrome">
+          <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
+          <button id="theme" class="iconbtn" aria-label="Toggle theme">◐</button>
+          <a class="btn sm" href="/dashboard" data-i18n="dashboard">{t("en", "dashboard")}</a>
+        </div>
       </div>
     </header>
-    <main><slot /></main>
-    <footer style="border-top:1px solid var(--line); margin-top:40px">
-      <div style="max-width:920px; margin:0 auto; padding:20px 22px; display:flex; flex-wrap:wrap; gap:14px; align-items:center">
-        <span style="color:var(--muted); font-size:13px">saasuluk — <span data-i18n="tagline">{t("en", "tagline")}</span></span>
-        <nav style="margin-inline-start:auto; flex-wrap:wrap">{footer.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} style="font-size:13px">{t("en", key)}</a>)}</nav>
+    <main><div class="wrap"><slot /></div></main>
+    <footer class="site">
+      <div class="wrap">
+        <div class="cols">
+          <div>
+            <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
+            <p style="color:var(--muted); font-size:14px; margin-top:12px; max-width:34ch">A premium SaaS starter where every layer — data, API, docs, UI, admin, cost — is projected from one typed contract.</p>
+          </div>
+          {footerCols.map((col) => (
+            <div><h4>{col.head}</h4>{col.links.map(([href, key]) => <a href={href} data-i18n={(key in DICT.en) ? key : undefined}>{label(key)}</a>)}</div>
+          ))}
+        </div>
+        <div class="bottom">
+          <span>© 2026 saasuluk · built on <a href="https://github.com/MahmoodKhalil57/sig-moonwalk">Suluk</a> (OpenAPI v4 candidate)</span>
+          <span style="margin-inline-start:auto" data-i18n="tagline">{t("en", "tagline")}</span>
+        </div>
       </div>
     </footer>
     <script is:inline>
-      if (window.__applyLang) window.__applyLang(window.__lang0); // translate the chrome to the stored locale
+      if (window.__applyLang) window.__applyLang(window.__lang0);
       document.getElementById("theme").addEventListener("click", function () {
         var next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
         document.documentElement.dataset.theme = next; try { localStorage.setItem("theme", next); } catch (e) {}

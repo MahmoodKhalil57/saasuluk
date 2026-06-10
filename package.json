@@ -12,7 +12,10 @@
     "test": "bun test",
     "preview": "bun dist/server/entry.mjs",
     "gen:openapi": "bun run scripts/gen-openapi.ts",
+    "gen:seed": "bun run scripts/gen-seed.ts",
     "build:worker": "bun build worker/worker.ts --outfile worker/dist/worker.js --format esm --target node",
+    "db:migrate:remote": "wrangler d1 execute saasuluk-db --file=./migrations/0000_domain.sql --remote",
+    "db:seed:remote": "bun run gen:seed && wrangler d1 execute saasuluk-db --file=./scripts/seed.sql --remote",
     "deploy": "bun run build && bun run build:worker && wrangler deploy"
   },
   "dependencies": {

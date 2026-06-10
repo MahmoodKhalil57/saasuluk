@@ -1,25 +1,68 @@
 ---
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
+const tiers = [
+  ["Frontend Lite", "$29", false, ["Marketing site + SEO", "shadcn UI components", "Light / dark themes", "i18n (en · es · ar + RTL)"]],
+  ["Frontend Pro", "$99", false, ["Everything in Lite", "Auth pages (Better Auth)", "Magic-link sign-in", "PWA + offline shell"]],
+  ["Full-Stack Lite", "$199", false, ["Admin cockpit (/superadmin)", "Products · cart · checkout", "Cloudflare D1 database", "Typed client + the v4 contract"]],
+  ["Full-Stack Pro", "$299", true, ["Stripe billing meters", "Orders · discounts · reviews", "Live cost ledger", "API tokens + developer portal"]],
+];
+const stack = ["Astro", "Hono", "TypeScript", "Drizzle", "Better Auth", "Stripe", "Scalar", "Cloudflare"];
 const features = [
-  ["Auth", "@suluk/better-auth", "Better Auth (email/password · bearer · admin), wired into the v4 contract."],
-  ["Payments", "@suluk/stripe + @suluk/cost", "Usage metered per user → Stripe Billing Meters. Cost shown as-is."],
-  ["API + Docs", "@suluk/hono + @suluk/scalar", "Typed Hono routes → OpenAPI v4 → Scalar, all derived from the schema."],
-  ["Database", "@suluk/drizzle", "Drizzle on sqlite/D1 is the system of record; the contract is projected from it."],
-  ["Admin", "@suluk/admin", "The /superadmin cockpit — the same brain as the VSCode extension, web-hosted."],
-  ["Typed client", "@suluk/nano-stores", "Per-operation fetcher/mutator stores with Zod-guarded I/O."],
-  ["UI", "@suluk/shadcn", "Forms + tables generated from the schema (react-hook-form + zodResolver)."],
-  ["Deploy", "@suluk/deploy", "One swappable target: Cloudflare Workers + D1 + assets."],
+  ["✦", "One contract", "Declare your data + routes once. The OpenAPI v4 document is derived — and every layer reads from it."],
+  ["◎", "Can't drift", "API, docs, typed client, shadcn UI, admin, and cost are projections of the same source. Not copies."],
+  ["⚡", "Edge-native", "Hono → Cloudflare Workers, Drizzle → D1. Static pages on the CDN. Deploy with one command."],
+  ["$", "Cost as a fact", "Every request is metered: frontend action → operation → third party. You see the real cost at /cost."],
+  ["⊞", "Admin for free", "The /superadmin cockpit is the same brain as the Suluk VS Code extension — it reads the contract."],
+  ["⎈", "Modules, not glue", "Add ecommerce, blog, billing as entities in a registry. 15 entities + 12 operations, one source."],
 ];
 ---
 <Layout>
-  <section>
-    <h1>Ship a SaaS on <span style="color:var(--accent)">Suluk</span>.</h1>
-    <p class="tag">A saastarter-class starter — auth, payments, admin, typed API + docs — reimplemented bottom-up on <b>Astro + Hono</b>, with every layer derived from <b>one typed contract</b>. They can't drift, because they're the same source.</p>
-    <p style="margin-top:18px"><a class="btn" href="/dashboard">Open the dashboard</a> <a class="btn ghost" href="/scalar">API docs</a> <a class="btn ghost" href="/superadmin">Admin</a></p>
+  <section class="hero">
+    <span class="pill accent">OpenAPI v4 · Moonwalk candidate</span>
+    <h1 style="margin-top:18px">The SaaS starter that<br /><span class="gradient">sells itself.</span></h1>
+    <p class="tag center">Auth, payments, eCommerce, an admin cockpit, a typed API + docs — every layer projected from <b>one contract</b>. This very store is the demo: it sells the code that renders it.</p>
+    <div class="cta">
+      <a class="btn" href="/products">Browse the store →</a>
+      <a class="btn ghost" href="/pricing">See pricing</a>
+    </div>
+    <div class="badges">{stack.map((s) => <span class="pill">{s}</span>)}</div>
   </section>
-  <h2>Everything, from one source</h2>
-  <div class="grid">{features.map(([t, pkg, d]) => <div class="card"><span class="pill">{t}</span> <b>{pkg}</b><p>{d}</p></div>)}</div>
-  <h2>Why Suluk</h2>
-  <p class="tag">You declare your data (Drizzle) and routes (Hono + Zod) once. The OpenAPI v4 document, Scalar docs, the typed client, the shadcn UI, request validation, contract tests, the admin panel, the cost ledger, and the Cloudflare deploy plan are all <b>projections</b> of it. <a href="https://mahmoodkhalil57.github.io/sig-moonwalk/">Read the Suluk docs →</a></p>
+
+  <section class="section">
+    <div class="center"><span class="pill accent">Meta</span><h3 style="font-size:26px;margin-top:12px">A store that sells its own source code</h3>
+    <p class="tag center" style="margin:6px auto 0">Each product below is a real tier of <b>this</b> starter. Add one to the cart, run the metered checkout, and watch the cost ledger move — all powered by the contract you just bought.</p></div>
+    <div class="tiers">
+      {tiers.map(([name, price, popular, feats]) => (
+        <div class={popular ? "tier popular" : "tier"}>
+          {popular && <span class="badge">Most popular</span>}
+          <h3>{name}</h3>
+          <div class="price">{price}</div>
+          <span style="color:var(--muted);font-size:13px">one-time · lifetime</span>
+          <ul>{(feats as string[]).map((f) => <li>{f}</li>)}</ul>
+          <div class="spacer"></div>
+          <a class={popular ? "btn" : "btn ghost"} href="/products" style="margin-top:18px; justify-content:center">Get {name}</a>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="center"><h3 style="font-size:26px">Everything, from one source</h3><p class="tag center" style="margin:6px auto 0">The features saastarter glues from a dozen tools — here they are projections of one typed document.</p></div>
+    <div class="grid" style="margin-top:24px">
+      {features.map(([icon, title, body]) => (
+        <div class="card">
+          <div style="font-size:22px; color:var(--accent)">{icon}</div>
+          <h3 style="margin-top:8px">{title}</h3>
+          <p>{body}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section center" style="padding:50px 0">
+    <h3 style="font-size:30px; letter-spacing:-.02em">Ship the contract. Get the platform.</h3>
+    <p class="tag center" style="margin:8px auto 0">Declare it once — the API, the docs, the client, the UI, the admin, and the billing follow.</p>
+    <div class="cta"><a class="btn" href="/products">Open the store →</a><a class="btn ghost" href="/scalar">Read the API</a></div>
+  </section>
 </Layout>

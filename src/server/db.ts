@@ -7,9 +7,11 @@
 import { Database } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { SCHEMA_SQL } from "./schema";
+import { SEED_SQL } from "./seed";
 
 export const sqlite = new Database(":memory:");
 sqlite.run(SCHEMA_SQL);
+sqlite.run(SEED_SQL); // the dev DB is in-memory (always empty) → seed the meta store so the local site is alive
 
 export const db: BunSQLiteDatabase = drizzle(sqlite);
 

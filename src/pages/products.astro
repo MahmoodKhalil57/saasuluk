@@ -1,37 +1,47 @@
 ---
 import Layout from "../layouts/Layout.astro";
 ---
-<Layout title="Products — saasuluk">
-  <h1>Products</h1>
-  <p class="tag">The storefront — every product is a <b>Product</b> entity in the contract, served by the generated CRUD. Add to cart, then check out.</p>
-  <form id="search" style="display:flex; gap:8px; margin:16px 0">
-    <input name="q" placeholder="Search products…" />
-    <button class="btn ghost" type="submit">Search</button>
+<Layout title="Store — saasuluk">
+  <section class="hero" style="padding:40px 0 6px">
+    <h1>The <span class="gradient">store</span>.</h1>
+    <p class="tag center">Every product is a <b>Product</b> entity in the contract — and a real slice of this starter. The store sells the code that renders it.</p>
+  </section>
+  <form id="search" style="display:flex; gap:8px; max-width:440px; margin:18px auto 6px">
+    <input name="q" placeholder="Search the store…" style="flex:1" />
+    <button class="btn ghost" type="submit" data-i18n="search">Search</button>
   </form>
-  <div class="grid" id="grid"></div>
+  <div class="grid" id="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>
   <script is:inline>
-    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(c % 100 ? 2 : 0);
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
     const setCart = (c) => localStorage.setItem("cart", JSON.stringify(c));
+    const esc = (s) => String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+    function card(p) {
+      const img = p.imageUrl || `/avatar?seed=${encodeURIComponent(p.slug || p.name)}`;
+      return `<div class="card" style="display:flex;flex-direction:column;padding:0;overflow:hidden">
+        <a href="/products/${p.slug}" style="display:block;aspect-ratio:16/10;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 14%,var(--panel)),var(--panel));display:grid;place-items:center">
+          <img src="${img}" alt="" style="width:72px;height:72px;border-radius:14px" loading="lazy" /></a>
+        <div style="padding:16px 18px;display:flex;flex-direction:column;flex:1">
+          <a href="/products/${p.slug}"><h3 style="margin:0">${esc(p.name)}</h3></a>
+          <p style="color:var(--muted);font-size:13.5px;margin:5px 0 0;flex:1">${esc((p.description || "").slice(0, 88))}</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+            <span style="font-size:22px;font-weight:800;letter-spacing:-.02em">${money(p.priceCents)}</span>
+            <button class="btn sm" data-id="${p.id}" data-name="${esc(p.name)}" data-price="${p.priceCents}">Add to cart</button>
+          </div>
+        </div></div>`;
+    }
     function render(products) {
-      document.getElementById("grid").innerHTML = products.length ? products.map((p) => `
-        <div class="card">
-          <img src="${p.imageUrl || `/avatar?seed=${encodeURIComponent(p.slug || p.name)}`}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;background:#0b0e14" />
-          <a href="/products/${p.slug}"><b style="font-family:inherit;font-size:15px">${p.name}</b></a>
-          <p>${money(p.priceCents)} · ${p.inventory ?? 0} in stock</p>
-          <button class="btn" data-id="${p.id}" data-name="${p.name}" data-price="${p.priceCents}" style="margin-top:8px;width:100%">Add to cart</button>
-        </div>`).join("") : `<p style="color:var(--muted)">No products yet — seed some at <a href="/superadmin">/superadmin</a> or POST /product.</p>`;
-      document.querySelectorAll("[data-id]").forEach((b) => b.addEventListener("click", () => {
-        const c = cart(); const id = Number(b.dataset.id);
-        const ex = c.find((i) => i.productId === id);
+      const g = document.getElementById("grid");
+      g.innerHTML = products.length ? products.map(card).join("") : `<p style="color:var(--muted);grid-column:1/-1">No products yet — seed some at <a href="/superadmin">/superadmin</a> or POST /product.</p>`;
+      g.querySelectorAll("[data-id]").forEach((b) => b.addEventListener("click", () => {
+        const c = cart(), id = Number(b.dataset.id), ex = c.find((i) => i.productId === id);
         if (ex) ex.qty++; else c.push({ productId: id, qty: 1, priceCents: Number(b.dataset.price), name: b.dataset.name });
         setCart(c); b.textContent = "Added ✓"; setTimeout(() => (b.textContent = "Add to cart"), 900);
       }));
     }
     async function load(q) {
-      const url = q ? `/search?q=${encodeURIComponent(q)}` : "/product";
-      const data = await (await fetch(url)).json();
-      render(q ? data.products : data.filter((p) => p.status === "published"));
+      const data = await (await fetch(q ? `/search?q=${encodeURIComponent(q)}` : "/product")).json();
+      render((q ? data.products : data).filter((p) => p.status === "published").sort((a, b) => a.priceCents - b.priceCents));
     }
     document.getElementById("search").addEventListener("submit", (e) => { e.preventDefault(); load(e.target.q.value.trim()); });
     load();
