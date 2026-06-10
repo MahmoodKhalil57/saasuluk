@@ -12,6 +12,8 @@ import Layout from "../layouts/Layout.astro";
     <button class="btn" type="submit">+ Create</button>
   </form>
   <table><thead><tr><th>ID</th><th>Name</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+  <h2>Usage billing — @suluk/cost → Stripe Billing Meters</h2>
+  <div class="card" id="billing" style="max-width:620px">Loading…</div>
   <h2>Cost ledger — what you've spent (as it is)</h2>
   <pre id="cost" class="card" style="white-space:pre-wrap; font-family:ui-monospace,monospace; font-size:12.5px; max-height:320px; overflow:auto"></pre>
   <script is:inline>
@@ -19,6 +21,28 @@ import Layout from "../layouts/Layout.astro";
     const money = (c) => "$" + (Number(c || 0) / 1e6).toFixed(4);
     async function resolveSession() {
       try { const s = await (await fetch("/api/auth/get-session", { credentials: "same-origin" })).json(); if (s && s.user) USER = s.user.id; } catch (e) {}
+    }
+    async function loadBilling() {
+      const el = document.getElementById("billing");
+      const accts = await (await fetch("/billingAccount")).json();
+      const acct = accts.find((a) => a.principal === USER);
+      if (!acct || !acct.stripeCustomerId) {
+        el.innerHTML = `<p style="margin:0 0 10px">Bill your metered cost through a real Stripe customer + a usage-based subscription. The cost ledger above becomes the usage you're charged on (cost × your margin).</p><button class="btn" id="connect">Connect usage billing</button>`;
+        document.getElementById("connect").addEventListener("click", async (e) => {
+          e.target.disabled = true; e.target.textContent = "Connecting…";
+          const r = await (await fetch("/billing/connect", { method: "POST", headers: { "content-type": "application/json", "x-user": USER }, body: JSON.stringify({ email: USER.includes("@") ? USER : undefined }) })).json();
+          if (r.connected) loadBilling(); else { e.target.disabled = false; e.target.textContent = "Connect usage billing"; el.insertAdjacentHTML("beforeend", `<p style="color:#e5484d">${r.error || "Failed."}</p>`); }
+        });
+      } else {
+        const last = acct.lastReportedAt ? `last reported ${money(acct.lastReportedMicroUsd)} on ${new Date(Number(acct.lastReportedAt)).toLocaleString()}` : "nothing reported yet";
+        el.innerHTML = `<p style="margin:0 0 4px">✓ Connected — Stripe customer <code>${acct.stripeCustomerId}</code>${acct.subscriptionId ? ` · subscription <code>${acct.subscriptionId}</code>` : ""}.</p><p style="color:var(--muted);font-size:13px;margin:0 0 12px">${last}</p><button class="btn" id="report">Report my usage to Stripe →</button> <span id="rmsg" style="color:var(--accent);font-size:14px"></span>`;
+        document.getElementById("report").addEventListener("click", async (e) => {
+          e.target.disabled = true; e.target.textContent = "Reporting…";
+          const r = await (await fetch("/billing/report", { method: "POST", headers: { "content-type": "application/json", "x-user": USER }, body: "{}" })).json();
+          document.getElementById("rmsg").textContent = r.reported ? `✓ reported ${money(r.valueMicroUsd)} to the “${r.eventName}” meter` : (r.reason || r.error || "nothing to report");
+          e.target.disabled = false; e.target.textContent = "Report my usage to Stripe →"; loadBilling();
+        });
+      }
     }
     async function load() {
       const H = { "x-user": USER };
@@ -35,6 +59,6 @@ import Layout from "../layouts/Layout.astro";
       await fetch("/project", { method: "POST", headers: { "x-user": USER, "content-type": "application/json", "x-suluk-action": "create-project-button" }, body: JSON.stringify({ name: e.target.name.value }) });
       e.target.reset(); load();
     });
-    resolveSession().then(load);
+    resolveSession().then(() => { load(); loadBilling(); });
   </script>
 </Layout>

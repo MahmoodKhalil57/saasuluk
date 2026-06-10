@@ -145,6 +145,28 @@ export const apiToken = sqliteTable("api_token", {
   revokedAt: integer("revoked_at"),
 });
 
+// usage-based billing: a principal's Stripe customer + metered subscription (the @suluk/cost → Stripe meter bridge).
+export const billingAccount = sqliteTable("billing_account", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  principal: text("principal").notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  subscriptionId: text("subscription_id"),
+  lastReportedMicroUsd: integer("last_reported_micro_usd"),
+  lastReportedAt: integer("last_reported_at"),
+  createdAt: integer("created_at"),
+});
+
+// the durable cost ledger (the Worker meters into it) — defined here so billing can SUM a principal's usage.
+export const costEvent = sqliteTable("cost_event", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  at: integer("at").notNull(),
+  principal: text("principal"),
+  operation: text("operation").notNull(),
+  action: text("action"),
+  totalMicroUsd: integer("total_micro_usd").notNull(),
+  breakdown: text("breakdown").notNull(),
+});
+
 // the original SaaS resource — kept (the README references it)
 export const project = sqliteTable("project", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -174,4 +196,6 @@ CREATE TABLE IF NOT EXISTS contact_submission (id INTEGER PRIMARY KEY AUTOINCREM
 CREATE TABLE IF NOT EXISTS media (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, alt TEXT NOT NULL, width INTEGER, height INTEGER);
 CREATE TABLE IF NOT EXISTS api_token (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, name TEXT NOT NULL, prefix TEXT NOT NULL, hashed_key TEXT NOT NULL, created_at INTEGER, last_used_at INTEGER, revoked_at INTEGER);
 CREATE TABLE IF NOT EXISTS project (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, owner_id TEXT, status TEXT NOT NULL DEFAULT 'active');
+CREATE TABLE IF NOT EXISTS billing_account (id INTEGER PRIMARY KEY AUTOINCREMENT, principal TEXT NOT NULL, stripe_customer_id TEXT, subscription_id TEXT, last_reported_micro_usd INTEGER, last_reported_at INTEGER, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS cost_event (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, principal TEXT, operation TEXT NOT NULL, action TEXT, total_micro_usd INTEGER NOT NULL, breakdown TEXT NOT NULL);
 `.trim();

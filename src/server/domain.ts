@@ -43,6 +43,7 @@ export const ENTITIES: EntityDef[] = [
   { name: "Media", table: s.media, r: 6, w: 25 },
   // platform
   { name: "ApiToken", table: s.apiToken, ownerCol: "userId", r: 8, w: 30 },
+  { name: "BillingAccount", table: s.billingAccount, ownerCol: "principal", r: 8, w: 30 },
   { name: "Project", table: s.project, ownerCol: "ownerId", r: 12, w: 40 },
 ];
 

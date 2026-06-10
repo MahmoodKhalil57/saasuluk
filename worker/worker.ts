@@ -31,7 +31,7 @@ const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true })
 const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes });
 const ada = buildAda(document);
 
-type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string };
+type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.

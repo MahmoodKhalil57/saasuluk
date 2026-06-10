@@ -7009,6 +7009,637 @@
         }
       }
     },
+    "billingAccount": {
+      "requests": {
+        "listBillingAccount": {
+          "method": "get",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "ok",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "principal": {
+                      "type": "string"
+                    },
+                    "stripeCustomerId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastReportedMicroUsd": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastReportedAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "principal"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "summary": "List BillingAccount",
+          "tags": [
+            "BillingAccount"
+          ],
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 8
+              }
+            ],
+            "estimateMicroUsd": 8
+          }
+        },
+        "createBillingAccount": {
+          "method": "post",
+          "responses": {
+            "201": {
+              "status": 201,
+              "description": "created",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "principal": {
+                    "type": "string"
+                  },
+                  "stripeCustomerId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "subscriptionId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastReportedMicroUsd": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastReportedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "principal"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "summary": "Create BillingAccount",
+          "tags": [
+            "BillingAccount"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "principal": {
+                "type": "string"
+              },
+              "stripeCustomerId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subscriptionId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastReportedMicroUsd": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastReportedAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "principal"
+            ],
+            "additionalProperties": false
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 130
+          }
+        }
+      }
+    },
+    "billingAccount/{id}": {
+      "requests": {
+        "getBillingAccount": {
+          "method": "get",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "ok",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "principal": {
+                    "type": "string"
+                  },
+                  "stripeCustomerId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "subscriptionId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastReportedMicroUsd": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastReportedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "principal"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "404": {
+              "status": 404,
+              "description": "not found"
+            }
+          },
+          "summary": "Get BillingAccount by id",
+          "tags": [
+            "BillingAccount"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 8
+              }
+            ],
+            "estimateMicroUsd": 8
+          }
+        },
+        "updateBillingAccount": {
+          "method": "patch",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "updated",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "principal": {
+                    "type": "string"
+                  },
+                  "stripeCustomerId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "subscriptionId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastReportedMicroUsd": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastReportedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "principal"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "summary": "Update BillingAccount",
+          "tags": [
+            "BillingAccount"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "principal": {
+                "type": "string"
+              },
+              "stripeCustomerId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subscriptionId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastReportedMicroUsd": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastReportedAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "principal"
+            ],
+            "additionalProperties": false
+          },
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 130
+          }
+        },
+        "deleteBillingAccount": {
+          "method": "delete",
+          "responses": {
+            "204": {
+              "status": 204,
+              "description": "deleted"
+            }
+          },
+          "summary": "Delete BillingAccount",
+          "tags": [
+            "BillingAccount"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 18
+              }
+            ],
+            "estimateMicroUsd": 118
+          }
+        }
+      }
+    },
     "project": {
       "requests": {
         "listProject": {
@@ -7968,6 +8599,86 @@
           }
         }
       }
+    },
+    "billing/connect": {
+      "requests": {
+        "connectBilling": {
+          "method": "post",
+          "summary": "Start usage-based billing: a Stripe customer + a metered subscription",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object"
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Start usage-based billing: a Stripe customer + a metered subscription",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 60
+              }
+            ],
+            "estimateMicroUsd": 160
+          }
+        }
+      }
+    },
+    "billing/report": {
+      "requests": {
+        "reportUsage": {
+          "method": "post",
+          "summary": "Report your accrued @suluk/cost usage to the Stripe Billing Meter",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object"
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Report your accrued @suluk/cost usage to the Stripe Billing Meter",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 40
+              }
+            ],
+            "estimateMicroUsd": 140
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8754,6 +9465,85 @@
           "createdAt",
           "lastUsedAt",
           "revokedAt"
+        ],
+        "additionalProperties": false
+      },
+      "BillingAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "principal": {
+            "type": "string"
+          },
+          "stripeCustomerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subscriptionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastReportedMicroUsd": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastReportedAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "principal",
+          "stripeCustomerId",
+          "subscriptionId",
+          "lastReportedMicroUsd",
+          "lastReportedAt",
+          "createdAt"
         ],
         "additionalProperties": false
       },

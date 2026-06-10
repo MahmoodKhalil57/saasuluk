@@ -27,7 +27,8 @@ the same source.
 | PWA | a **manifest + service worker** (offline shell) + maskable favicon |
 | @dicebear avatars | a **derived identicon** SVG (`/avatar?seed=…`) — dependency-free |
 | PayloadCMS collections / ecommerce plugin | the **entity registry** (`domain.ts`) — one typed source instead of ~14 collection configs + a plugin |
-| Stripe payments | **Stripe** via `@suluk/stripe` (Billing Meters) + **usage** via `@suluk/cost` |
+| Stripe payments | **Stripe Checkout** (real hosted checkout + signature-verified webhook) via the REST API |
+| Usage-based billing | **@suluk/cost → Stripe Billing Meters** — connect a customer + metered subscription, report accrued cost as meter events (`/billing/connect`, `/billing/report`); the dashboard drives it |
 | PayloadCMS admin | the **`/superadmin` cockpit** via `@suluk/admin` (same brain as the Suluk VSCode extension) |
 | openapi-typescript / openapi-fetch | the **typed client** via `@suluk/nano-stores` (Zod-guarded fetcher/mutator stores) |
 | OpenAPI generation | the **v4 document** via `@suluk/hono` + `@suluk/drizzle` (derived from the schema) |

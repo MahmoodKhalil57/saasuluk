@@ -9,8 +9,10 @@
 import { and, eq, gte, like, lt, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken } from "./schema";
+import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
+import { customerParams, subscriptionParams, meterEventParams } from "@suluk/stripe";
+import { restStripe } from "./stripe-rest";
 
 /** SHA-256 of an API key (Web Crypto — Worker-safe). We store only the hash; the plaintext is shown once. */
 export async function hashKey(key: string): Promise<string> {
@@ -71,6 +73,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30),
+  connectBilling: write(60), reportUsage: write(40),
 };
 
 /** The v4 path fragment for the custom operations — merged into the contract document. */
@@ -89,6 +92,8 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
   "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: { type: "object" } }) } },
   "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: { type: "object" } }) } },
+  "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: { type: "object" } }) } },
+  "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object" } }) } },
 };
 
 /** Validate a discount code against the table: must exist, be active, not expired, and under its usage cap. */
@@ -289,6 +294,45 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     return c.json({ paid, order: row });
   };
 
+  // ── @suluk/cost → Stripe Billing Meters: connect a customer + metered subscription, then report usage. ──
+  const connectBilling = async (c: Context) => {
+    const key = secret(c, "STRIPE_SECRET_KEY");
+    const priceId = secret(c, "STRIPE_METERED_PRICE_ID");
+    if (!key || !priceId) return c.json({ error: "Usage billing isn't configured (run scripts/setup-billing.ts)." }, 503);
+    const who = principal(c);
+    if (!who) return c.json({ error: "Sign in first." }, 401);
+    const dz = dbFor(c);
+    const existing = await dz.select().from(billingAccount).where(eq(billingAccount.principal, who)).get();
+    if (existing?.stripeCustomerId) return c.json({ connected: true, already: true, customerId: existing.stripeCustomerId, subscriptionId: existing.subscriptionId });
+    const body = (await c.req.json().catch(() => ({}))) as { email?: string };
+    const stripe = restStripe(key);
+    const customer = await stripe.customers.create(customerParams({ email: body.email, metadata: { principal: who } }));
+    let subscriptionId: string | null = null;
+    // metered subs bill at period end; default_incomplete avoids an upfront charge so it works without a card (test mode)
+    try { const sub = await stripe.subscriptions.create({ ...subscriptionParams({ customerId: customer.id, priceId }), payment_behavior: "default_incomplete" }); subscriptionId = (sub as { id: string }).id; } catch { /* customer still meters */ }
+    if (existing) await dz.update(billingAccount).set({ stripeCustomerId: customer.id, subscriptionId }).where(eq(billingAccount.id, existing.id)).run();
+    else await dz.insert(billingAccount).values({ principal: who, stripeCustomerId: customer.id, subscriptionId, createdAt: Date.now() }).run();
+    return c.json({ connected: true, customerId: customer.id, subscriptionId });
+  };
+
+  const reportUsage = async (c: Context) => {
+    const key = secret(c, "STRIPE_SECRET_KEY");
+    const eventName = secret(c, "STRIPE_METER_EVENT_NAME") ?? "saasuluk_cost";
+    if (!key) return c.json({ error: "Stripe is not configured." }, 503);
+    const who = principal(c);
+    if (!who) return c.json({ error: "Sign in first." }, 401);
+    const dz = dbFor(c);
+    const acct = await dz.select().from(billingAccount).where(eq(billingAccount.principal, who)).get();
+    if (!acct?.stripeCustomerId) return c.json({ error: "Connect usage billing first.", connected: false }, 409);
+    // sum this principal's metered cost from the durable ledger and report it as ONE meter event
+    const rows = await dz.select().from(costEvent).where(eq(costEvent.principal, who)).all();
+    const totalMicroUsd = (rows as { totalMicroUsd: number }[]).reduce((s, r) => s + Number(r.totalMicroUsd), 0);
+    if (totalMicroUsd <= 0) return c.json({ reported: false, reason: "no metered usage yet" });
+    await restStripe(key).billing.meterEvents.create(meterEventParams({ eventName, customerId: acct.stripeCustomerId, value: totalMicroUsd }));
+    await dz.update(billingAccount).set({ lastReportedMicroUsd: totalMicroUsd, lastReportedAt: Date.now() }).where(eq(billingAccount.id, acct.id)).run();
+    return c.json({ reported: true, valueMicroUsd: totalMicroUsd, customerId: acct.stripeCustomerId, eventName });
+  };
+
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
   const generateAvatar = (c: Context) => {
     const seed = c.req.query("seed") ?? "anon";
@@ -319,4 +363,6 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.post("/tokens/:id/revoke", revokeToken);
   app.post("/checkout/pay", payCheckout);
   app.post("/checkout/confirm", confirmCheckout);
+  app.post("/billing/connect", connectBilling);
+  app.post("/billing/report", reportUsage);
 }

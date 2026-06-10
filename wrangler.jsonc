@@ -13,5 +13,7 @@
   "assets": { "directory": "dist/client", "binding": "ASSETS" },
   // Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
   // RESEND_API_KEY, EMAIL_FROM) are stored ENCRYPTED via `wrangler secret put` — never in this file.
+  // These are Stripe OBJECT ids (not secrets) from scripts/setup-billing.ts — the usage-billing meter + price.
+  "vars": { "STRIPE_METER_EVENT_NAME": "saasuluk_cost", "STRIPE_METERED_PRICE_ID": "price_1TgvOjR9OvhT1CxIicetCJ8R" },
   "observability": { "enabled": true }
 }
