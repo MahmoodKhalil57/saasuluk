@@ -19,6 +19,28 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(Object.keys(doc.components.securitySchemes)).toContain("sessionCookie");
   });
 
+  test("the WHOLE domain projects from the registry — every entity has CRUD + cost (one source)", async () => {
+    const doc = await (await app.request("/openapi.json")).json() as any;
+    // saastarter's collections + ecommerce, now declared once and projected into the contract
+    for (const e of ["product", "order", "cart", "review", "wishlistItem", "discountCode", "post", "faq", "newsletterSubscriber", "contactSubmission", "category", "variant", "media", "apiToken"]) {
+      expect(doc.paths[e], `missing path: ${e}`).toBeDefined();
+      expect(doc.paths[e].requests[`create${e[0].toUpperCase()}${e.slice(1)}`]["x-suluk-cost"]).toBeDefined();
+    }
+  });
+
+  test("a new entity serves real Drizzle CRUD, owner-stamped + cost-metered (generic, not hand-written)", async () => {
+    const created = await post("/product", { name: "Widget", slug: "widget", priceCents: 1999, status: "published" }, { "x-user": "u9", "x-suluk-action": "add-product" });
+    expect(created.status).toBe(201);
+    expect((await created.json()).name).toBe("Widget");
+    expect(((await (await app.request("/product")).json()) as unknown[]).length).toBeGreaterThan(0);
+    // an owned entity stamps the caller as customerId without the client sending it
+    const order = await post("/order", { totalCents: 1999, status: "pending" }, { "x-user": "u9" });
+    expect((await order.json()).customerId).toBe("u9");
+    const cost = await (await app.request("/cost")).json() as any;
+    expect(cost.byPrincipal.u9).toBeGreaterThan(0);
+    expect(cost.byAction["add-product"]).toBeGreaterThan(0);
+  });
+
   test("Scalar renders the docs", async () => {
     expect(await (await app.request("/scalar")).text()).toContain("Scalar.createApiReference");
   });

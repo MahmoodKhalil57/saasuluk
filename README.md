@@ -15,6 +15,10 @@ the same source.
 | saastarter (Next.js) | saasuluk (Astro + Hono) |
 |---|---|
 | Better-Auth | **Better Auth** via `@suluk/better-auth` (wired into the v4 contract: securitySchemes + its OpenAPI ingested) |
+| Ecommerce (products, variants, categories, carts, orders, discount codes, reviews, wishlists) | **entities in the contract** — declared once in `src/server/schema.ts`, registered in `src/server/domain.ts`; CRUD API + docs + admin + client + UI + cost project automatically |
+| Blog, FAQs, newsletter, contact, media | the same: content **entities**, not bespoke collections |
+| API tokens / developer portal | an `ApiToken` **entity** (+ Better Auth) |
+| PayloadCMS collections / ecommerce plugin | the **entity registry** (`domain.ts`) — one typed source instead of ~14 collection configs + a plugin |
 | Stripe payments | **Stripe** via `@suluk/stripe` (Billing Meters) + **usage** via `@suluk/cost` |
 | PayloadCMS admin | the **`/superadmin` cockpit** via `@suluk/admin` (same brain as the Suluk VSCode extension) |
 | openapi-typescript / openapi-fetch | the **typed client** via `@suluk/nano-stores` (Zod-guarded fetcher/mutator stores) |

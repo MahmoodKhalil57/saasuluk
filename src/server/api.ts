@@ -13,7 +13,8 @@ import { costMeter, MemoryCostSink, summarize } from "@suluk/cost";
 import { stripeProvider, type StripeLike } from "@suluk/stripe";
 import { auth, ensureAuthTables } from "./auth";
 import { buildContract, costs } from "./contract";
-import { projectHandlers } from "./projects";
+import { tableByEntity } from "./domain";
+import { crudHandlers, type CrudHandlers } from "./crud";
 
 export async function createApp() {
   await ensureAuthTables();
@@ -21,10 +22,18 @@ export async function createApp() {
   const sink = new MemoryCostSink();
   const ada = buildAda(document);
 
-  // bind real Drizzle handlers to the contract-generated Project routes
+  // bind a real Drizzle CRUD handler to EVERY contract-generated route, by entity. One generic factory covers
+  // the whole domain — `list/get/create/update/delete<Entity>` → crudHandlers(table) for that entity.
+  const handlerCache = new Map<string, CrudHandlers>();
   const routes: RouteContract[] = built.backend.routes.map((r) => {
-    const m = /^(list|create|get|update|delete)Project$/.exec(r.name ?? "");
-    return m ? { ...r, handler: projectHandlers[m[1] as keyof typeof projectHandlers] as RouteContract["handler"] } : r;
+    const m = /^(list|create|get|update|delete)([A-Z]\w*)$/.exec(r.name ?? "");
+    if (!m) return r;
+    const [, verb, entity] = m;
+    const def = tableByEntity[entity];
+    if (!def) return r;
+    let h = handlerCache.get(entity);
+    if (!h) { h = crudHandlers(def.table, def.ownerCol); handlerCache.set(entity, h); }
+    return { ...r, handler: h[verb as keyof CrudHandlers] as RouteContract["handler"] };
   });
 
   const app = new Hono();

@@ -1,26 +1,17 @@
 /**
- * Data floor — Drizzle on bun:sqlite (which IS Cloudflare D1). The domain table `project` is the SaaS
- * resource; Better Auth manages its own users/sessions tables in the same database. Everything downstream
- * (API, v4 contract, docs, client, UI, cost) is derived from these definitions.
+ * Data floor (dev) — Drizzle on bun:sqlite (which IS Cloudflare D1's engine). The table DEFINITIONS live in
+ * `schema.ts` (runtime-agnostic, shared with the Worker); here we create the in-memory dev database and apply
+ * the same DDL the D1 migration ships. Everything downstream (API, v4 contract, docs, client, UI, cost) is
+ * derived from `schema.ts` via the registry in `domain.ts` — Better Auth owns its own users/sessions tables.
  */
 import { Database } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { SCHEMA_SQL } from "./schema";
 
 export const sqlite = new Database(":memory:");
-
-export const project = sqliteTable("project", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  ownerId: text("owner_id"),
-  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
-});
-
-sqlite.run(`CREATE TABLE IF NOT EXISTS project (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  owner_id TEXT,
-  status TEXT NOT NULL DEFAULT 'active'
-)`);
+sqlite.run(SCHEMA_SQL);
 
 export const db: BunSQLiteDatabase = drizzle(sqlite);
+
+// re-export the tables so existing imports (`import { project } from "./db"`) keep working.
+export * from "./schema";

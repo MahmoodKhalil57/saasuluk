@@ -1,37 +1,28 @@
 /**
- * saasuluk on Cloudflare Workers — the full Suluk stack, D1-backed.
+ * saasuluk on Cloudflare Workers — the full Suluk stack, D1-backed, from the SAME entity registry the dev
+ * server uses (src/server/domain.ts): no re-declared schema, no drift.
  *  - the v4 contract (cost-annotated + auth securitySchemes), built at load (eval-free)
- *  - Project CRUD on D1 (drizzle-orm/d1, async)
+ *  - GENERIC CRUD on D1 (drizzle-orm/d1, async) for EVERY domain entity, mounted from the contract routes
  *  - a DURABLE cost meter: each operation's cost is persisted to a D1 cost_event row, so /cost accumulates
  *    across isolates (per-user / operation / frontend-action / source)
  *  - /scalar + /openapi.json, and the /superadmin cockpit (validateDocument is precompiled → Workers-safe)
  * Static pages (landing/dashboard/pricing) are served by the assets binding; this worker owns everything else.
  */
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { eq } from "drizzle-orm";
-import { tableToV4 } from "@suluk/drizzle";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
+import { mount, type RouteContract } from "@suluk/hono";
 import { buildApp } from "@suluk/builder";
-import { annotateCosts, computeCost, summarize, type CostModel, type CostEvent } from "@suluk/cost";
+import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
+import { entitySchemas, costs, tableByEntity } from "../src/server/domain";
 
-const project = sqliteTable("project", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  ownerId: text("owner_id"),
-  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
-});
-
-const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
-const write = (m: number): CostModel => ({ components: [{ source: "compute", basis: "per-call", microUsd: 100 }, { source: "db-write", basis: "per-call", microUsd: m }], estimateMicroUsd: 100 + m });
-const costs: Record<string, CostModel> = { listProject: read(12), getProject: read(8), createProject: write(40), updateProject: write(40), deleteProject: write(25) };
-
-const built = buildApp({ entities: [{ name: "Project", schema: tableToV4(project).insert }], info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
+const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
 const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes });
 const ada = buildAda(document);
@@ -49,18 +40,39 @@ app.on(["GET", "POST"], "/api/auth/*", async (c) => {
 app.use("*", async (c, next) => {
   await next();
   const op = matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name;
-  if (!op) return;
+  if (!op || !costs[op]) return;
   const { breakdown, totalMicroUsd } = computeCost(costs[op], []);
   await c.env.DB.prepare("INSERT INTO cost_event (at, principal, operation, action, total_micro_usd, breakdown) VALUES (?,?,?,?,?,?)")
     .bind(Date.now(), c.req.header("x-user") ?? null, op, c.req.header("x-suluk-action") ?? null, totalMicroUsd, JSON.stringify(breakdown)).run();
 });
 
-const D = (c: { env: Env }) => drizzle(c.env.DB);
-app.get("/project", async (c) => c.json(await D(c).select().from(project).all()));
-app.post("/project", async (c) => { const b = (await c.req.json()) as Record<string, unknown>; const r = await D(c).insert(project).values({ ...b, ownerId: c.req.header("x-user") ?? null } as typeof project.$inferInsert).returning(); return c.json(r[0], 201); });
-app.get("/project/:id", async (c) => { const r = await D(c).select().from(project).where(eq(project.id, Number(c.req.param("id")))); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404); });
-app.patch("/project/:id", async (c) => { const b = (await c.req.json()) as Record<string, unknown>; await D(c).update(project).set(b).where(eq(project.id, Number(c.req.param("id")))); const r = await D(c).select().from(project).where(eq(project.id, Number(c.req.param("id")))); return c.json(r[0]); });
-app.delete("/project/:id", async (c) => { await D(c).delete(project).where(eq(project.id, Number(c.req.param("id")))); return c.body(null, 204); });
+// generic D1 CRUD (async) — written ONCE, bound to every contract-generated route, the D1 twin of src/server/crud.ts.
+function d1Crud(table: SQLiteTable, ownerCol?: string) {
+  const pk = (table as unknown as { id: Parameters<typeof eq>[0] }).id;
+  const dz = (c: Context<{ Bindings: Env }>) => drizzle(c.env.DB);
+  const rid = (c: Context) => Number(c.req.param("id"));
+  return {
+    list: async (c: Context<{ Bindings: Env }>) => c.json(await dz(c).select().from(table).all()),
+    get: async (c: Context<{ Bindings: Env }>) => { const r = await dz(c).select().from(table).where(eq(pk, rid(c))); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404); },
+    create: async (c: Context<{ Bindings: Env }>) => { const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; const owner = ownerCol ? { [ownerCol]: c.req.header("x-user") ?? null } : {}; const r = await dz(c).insert(table).values({ ...b, ...owner } as never).returning(); return c.json(r[0], 201); },
+    update: async (c: Context<{ Bindings: Env }>) => { const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; delete b.id; await dz(c).update(table).set(b as never).where(eq(pk, rid(c))); const r = await dz(c).select().from(table).where(eq(pk, rid(c))); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404); },
+    delete: async (c: Context<{ Bindings: Env }>) => { await dz(c).delete(table).where(eq(pk, rid(c))); return c.body(null, 204); },
+  };
+}
+
+type D1Handlers = ReturnType<typeof d1Crud>;
+const handlerCache = new Map<string, D1Handlers>();
+const routes: RouteContract[] = built.backend.routes.map((r) => {
+  const m = /^(list|create|get|update|delete)([A-Z]\w*)$/.exec(r.name ?? "");
+  if (!m) return r;
+  const [, verb, entity] = m;
+  const def = tableByEntity[entity];
+  if (!def) return r;
+  let h = handlerCache.get(entity);
+  if (!h) { h = d1Crud(def.table, def.ownerCol); handlerCache.set(entity, h); }
+  return { ...r, handler: h[verb as keyof D1Handlers] as unknown as RouteContract["handler"] };
+});
+mount(app, routes);
 
 app.get("/scalar", () => scalarResponse(document));
 app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
