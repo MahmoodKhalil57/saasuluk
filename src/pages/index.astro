@@ -1,0 +1,24 @@
+---
+import Layout from "../layouts/Layout.astro";
+const features = [
+  ["Auth", "@suluk/better-auth", "Better Auth (email/password · bearer · admin), wired into the v4 contract."],
+  ["Payments", "@suluk/stripe + @suluk/cost", "Usage metered per user → Stripe Billing Meters. Cost shown as-is."],
+  ["API + Docs", "@suluk/hono + @suluk/scalar", "Typed Hono routes → OpenAPI v4 → Scalar, all derived from the schema."],
+  ["Database", "@suluk/drizzle", "Drizzle on sqlite/D1 is the system of record; the contract is projected from it."],
+  ["Admin", "@suluk/admin", "The /superadmin cockpit — the same brain as the VSCode extension, web-hosted."],
+  ["Typed client", "@suluk/nano-stores", "Per-operation fetcher/mutator stores with Zod-guarded I/O."],
+  ["UI", "@suluk/shadcn", "Forms + tables generated from the schema (react-hook-form + zodResolver)."],
+  ["Deploy", "@suluk/deploy", "One swappable target: Cloudflare Workers + D1 + assets."],
+];
+---
+<Layout>
+  <section>
+    <h1>Ship a SaaS on <span style="color:var(--accent)">Suluk</span>.</h1>
+    <p class="tag">A saastarter-class starter — auth, payments, admin, typed API + docs — reimplemented bottom-up on <b>Astro + Hono</b>, with every layer derived from <b>one typed contract</b>. They can't drift, because they're the same source.</p>
+    <p style="margin-top:18px"><a class="btn" href="/dashboard">Open the dashboard</a> <a class="btn ghost" href="/scalar">API docs</a> <a class="btn ghost" href="/superadmin">Admin</a></p>
+  </section>
+  <h2>Everything, from one source</h2>
+  <div class="grid">{features.map(([t, pkg, d]) => <div class="card"><span class="pill">{t}</span> <b>{pkg}</b><p>{d}</p></div>)}</div>
+  <h2>Why Suluk</h2>
+  <p class="tag">You declare your data (Drizzle) and routes (Hono + Zod) once. The OpenAPI v4 document, Scalar docs, the typed client, the shadcn UI, request validation, contract tests, the admin panel, the cost ledger, and the Cloudflare deploy plan are all <b>projections</b> of it. <a href="https://mahmoodkhalil57.github.io/sig-moonwalk/">Read the Suluk docs →</a></p>
+</Layout>

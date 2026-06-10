@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Dashboard — saasuluk">
+  <h1>Dashboard</h1>
+  <p class="tag">Your projects — Drizzle-backed, served through the Suluk contract. Every write is metered (see the cost panel).</p>
+  <h2>Projects</h2>
+  <form id="new" style="display:flex; gap:8px; margin-bottom:10px">
+    <input name="name" placeholder="New project name" required />
+    <button class="btn" type="submit">+ Create</button>
+  </form>
+  <table><thead><tr><th>ID</th><th>Name</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+  <h2>Cost — what you've spent (as it is)</h2>
+  <pre id="cost" class="card" style="white-space:pre-wrap; font-family:ui-monospace,monospace; font-size:13px"></pre>
+  <script is:inline>
+    const H = { "x-user": "demo-user" };
+    async function load() {
+      const rows = await (await fetch("/project", { headers: H })).json();
+      document.getElementById("rows").innerHTML = rows.map((p) => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.status}</td></tr>`).join("") || `<tr><td colspan="3" style="color:#9399b2">no projects yet</td></tr>`;
+      document.getElementById("cost").textContent = JSON.stringify(await (await fetch("/cost")).json(), null, 2);
+    }
+    document.getElementById("new").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await fetch("/project", { method: "POST", headers: { ...H, "content-type": "application/json", "x-suluk-action": "create-project-button" }, body: JSON.stringify({ name: e.target.name.value }) });
+      e.target.reset(); load();
+    });
+    load();
+  </script>
+</Layout>
