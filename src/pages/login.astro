@@ -1,0 +1,63 @@
+---
+export const prerender = true;
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Sign in — saasuluk" description="Sign in to saasuluk — email + password, or a passwordless magic link.">
+  <section style="max-width:420px; margin:40px auto 0">
+    <div class="center"><h1 style="font-size:34px">Welcome back</h1><p class="tag center" style="font-size:16px">Real Better Auth, wired into the contract. Sign in, create an account, or use a magic link.</p></div>
+    <div class="card" style="margin-top:24px; padding:22px">
+      <div id="tabs" style="display:flex; gap:6px; background:var(--bg-soft); padding:4px; border-radius:11px; margin-bottom:18px">
+        <button class="tab on" data-tab="signin" style="flex:1; padding:8px; border:0; border-radius:8px; background:var(--panel); color:var(--fg); font-weight:600; cursor:pointer">Sign in</button>
+        <button class="tab" data-tab="signup" style="flex:1; padding:8px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:600; cursor:pointer">Create account</button>
+        <button class="tab" data-tab="magic" style="flex:1; padding:8px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:600; cursor:pointer">Magic link</button>
+      </div>
+      <form id="form" style="display:grid; gap:11px">
+        <input id="name" name="name" placeholder="Your name" autocomplete="name" style="display:none" />
+        <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email" required />
+        <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" minlength="8" required />
+        <button class="btn" type="submit" style="justify-content:center; margin-top:4px">Sign in</button>
+      </form>
+      <p id="msg" style="margin:14px 0 0; font-size:14px"></p>
+    </div>
+    <p class="center" style="color:var(--muted); font-size:13px; margin-top:14px">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+  </section>
+  <script is:inline>
+    let mode = "signin";
+    const $ = (id) => document.getElementById(id);
+    const submitText = { signin: "Sign in", signup: "Create account", magic: "Email me a link" };
+    function setMode(m) {
+      mode = m;
+      document.querySelectorAll(".tab").forEach((t) => {
+        const on = t.dataset.tab === m;
+        t.classList.toggle("on", on); t.style.background = on ? "var(--panel)" : "transparent"; t.style.color = on ? "var(--fg)" : "var(--muted)";
+      });
+      $("name").style.display = m === "signup" ? "block" : "none";
+      $("password").style.display = m === "magic" ? "none" : "block";
+      $("password").required = m !== "magic";
+      $("form").querySelector("button").textContent = submitText[m];
+      $("msg").textContent = "";
+    }
+    document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.tab)));
+    const ok = (s) => { $("msg").innerHTML = `<span style="color:var(--accent)">${s}</span>`; };
+    const err = (s) => { $("msg").innerHTML = `<span class="rem" style="color:#e5484d">${s}</span>`; };
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = $("email").value.trim(), password = $("password").value, name = $("name").value.trim();
+      const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "…";
+      try {
+        if (mode === "magic") {
+          const r = await fetch("/api/auth/sign-in/magic-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, callbackURL: "/account" }) });
+          if (r.ok) ok("Check your email for a sign-in link. (In dev it logs to the server console.)"); else err("Could not send the link.");
+        } else {
+          const path = mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
+          const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(mode === "signup" ? { email, password, name: name || email.split("@")[0] } : { email, password }) });
+          const data = await r.json().catch(() => ({}));
+          if (r.ok && data.user) { ok("Signed in — redirecting…"); setTimeout(() => (location.href = "/account"), 500); }
+          else err(data.message || data.error?.message || "Invalid email or password.");
+        }
+      } catch (x) { err("Something went wrong."); }
+      btn.disabled = false; btn.textContent = submitText[mode];
+    });
+    setMode("signin");
+  </script>
+</Layout>

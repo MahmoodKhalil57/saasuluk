@@ -1,26 +1,22 @@
 ---
 export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
-import { POST_SLUGS } from "../../content-slugs";
-export function getStaticPaths() { return POST_SLUGS.map((slug) => ({ params: { slug } })); }
-const { slug } = Astro.params;
+import { SEED_POSTS } from "../../server/seed";
+export function getStaticPaths() {
+  return SEED_POSTS.map((p) => ({ params: { slug: p.slug }, props: { post: p } }));
+}
+const { post } = Astro.props;
 ---
-<Layout title={`${slug} — saasuluk blog`}>
-  <p style="margin-bottom:10px"><a href="/blogs" class="pill">← Blog</a></p>
-  <article id="post"><p style="color:var(--muted)">Loading…</p></article>
-  <script is:inline>
-    const slug = location.pathname.split("/").filter(Boolean).pop();
-    const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "";
-    const esc = (s) => String(s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    async function load() {
-      const post = (await (await fetch("/post")).json()).find((p) => p.slug === slug);
-      document.getElementById("post").innerHTML = post ? `
-        <h1>${esc(post.title)}</h1>
-        <p style="color:var(--muted);font-size:13px">${when(post.publishedAt)}</p>
-        ${post.coverImageUrl ? `<img src="${post.coverImageUrl}" alt="" style="width:100%;border-radius:10px;margin:14px 0" />` : ""}
-        <p class="tag" style="font-size:16px">${esc(post.excerpt)}</p>
-        <div style="margin-top:16px;white-space:pre-wrap;line-height:1.8">${esc(post.body)}</div>` : "<p>Post not found.</p>";
-    }
-    load();
-  </script>
+<Layout title={`${post.title} — saasuluk blog`} description={post.excerpt}>
+  <p style="margin:6px 0 14px"><a href="/blogs" class="pill">← Blog</a></p>
+  <article style="max-width:680px; margin:0 auto">
+    <h1>{post.title}</h1>
+    <p class="tag" style="font-size:19px; margin-top:8px">{post.excerpt}</p>
+    <div style="margin-top:22px; font-size:17px; line-height:1.85; color:var(--fg)">{post.body}</div>
+    <div style="margin-top:34px; padding-top:18px; border-top:1px solid var(--line); display:flex; gap:12px; align-items:center">
+      <img src={`/avatar?seed=${post.author}`} width="40" height="40" style="border-radius:50%" alt="" />
+      <div><b style="font-family:inherit">The saasuluk team</b><p style="color:var(--muted); font-size:13px; margin:0">Building the SaaS that ships itself.</p></div>
+    </div>
+    <div style="margin-top:24px"><a class="btn" href="/products">Browse the store →</a> <a class="btn ghost" href="/blogs">More posts</a></div>
+  </article>
 </Layout>

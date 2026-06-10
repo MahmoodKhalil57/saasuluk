@@ -4,27 +4,37 @@ import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Dashboard — saasuluk">
   <h1>Dashboard</h1>
-  <p class="tag">Your projects — Drizzle-backed, served through the Suluk contract. Every write is metered (see the cost panel).</p>
+  <p class="tag">Your projects — Drizzle-backed, served through the Suluk contract. Every write is metered; the cost is shown raw below.</p>
+  <div class="grid" id="stats" style="margin-top:20px"></div>
   <h2>Projects</h2>
-  <form id="new" style="display:flex; gap:8px; margin-bottom:10px">
-    <input name="name" placeholder="New project name" required />
+  <form id="new" style="display:flex; gap:8px; margin-bottom:12px; max-width:440px">
+    <input name="name" placeholder="New project name" required style="flex:1" />
     <button class="btn" type="submit">+ Create</button>
   </form>
   <table><thead><tr><th>ID</th><th>Name</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
-  <h2>Cost — what you've spent (as it is)</h2>
-  <pre id="cost" class="card" style="white-space:pre-wrap; font-family:ui-monospace,monospace; font-size:13px"></pre>
+  <h2>Cost ledger — what you've spent (as it is)</h2>
+  <pre id="cost" class="card" style="white-space:pre-wrap; font-family:ui-monospace,monospace; font-size:12.5px; max-height:320px; overflow:auto"></pre>
   <script is:inline>
-    const H = { "x-user": "demo-user" };
+    let USER = "demo-user";
+    const money = (c) => "$" + (Number(c || 0) / 1e6).toFixed(4);
+    async function resolveSession() {
+      try { const s = await (await fetch("/api/auth/get-session", { credentials: "same-origin" })).json(); if (s && s.user) USER = s.user.id; } catch (e) {}
+    }
     async function load() {
+      const H = { "x-user": USER };
       const rows = await (await fetch("/project", { headers: H })).json();
-      document.getElementById("rows").innerHTML = rows.map((p) => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.status}</td></tr>`).join("") || `<tr><td colspan="3" style="color:#9399b2">no projects yet</td></tr>`;
-      document.getElementById("cost").textContent = JSON.stringify(await (await fetch("/cost")).json(), null, 2);
+      document.getElementById("rows").innerHTML = rows.length ? rows.map((p) => `<tr><td>${p.id}</td><td>${p.name}</td><td><span class="pill">${p.status}</span></td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">No projects yet — create one above.</td></tr>`;
+      const cost = await (await fetch("/cost")).json();
+      document.getElementById("stats").innerHTML = [
+        ["Projects", rows.length], ["Operations metered", cost.count || 0], ["Total cost", money(cost.total)], ["You spent", money((cost.byPrincipal || {})[USER] || 0)],
+      ].map(([k, v]) => `<div class="card"><p style="margin:0;font-size:12px">${k}</p><b style="font-family:inherit;font-size:22px">${v}</b></div>`).join("");
+      document.getElementById("cost").textContent = JSON.stringify(cost, null, 2);
     }
     document.getElementById("new").addEventListener("submit", async (e) => {
       e.preventDefault();
-      await fetch("/project", { method: "POST", headers: { ...H, "content-type": "application/json", "x-suluk-action": "create-project-button" }, body: JSON.stringify({ name: e.target.name.value }) });
+      await fetch("/project", { method: "POST", headers: { "x-user": USER, "content-type": "application/json", "x-suluk-action": "create-project-button" }, body: JSON.stringify({ name: e.target.name.value }) });
       e.target.reset(); load();
     });
-    load();
+    resolveSession().then(load);
   </script>
 </Layout>

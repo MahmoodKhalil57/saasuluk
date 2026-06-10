@@ -3,9 +3,13 @@ export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Account — saasuluk">
-  <div style="display:flex; gap:14px; align-items:center">
+  <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap">
     <img id="avatar" alt="" width="56" height="56" style="border-radius:50%;border:1px solid var(--line)" />
-    <div><h1 style="font-size:28px;margin:0">Your account</h1><p class="tag" style="font-size:14px">Signed in as <b id="who">demo-user</b> · <a href="/api/auth/reference">Better Auth</a></p></div>
+    <div style="flex:1; min-width:200px"><h1 style="font-size:28px;margin:0">Your account</h1><p class="tag" style="font-size:14px;margin:2px 0 0" id="sub">Loading…</p></div>
+    <a id="signout" class="btn ghost sm" href="#" style="display:none">Sign out</a>
+  </div>
+  <div id="anon" class="card" style="display:none; margin-top:16px; background:color-mix(in srgb,var(--accent) 7%,var(--panel))">
+    You're browsing as a demo user. <a href="/login">Sign in or create an account →</a> to make your orders, wishlist and tokens really yours.
   </div>
   <h2>Orders</h2>
   <table><thead><tr><th>#</th><th>Status</th><th>Total</th><th>Placed</th></tr></thead><tbody id="orders"></tbody></table>
@@ -16,16 +20,31 @@ import Layout from "../layouts/Layout.astro";
   <p id="newtok"></p>
   <table><thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th></th></tr></thead><tbody id="tokens"></tbody></table>
   <script is:inline>
-    const USER = "demo-user";
+    let USER = "demo-user";
     const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
     const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "—";
-    document.getElementById("avatar").src = `/avatar?seed=${USER}`;
+    async function resolveSession() {
+      try {
+        const s = await (await fetch("/api/auth/get-session", { credentials: "same-origin" })).json();
+        if (s && s.user) {
+          USER = s.user.id;
+          document.getElementById("avatar").src = `/avatar?seed=${encodeURIComponent(s.user.email || USER)}`;
+          document.getElementById("sub").innerHTML = `Signed in as <b>${s.user.name || s.user.email}</b> · ${s.user.email}`;
+          const so = document.getElementById("signout"); so.style.display = "inline-flex";
+          so.addEventListener("click", async (e) => { e.preventDefault(); await fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" }); location.href = "/"; });
+          return;
+        }
+      } catch (e) {}
+      document.getElementById("avatar").src = `/avatar?seed=${USER}`;
+      document.getElementById("sub").innerHTML = `Browsing as <b>demo-user</b>`;
+      document.getElementById("anon").style.display = "block";
+    }
     async function load() {
       const orders = (await (await fetch("/order")).json()).filter((o) => o.customerId === USER);
-      document.getElementById("orders").innerHTML = orders.length ? orders.map((o) => `<tr><td>#${o.id}</td><td><span class="pill">${o.status}</span></td><td>${money(o.totalCents)}</td><td>${when(o.createdAt)}</td></tr>`).join("") : `<tr><td colspan="4" style="color:var(--muted)">No orders yet — <a href="/products">shop</a>.</td></tr>`;
+      document.getElementById("orders").innerHTML = orders.length ? orders.map((o) => `<tr><td>#${o.id}</td><td><span class="pill">${o.status}</span></td><td>${money(o.totalCents)}</td><td>${when(o.createdAt)}</td></tr>`).join("") : `<tr><td colspan="4" style="color:var(--muted)">No orders yet — <a href="/products">shop the store</a>.</td></tr>`;
       const wl = (await (await fetch("/wishlistItem")).json()).filter((w) => w.customerId === USER);
       const products = await (await fetch("/product")).json();
-      document.getElementById("wishlist").innerHTML = wl.length ? wl.map((w) => { const p = products.find((x) => x.id === w.productId) || {}; return `<div class="card"><b style="font-family:inherit">${p.name || "#" + w.productId}</b><p>${money(p.priceCents)}</p></div>`; }).join("") : `<p style="color:var(--muted)">Empty.</p>`;
+      document.getElementById("wishlist").innerHTML = wl.length ? wl.map((w) => { const p = products.find((x) => x.id === w.productId) || {}; return `<div class="card"><b style="font-family:inherit">${p.name || "#" + w.productId}</b><p>${money(p.priceCents)}</p></div>`; }).join("") : `<p style="color:var(--muted)">Empty — <a href="/products">add something →</a></p>`;
       loadTokens();
     }
     async function loadTokens() {
@@ -35,15 +54,14 @@ import Layout from "../layouts/Layout.astro";
     }
     document.getElementById("tok").addEventListener("submit", async (e) => {
       e.preventDefault();
-      // the secret is generated + hashed server-side and returned ONCE — show it, then only the prefix persists.
       const r = await (await fetch("/tokens/create", { method: "POST", headers: { "content-type": "application/json", "x-user": USER }, body: JSON.stringify({ name: e.target.name.value }) })).json();
-      document.getElementById("newtok").innerHTML = `<span class="card" style="display:inline-block">New token <b style="font-family:ui-monospace,monospace">${r.token}</b> — copy it now, it won't be shown again. <button class="btn" data-test="${r.token}" style="padding:2px 8px">Test it</button></span>`;
+      document.getElementById("newtok").innerHTML = `<span class="card" style="display:inline-block">New token <b style="font-family:ui-monospace,monospace">${r.token}</b> — copy it now, it won't be shown again. <button class="btn sm" data-test="${r.token}">Test it</button></span>`;
       document.querySelector("[data-test]").addEventListener("click", async (ev) => {
-        const who = await (await fetch("/apiToken", { headers: { authorization: "Bearer " + ev.target.dataset.test } })).status;
-        ev.target.textContent = "Authenticated ✓ (" + who + ")";
+        const status = (await fetch("/apiToken", { headers: { authorization: "Bearer " + ev.target.dataset.test } })).status;
+        ev.target.textContent = "Authenticated ✓ (" + status + ")";
       });
       e.target.reset(); loadTokens();
     });
-    load();
+    resolveSession().then(load);
   </script>
 </Layout>

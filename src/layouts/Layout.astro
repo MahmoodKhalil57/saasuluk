@@ -133,7 +133,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         <div class="chrome">
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
           <button id="theme" class="iconbtn" aria-label="Toggle theme">◐</button>
-          <a class="btn sm" href="/dashboard" data-i18n="dashboard">{t("en", "dashboard")}</a>
+          <a id="authlink" class="btn sm" href="/login">Sign in</a>
         </div>
       </div>
     </header>
@@ -167,6 +167,16 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         if (window.__applyLang) window.__applyLang(e.target.value);
       });
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
+      // session-aware header: swap "Sign in" for the user's avatar when a Better Auth session exists.
+      (function () {
+        var link = document.getElementById("authlink"); if (!link) return;
+        fetch("/api/auth/get-session", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
+          var u = s && s.user; if (!u) return;
+          var name = u.name || (u.email || "").split("@")[0];
+          link.href = "/account"; link.className = "iconbtn"; link.style.display = "inline-flex"; link.style.alignItems = "center"; link.style.gap = "6px"; link.style.padding = "4px 9px 4px 5px";
+          link.innerHTML = '<img src="/avatar?seed=' + encodeURIComponent(u.email || name) + '" width="22" height="22" style="border-radius:50%"/> <span>' + name + '</span>';
+        }).catch(function () {});
+      })();
     </script>
   </body>
 </html>

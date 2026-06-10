@@ -97,4 +97,13 @@ app.get("/cost", async (c) => {
 // the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker.
 app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => c.req.header("x-role") === "superadmin" }));
 app.get("/api/health", (c) => c.json({ ok: true, on: "cloudflare-workers", name: "saasuluk" }));
+
+// unmatched: a browser navigation gets the premium static 404 page; an API client gets JSON.
+app.notFound(async (c) => {
+  if (c.req.method === "GET" && (c.req.header("accept") ?? "").includes("text/html")) {
+    const res = await (c.env as Env & { ASSETS: { fetch: (req: Request) => Promise<Response> } }).ASSETS.fetch(new Request(new URL("/404.html", c.req.url)));
+    return new Response(res.body, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
+  }
+  return c.json({ error: "not found" }, 404);
+});
 export default app;
