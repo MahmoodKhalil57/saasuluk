@@ -1,0 +1,17 @@
+import { writeFileSync } from "node:fs";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { tableToV4, tableComponents } from "@suluk/drizzle";
+import { buildApp } from "@suluk/builder";
+import { annotateCosts, type CostModel } from "@suluk/cost";
+import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
+const project = sqliteTable("project", { id: integer("id").primaryKey({ autoIncrement: true }), name: text("name").notNull(), ownerId: text("owner_id"), status: text("status", { enum: ["active", "archived"] }).notNull().default("active") });
+const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
+const write = (m: number): CostModel => ({ components: [{ source: "compute", basis: "per-call", microUsd: 100 }, { source: "db-write", basis: "per-call", microUsd: m }], estimateMicroUsd: 100 + m });
+const costs = { listProject: read(12), getProject: read(8), createProject: write(40), updateProject: write(40), deleteProject: write(25) };
+const built = buildApp({ entities: [{ name: "Project", schema: tableToV4(project).insert }], info: { title: "Saasuluk API", version: "0.1.0" } });
+let doc = annotateCosts(built.backend.document, costs);
+doc.components = { ...(doc.components ?? {}), schemas: { ...(doc.components?.schemas ?? {}), ...tableComponents([project]) } };
+const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
+doc = mergeAuth(doc, {}, { securitySchemes });
+writeFileSync("openapi.json", JSON.stringify(doc, null, 2));
+console.log("wrote openapi.json — schemas:", Object.keys(doc.components?.schemas ?? {}).join(", "));
