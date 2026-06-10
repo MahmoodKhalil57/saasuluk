@@ -73,6 +73,21 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(await av.text()).toContain("<svg");
   });
 
+  test("developer portal: an API token is generated once, authenticates a Bearer request, owner-stamps + meters, then revokes", async () => {
+    const tok = await (await post("/tokens/create", { name: "CI" }, { "x-user": "dev-1" })).json();
+    expect(tok.token).toMatch(/^sk_/);
+    expect(tok.prefix.length).toBeLessThan(tok.token.length); // only a prefix is shown in listings
+    // a Bearer token authenticates with NO x-user header — the row is owner-stamped to the token's user
+    const made = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "via-token" }) })).json();
+    expect(made.ownerId).toBe("dev-1");
+    const cost = await (await app.request("/cost")).json() as any;
+    expect(cost.byPrincipal["dev-1"]).toBeGreaterThan(0);
+    // revoke → the same token no longer authenticates
+    await post(`/tokens/${tok.id}/revoke`, {}, {});
+    const after = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "after" }) })).json();
+    expect(after.ownerId).toBeNull();
+  });
+
   test("Scalar renders the docs", async () => {
     expect(await (await app.request("/scalar")).text()).toContain("Scalar.createApiReference");
   });

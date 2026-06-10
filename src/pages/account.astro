@@ -12,6 +12,7 @@ import Layout from "../layouts/Layout.astro";
   <div class="grid" id="wishlist"></div>
   <h2>API tokens (developer)</h2>
   <form id="tok" style="display:flex; gap:8px; margin-bottom:8px"><input name="name" placeholder="Token name" required /><button class="btn" type="submit">+ Create</button></form>
+  <p id="newtok"></p>
   <table><thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th></th></tr></thead><tbody id="tokens"></tbody></table>
   <script is:inline>
     const USER = "demo-user";
@@ -29,12 +30,17 @@ import Layout from "../layouts/Layout.astro";
     async function loadTokens() {
       const ts = (await (await fetch("/apiToken")).json()).filter((t) => t.userId === USER && !t.revokedAt);
       document.getElementById("tokens").innerHTML = ts.length ? ts.map((t) => `<tr><td>${t.name}</td><td><code>${t.prefix}…</code></td><td>${when(t.createdAt)}</td><td><button class="pill" data-r="${t.id}" style="cursor:pointer;border:0">revoke</button></td></tr>`).join("") : `<tr><td colspan="4" style="color:var(--muted)">No tokens.</td></tr>`;
-      document.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/apiToken/${b.dataset.r}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ revokedAt: Date.now() }) }); loadTokens(); }));
+      document.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/tokens/${b.dataset.r}/revoke`, { method: "POST", headers: { "x-user": USER } }); loadTokens(); }));
     }
     document.getElementById("tok").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const prefix = "sk_" + Math.random().toString(36).slice(2, 8);
-      await fetch("/apiToken", { method: "POST", headers: { "content-type": "application/json", "x-user": USER }, body: JSON.stringify({ name: e.target.name.value, prefix, hashedKey: "demo-" + prefix, createdAt: Date.now() }) });
+      // the secret is generated + hashed server-side and returned ONCE — show it, then only the prefix persists.
+      const r = await (await fetch("/tokens/create", { method: "POST", headers: { "content-type": "application/json", "x-user": USER }, body: JSON.stringify({ name: e.target.name.value }) })).json();
+      document.getElementById("newtok").innerHTML = `<span class="card" style="display:inline-block">New token <b style="font-family:ui-monospace,monospace">${r.token}</b> — copy it now, it won't be shown again. <button class="btn" data-test="${r.token}" style="padding:2px 8px">Test it</button></span>`;
+      document.querySelector("[data-test]").addEventListener("click", async (ev) => {
+        const who = await (await fetch("/apiToken", { headers: { authorization: "Bearer " + ev.target.dataset.test } })).status;
+        ev.target.textContent = "Authenticated ✓ (" + who + ")";
+      });
       e.target.reset(); loadTokens();
     });
     load();

@@ -9,7 +9,28 @@
 import { and, eq, gte, like, lt, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, post, order, cart, review, discountCode, newsletterSubscriber } from "./schema";
+import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken } from "./schema";
+import { sendEmailAsync, brandedEmail } from "./email";
+
+/** SHA-256 of an API key (Web Crypto — Worker-safe). We store only the hash; the plaintext is shown once. */
+export async function hashKey(key: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** The acting principal for a request: a verified API-token user (set by the auth middleware) else the
+ *  `x-user` header. The ONE place owner-stamping reads, so a Bearer token attributes rows + cost identically. */
+export const principal = (c: Context): string | null => (c.get("tokenUser") as string | undefined) ?? c.req.header("x-user") ?? null;
+
+/** Resolve an `Authorization: Bearer sk_…` header to the owning userId via the api_token table (or null). */
+export async function verifyApiToken(dz: { select: (...a: unknown[]) => any }, authHeader: string | undefined): Promise<string | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const m = /^Bearer\s+(sk_[A-Za-z0-9_]+)$/.exec(authHeader ?? "");
+  if (!m) return null;
+  const hashed = await hashKey(m[1]);
+  const row = await dz.select().from(apiToken).where(eq(apiToken.hashedKey, hashed)).get();
+  if (!row || row.revokedAt) return null;
+  return row.userId ?? null;
+}
 
 // a permissive Drizzle handle — both bun:sqlite and D1 expose the same query-builder surface.
 type Dz = {
@@ -44,6 +65,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
+  createToken: write(30), revokeToken: write(20),
 };
 
 /** The v4 path fragment for the custom operations — merged into the contract document. */
@@ -58,6 +80,8 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string" } }, required: ["productId"] } } }) } },
   "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: { type: "object", properties: { email: { type: "string" } }, required: ["email"] }, status: 201 }) } },
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: { type: "object", properties: { seed: { type: "string" } } } }, contentType: "image/svg+xml", response: { type: "string" } }) } },
+  "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: { type: "object", properties: { name: { type: "string" } }, required: ["name"] }, status: 201 }) } },
+  "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
 };
 
 /** Validate a discount code against the table: must exist, be active, not expired, and under its usage cap. */
@@ -96,7 +120,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const disc = codeUsed ? await resolveDiscount(dz, codeUsed) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
     if (codeUsed && !disc.valid) codeUsed = null;
-    const customerId = c.req.header("x-user") ?? null;
+    const customerId = principal(c);
     const created = await dz.insert(order).values({ customerId, items: JSON.stringify(items), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
     if (codeUsed && disc.valid) await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, codeUsed.toUpperCase().trim())).run();
     return c.json({ order: created[0], subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid }, 201);
@@ -186,7 +210,27 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const existing = await dz.select().from(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).get();
     if (existing) return c.json({ subscribed: true, already: true });
     await dz.insert(newsletterSubscriber).values({ email, subscribedAt: Date.now() }).run();
+    sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", "<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p>") });
     return c.json({ subscribed: true, already: false }, 201);
+  };
+
+  const createToken = async (c: Context) => {
+    const dz = dbFor(c);
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string };
+    const name = String(body.name ?? "").trim() || "token";
+    // sk_<random> — shown ONCE; we persist only its SHA-256 hash + a short prefix for display.
+    const secret = "sk_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    const hashedKey = await hashKey(secret);
+    const userId = principal(c);
+    const created = await dz.insert(apiToken).values({ userId, name, prefix: secret.slice(0, 10), hashedKey, createdAt: Date.now() }).returning();
+    return c.json({ id: created[0].id, name, token: secret, prefix: created[0].prefix, note: "Copy this now — it will not be shown again." }, 201);
+  };
+
+  const revokeToken = async (c: Context) => {
+    const dz = dbFor(c);
+    const id = Number(c.req.param("id"));
+    await dz.update(apiToken).set({ revokedAt: Date.now() }).where(eq(apiToken.id, id)).run();
+    return c.json({ revoked: true, id });
   };
 
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
@@ -215,4 +259,6 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.get("/recommendations/:productId", recommendRelated);
   app.post("/newsletter/subscribe", subscribeNewsletter);
   app.get("/avatar", generateAvatar);
+  app.post("/tokens/create", createToken);
+  app.post("/tokens/:id/revoke", revokeToken);
 }

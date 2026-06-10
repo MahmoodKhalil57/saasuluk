@@ -7796,6 +7796,103 @@
           }
         }
       }
+    },
+    "tokens/create": {
+      "requests": {
+        "createToken": {
+          "method": "post",
+          "summary": "Create an API token (returns the secret ONCE)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "responses": {
+            "ok": {
+              "status": 201,
+              "description": "Create an API token (returns the secret ONCE)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 130
+          }
+        }
+      }
+    },
+    "tokens/{id}/revoke": {
+      "requests": {
+        "revokeToken": {
+          "method": "post",
+          "summary": "Revoke an API token",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Revoke an API token",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 120
+          }
+        }
+      }
     }
   },
   "components": {

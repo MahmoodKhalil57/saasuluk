@@ -17,7 +17,15 @@ the same source.
 | Better-Auth | **Better Auth** via `@suluk/better-auth` (wired into the v4 contract: securitySchemes + its OpenAPI ingested) |
 | Ecommerce (products, variants, categories, carts, orders, discount codes, reviews, wishlists) | **entities in the contract** — declared once in `src/server/schema.ts`, registered in `src/server/domain.ts`; CRUD API + docs + admin + client + UI + cost project automatically |
 | Blog, FAQs, newsletter, contact, media | the same: content **entities**, not bespoke collections |
-| API tokens / developer portal | an `ApiToken` **entity** (+ Better Auth) |
+| Checkout, discounts, search, recommendations, analytics | **custom operations** (`src/server/operations.ts`) — one factory, mounted in dev + the Worker, merged into the contract (Scalar + cost) |
+| Cart / checkout / orders pages, blog, account, FAQ, contact, legal, metrics | **Astro pages** over the typed contract (`src/pages/*`) — storefront, reviews, wishlist, analytics dashboard |
+| API tokens / developer portal | a real **token operation**: `/tokens/create` generates → hashes → returns once; a `Bearer sk_…` authenticates + owner-stamps + meters; `/tokens/:id/revoke` |
+| Resend email | **Resend over fetch** (Worker-safe, graceful) — newsletter welcome + magic-link; `src/server/email.ts` |
+| Passkey / passwordless | **magic-link** sign-in (Better Auth) via the email module; passkey is a documented drop-in (`@better-auth/passkey`) |
+| i18n (en/ar/es, RTL) | **client-side i18n** (`src/i18n.ts`) — one dictionary, a language switcher, RTL for Arabic, persisted |
+| next-themes (dark mode) | a **light/dark toggle** (CSS vars, persisted, applied pre-paint) |
+| PWA | a **manifest + service worker** (offline shell) + maskable favicon |
+| @dicebear avatars | a **derived identicon** SVG (`/avatar?seed=…`) — dependency-free |
 | PayloadCMS collections / ecommerce plugin | the **entity registry** (`domain.ts`) — one typed source instead of ~14 collection configs + a plugin |
 | Stripe payments | **Stripe** via `@suluk/stripe` (Billing Meters) + **usage** via `@suluk/cost` |
 | PayloadCMS admin | the **`/superadmin` cockpit** via `@suluk/admin` (same brain as the Suluk VSCode extension) |

@@ -21,7 +21,7 @@ import { scalarResponse } from "@suluk/scalar";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal } from "../src/server/operations";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
@@ -31,12 +31,19 @@ const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { s
 const ada = buildAda(document);
 
 type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string };
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
 app.on(["GET", "POST"], "/api/auth/*", async (c) => {
   try { return await getAuth(c.env).handler(c.req.raw); }
   catch (e) { return c.json({ error: "auth unavailable", detail: String((e as Error)?.message ?? e) }, 503); }
+});
+
+// API-token auth — a Bearer sk_… resolves to its owning user (attributed in the cost ledger).
+app.use("*", async (c, next) => {
+  const h = c.req.header("authorization");
+  if (h?.startsWith("Bearer sk_")) { const u = await verifyApiToken(drizzle(c.env.DB), h); if (u) c.set("tokenUser", u); }
+  await next();
 });
 
 // durable cost meter — persist each operation's cost to D1 so /cost accumulates across isolates.
@@ -45,8 +52,9 @@ app.use("*", async (c, next) => {
   const op = matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name;
   if (!op || !costs[op]) return;
   const { breakdown, totalMicroUsd } = computeCost(costs[op], []);
+  const principal = (c.get("tokenUser") as string | undefined) ?? c.req.header("x-user") ?? null;
   await c.env.DB.prepare("INSERT INTO cost_event (at, principal, operation, action, total_micro_usd, breakdown) VALUES (?,?,?,?,?,?)")
-    .bind(Date.now(), c.req.header("x-user") ?? null, op, c.req.header("x-suluk-action") ?? null, totalMicroUsd, JSON.stringify(breakdown)).run();
+    .bind(Date.now(), principal, op, c.req.header("x-suluk-action") ?? null, totalMicroUsd, JSON.stringify(breakdown)).run();
 });
 
 // generic D1 CRUD (async) — written ONCE, bound to every contract-generated route, the D1 twin of src/server/crud.ts.
@@ -57,7 +65,7 @@ function d1Crud(table: SQLiteTable, ownerCol?: string) {
   return {
     list: async (c: Context<{ Bindings: Env }>) => c.json(await dz(c).select().from(table).all()),
     get: async (c: Context<{ Bindings: Env }>) => { const r = await dz(c).select().from(table).where(eq(pk, rid(c))); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404); },
-    create: async (c: Context<{ Bindings: Env }>) => { const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; const owner = ownerCol ? { [ownerCol]: c.req.header("x-user") ?? null } : {}; const r = await dz(c).insert(table).values({ ...b, ...owner } as never).returning(); return c.json(r[0], 201); },
+    create: async (c: Context<{ Bindings: Env }>) => { const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; const owner = ownerCol ? { [ownerCol]: principal(c) } : {}; const r = await dz(c).insert(table).values({ ...b, ...owner } as never).returning(); return c.json(r[0], 201); },
     update: async (c: Context<{ Bindings: Env }>) => { const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; delete b.id; await dz(c).update(table).set(b as never).where(eq(pk, rid(c))); const r = await dz(c).select().from(table).where(eq(pk, rid(c))); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404); },
     delete: async (c: Context<{ Bindings: Env }>) => { await dz(c).delete(table).where(eq(pk, rid(c))); return c.body(null, 204); },
   };

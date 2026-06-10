@@ -1,0 +1,27 @@
+/**
+ * Lightweight i18n — the chrome (nav, footer, common actions) translated across en / es / ar, with RTL for
+ * Arabic. saastarter ships a namespace-per-locale system in src/messages; here it is one typed dictionary +
+ * a `t()` lookup, read by the Layout from a `lang` cookie. Extend by adding keys (and page-body strings) to
+ * DICT — the pattern is the same. RTL is handled by `dir` on <html> so logical CSS just works.
+ */
+export const LOCALES = ["en", "es", "ar"] as const;
+export type Locale = (typeof LOCALES)[number];
+export const RTL: Locale[] = ["ar"];
+export const LOCALE_LABEL: Record<Locale, string> = { en: "English", es: "Español", ar: "العربية" };
+
+type Key =
+  | "home" | "products" | "blog" | "pricing" | "dashboard" | "account"
+  | "faq" | "contact" | "about" | "metrics" | "docs" | "admin"
+  | "privacy" | "terms" | "license" | "tagline" | "search" | "addToCart" | "checkout";
+
+export const DICT: Record<Locale, Record<Key, string>> = {
+  en: { home: "Home", products: "Products", blog: "Blog", pricing: "Pricing", dashboard: "Dashboard", account: "Account", faq: "FAQ", contact: "Contact", about: "About", metrics: "Metrics", docs: "API Docs", admin: "Admin", privacy: "Privacy", terms: "Terms", license: "License", tagline: "every layer from one contract.", search: "Search", addToCart: "Add to cart", checkout: "Checkout" },
+  es: { home: "Inicio", products: "Productos", blog: "Blog", pricing: "Precios", dashboard: "Panel", account: "Cuenta", faq: "Preguntas", contact: "Contacto", about: "Acerca de", metrics: "Métricas", docs: "API Docs", admin: "Admin", privacy: "Privacidad", terms: "Términos", license: "Licencia", tagline: "cada capa desde un solo contrato.", search: "Buscar", addToCart: "Añadir al carrito", checkout: "Pagar" },
+  ar: { home: "الرئيسية", products: "المنتجات", blog: "المدونة", pricing: "الأسعار", dashboard: "لوحة التحكم", account: "الحساب", faq: "الأسئلة", contact: "اتصل بنا", about: "حول", metrics: "الإحصاءات", docs: "وثائق API", admin: "الإدارة", privacy: "الخصوصية", terms: "الشروط", license: "الرخصة", tagline: "كل طبقة من عقد واحد.", search: "بحث", addToCart: "أضف إلى السلة", checkout: "الدفع" },
+};
+
+export const isLocale = (v: unknown): v is Locale => typeof v === "string" && (LOCALES as readonly string[]).includes(v);
+export const dirOf = (l: Locale): "rtl" | "ltr" => (RTL.includes(l) ? "rtl" : "ltr");
+export function t(locale: Locale, key: Key): string {
+  return DICT[locale]?.[key] ?? DICT.en[key] ?? key;
+}

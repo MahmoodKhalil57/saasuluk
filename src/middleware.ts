@@ -20,7 +20,7 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const HONO = [
   "/api", "/scalar", "/openapi.json", "/superadmin", "/cost",
   ...ENTITIES.map((e) => `/${lowerFirst(e.name)}`),
-  "/checkout", "/discount", "/search", "/analytics", "/recommendations", "/newsletter", "/avatar",
+  "/checkout", "/discount", "/search", "/analytics", "/recommendations", "/newsletter", "/avatar", "/tokens",
 ];
 // the rare path that names BOTH an Astro page and an API operation: the page is GET, the operation is POST.
 // GET → Astro (the page); any other method → Hono (the operation). Keeps /checkout working as both.

@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { db } from "./db";
+import { principal } from "./operations";
 
 type AnyRow = Record<string, unknown>;
 const numId = (c: Context) => Number(c.req.param("id"));
@@ -34,7 +35,7 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string): CrudHandler
     },
     create: async (c) => {
       const body = (await c.req.json().catch(() => ({}))) as AnyRow;
-      const owner = ownerCol ? { [ownerCol]: c.req.header("x-user") ?? null } : {};
+      const owner = ownerCol ? { [ownerCol]: principal(c) } : {};
       const r = db.insert(table).values({ ...body, ...owner } as never).returning().get();
       return c.json(r, 201);
     },
