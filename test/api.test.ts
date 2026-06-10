@@ -113,7 +113,7 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(r.status).not.toBe(404); // Better Auth handles it (the OpenAPI reference UI)
   });
 
-  test("Stripe webhook endpoint exists (503 until configured)", async () => {
-    expect((await post("/api/stripe/webhook", {})).status).toBe(503);
+  test("Stripe webhook endpoint exists (rejects an unsigned request: 400 when configured, 503 when not)", async () => {
+    expect([400, 503]).toContain((await post("/api/stripe/webhook", {})).status);
   });
 });

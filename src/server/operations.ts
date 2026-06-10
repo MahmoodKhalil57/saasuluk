@@ -22,6 +22,10 @@ export async function hashKey(key: string): Promise<string> {
  *  `x-user` header. The ONE place owner-stamping reads, so a Bearer token attributes rows + cost identically. */
 export const principal = (c: Context): string | null => (c.get("tokenUser") as string | undefined) ?? c.req.header("x-user") ?? null;
 
+/** Read a secret/var from the Worker env (c.env) or the dev process.env — so one handler works in both runtimes. */
+const secret = (c: Context, name: string): string | undefined =>
+  ((c.env as Record<string, string> | undefined)?.[name]) ?? (typeof process !== "undefined" ? process.env?.[name] : undefined);
+
 /** Resolve an `Authorization: Bearer sk_…` header to the owning userId via the api_token table (or null). */
 export async function verifyApiToken(dz: { select: (...a: unknown[]) => any }, authHeader: string | undefined): Promise<string | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const m = /^Bearer\s+(sk_[A-Za-z0-9_]+)$/.exec(authHeader ?? "");
@@ -66,6 +70,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
+  payCheckout: write(90), confirmCheckout: read(30),
 };
 
 /** The v4 path fragment for the custom operations — merged into the contract document. */
@@ -82,6 +87,8 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: { type: "object", properties: { seed: { type: "string" } } } }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: { type: "object", properties: { name: { type: "string" } }, required: ["name"] }, status: 201 }) } },
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
+  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: { type: "object" } }) } },
+  "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: { type: "object" } }) } },
 };
 
 /** Validate a discount code against the table: must exist, be active, not expired, and under its usage cap. */
@@ -233,6 +240,55 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     return c.json({ revoked: true, id });
   };
 
+  // real Stripe Checkout — via the REST API over fetch (no SDK → Worker-safe). Creates a pending order + a
+  // hosted Checkout Session; the success page calls confirmCheckout, which retrieves the session from Stripe
+  // (the source of truth) and marks the order paid — so it works WITHOUT a configured webhook endpoint.
+  const payCheckout = async (c: Context) => {
+    const key = secret(c, "STRIPE_SECRET_KEY");
+    if (!key) return c.json({ error: "Stripe is not configured (set STRIPE_SECRET_KEY)." }, 503);
+    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string };
+    const items: LineItem[] = Array.isArray(body.items) ? body.items : [];
+    if (!items.length) return c.json({ error: "Your cart is empty." }, 422);
+    const dz = dbFor(c);
+    const subtotal = itemsTotal(items);
+    const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode) : { valid: false } as ResolvedDiscount;
+    const total = applyDiscount(subtotal, disc);
+    if (total < 50) return c.json({ error: "Stripe's minimum charge is $0.50 — use “Place order” for free items." }, 422);
+    const codeUsed = disc.valid ? body.discountCode! : null;
+    const created = await dz.insert(order).values({ customerId: principal(c), items: JSON.stringify(items), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
+    const orderId = created[0].id;
+    const origin = new URL(c.req.url).origin;
+    const form = new URLSearchParams();
+    form.set("mode", "payment");
+    form.set("success_url", `${origin}/checkout/success?order=${orderId}&session_id={CHECKOUT_SESSION_ID}`);
+    form.set("cancel_url", `${origin}/checkout`);
+    form.set("client_reference_id", String(orderId));
+    form.set("metadata[orderId]", String(orderId));
+    form.set("line_items[0][quantity]", "1");
+    form.set("line_items[0][price_data][currency]", "usd");
+    form.set("line_items[0][price_data][unit_amount]", String(total));
+    form.set("line_items[0][price_data][product_data][name]", `saasuluk order #${orderId}${codeUsed ? ` · ${codeUsed} applied` : ""}`);
+    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body: form.toString() });
+    const session = (await r.json().catch(() => ({}))) as { id?: string; url?: string; error?: { message?: string } };
+    if (!r.ok || !session.url) return c.json({ error: session.error?.message ?? "Stripe error", orderId }, 502);
+    await dz.update(order).set({ stripePaymentIntentId: session.id }).where(eq(order.id, orderId)).run();
+    return c.json({ url: session.url, orderId, totalCents: total });
+  };
+
+  const confirmCheckout = async (c: Context) => {
+    const key = secret(c, "STRIPE_SECRET_KEY");
+    const body = (await c.req.json().catch(() => ({}))) as { orderId?: number; sessionId?: string };
+    const orderId = Number(body.orderId);
+    if (!key || !body.sessionId || !orderId) return c.json({ paid: false, reason: "missing key, session or order" }, 400);
+    const dz = dbFor(c);
+    const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(body.sessionId)}`, { headers: { authorization: `Bearer ${key}` } });
+    const session = (await r.json().catch(() => ({}))) as { payment_status?: string; client_reference_id?: string };
+    const paid = r.ok && session.payment_status === "paid" && String(session.client_reference_id) === String(orderId);
+    if (paid) await dz.update(order).set({ status: "paid" }).where(eq(order.id, orderId)).run();
+    const row = await dz.select().from(order).where(eq(order.id, orderId)).get();
+    return c.json({ paid, order: row });
+  };
+
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
   const generateAvatar = (c: Context) => {
     const seed = c.req.query("seed") ?? "anon";
@@ -261,4 +317,6 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.get("/avatar", generateAvatar);
   app.post("/tokens/create", createToken);
   app.post("/tokens/:id/revoke", revokeToken);
+  app.post("/checkout/pay", payCheckout);
+  app.post("/checkout/confirm", confirmCheckout);
 }

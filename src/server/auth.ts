@@ -15,6 +15,11 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: true },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me-in-prod",
   baseURL: process.env.BASE_URL ?? "http://localhost:3000",
+  // Google OAuth — enabled when the keys are present (Sign in with Google). Add the callback
+  // <baseURL>/api/auth/callback/google to the Google OAuth app's authorized redirect URIs.
+  socialProviders: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? { google: { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET } }
+    : undefined,
   plugins: [
     bearer(),
     admin(),

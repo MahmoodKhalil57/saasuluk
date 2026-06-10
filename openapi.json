@@ -7893,6 +7893,81 @@
           }
         }
       }
+    },
+    "checkout/pay": {
+      "requests": {
+        "payCheckout": {
+          "method": "post",
+          "summary": "Create a pending order + a Stripe Checkout Session (returns the hosted URL)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object"
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Create a pending order + a Stripe Checkout Session (returns the hosted URL)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 90
+              }
+            ],
+            "estimateMicroUsd": 190
+          }
+        }
+      }
+    },
+    "checkout/confirm": {
+      "requests": {
+        "confirmCheckout": {
+          "method": "post",
+          "summary": "Confirm payment by retrieving the Stripe session; mark the order paid",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object"
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Confirm payment by retrieving the Stripe session; mark the order paid",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 30
+          }
+        }
+      }
     }
   },
   "components": {

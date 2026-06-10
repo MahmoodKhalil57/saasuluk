@@ -11,6 +11,7 @@
     { "pattern": "saasuluk.saastemly.com", "custom_domain": true }
   ],
   "assets": { "directory": "dist/client", "binding": "ASSETS" },
-  "vars": { "BETTER_AUTH_SECRET": "saasuluk-prod-secret-please-rotate-32x" },
+  // Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+  // RESEND_API_KEY, EMAIL_FROM) are stored ENCRYPTED via `wrangler secret put` — never in this file.
   "observability": { "enabled": true }
 }

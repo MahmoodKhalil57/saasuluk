@@ -21,6 +21,7 @@ import { scalarResponse } from "@suluk/scalar";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
+import { order } from "../src/server/schema";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal } from "../src/server/operations";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
@@ -30,7 +31,7 @@ const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true })
 const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes });
 const ada = buildAda(document);
 
-type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string };
+type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
@@ -97,6 +98,30 @@ app.get("/cost", async (c) => {
 // the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker.
 app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => c.req.header("x-role") === "superadmin" }));
 app.get("/api/health", (c) => c.json({ ok: true, on: "cloudflare-workers", name: "saasuluk" }));
+
+// Stripe webhook — verifies the signature with Web Crypto (no SDK) and marks the order paid on completion.
+// Secondary to the success-page confirm (which retrieves the session directly); add an endpoint in Stripe
+// (https://saasuluk.saastemly.com/api/stripe/webhook) and put its signing secret in STRIPE_WEBHOOK_SECRET.
+async function verifyStripe(raw: string, sig: string, secret: string): Promise<boolean> {
+  const parts = Object.fromEntries(sig.split(",").map((p) => p.split("=")));
+  if (!parts.t || !parts.v1) return false;
+  const keyData = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", keyData, new TextEncoder().encode(`${parts.t}.${raw}`));
+  const expected = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return expected === parts.v1;
+}
+app.post("/api/stripe/webhook", async (c) => {
+  const secret = c.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) return c.json({ error: "stripe webhook not configured" }, 503);
+  const raw = await c.req.text();
+  if (!(await verifyStripe(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
+  const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string } } } };
+  if (evt.type === "checkout.session.completed") {
+    const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
+    if (oid) await drizzle(c.env.DB).update(order).set({ status: "paid" }).where(eq(order.id, oid)).run();
+  }
+  return c.json({ received: true, type: evt.type });
+});
 
 // unmatched: a browser navigation gets the premium static 404 page; an API client gets JSON.
 app.notFound(async (c) => {

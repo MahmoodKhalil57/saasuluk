@@ -1,10 +1,17 @@
 /** Better Auth on Cloudflare Workers + D1 — a per-request instance (the D1 binding is per-request), cached
- *  per isolate. Uses the kysely-d1 dialect over env.DB. The auth tables live in the same D1 as the domain. */
+ *  per isolate. Uses the kysely-d1 dialect over env.DB. The auth tables live in the same D1 as the domain.
+ *  Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_*, RESEND_API_KEY) come from the Worker env (wrangler secrets). */
 import { betterAuth } from "better-auth";
-import { bearer, admin, openAPI } from "better-auth/plugins";
+import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
 import { D1Dialect } from "kysely-d1";
+import { sendEmailAsync, brandedEmail } from "../src/server/email";
 
-export interface AuthEnv { DB: D1Database; BETTER_AUTH_SECRET?: string }
+export interface AuthEnv {
+  DB: D1Database;
+  BETTER_AUTH_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+}
 const cache = new WeakMap<object, ReturnType<typeof betterAuth>>();
 
 export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
@@ -16,7 +23,19 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
     secret: env.BETTER_AUTH_SECRET ?? "saasuluk-dev-secret-change-me-32chars!",
     baseURL: "https://saasuluk.saastemly.com",
     trustedOrigins: ["https://saasuluk.saastemly.com"],
-    plugins: [bearer(), admin(), openAPI()],
+    socialProviders: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+      : undefined,
+    plugins: [
+      bearer(),
+      admin(),
+      openAPI(),
+      magicLink({
+        sendMagicLink: async ({ email, url }) => {
+          sendEmailAsync({ to: email, subject: "Your saasuluk sign-in link", html: brandedEmail("Sign in to saasuluk", `<p>Click to sign in — this link expires shortly.</p><p><a href="${url}" style="color:#6366f1">${url}</a></p>`) });
+        },
+      }),
+    ],
   });
   cache.set(env.DB as unknown as object, auth);
   return auth;

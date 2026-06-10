@@ -1,0 +1,26 @@
+---
+export const prerender = true;
+import Layout from "../../layouts/Layout.astro";
+---
+<Layout title="Order confirmed — saasuluk">
+  <section class="hero" style="padding:60px 0">
+    <div id="state"><p style="color:var(--muted)">Confirming your payment with Stripe…</p></div>
+  </section>
+  <script is:inline>
+    const params = new URLSearchParams(location.search);
+    const orderId = params.get("order"), sessionId = params.get("session_id");
+    (async () => {
+      const state = document.getElementById("state");
+      if (!orderId || !sessionId) { state.innerHTML = '<h1>Thanks!</h1><p class="tag center">Nothing to confirm. <a href="/products">Back to the store →</a></p>'; return; }
+      try {
+        const r = await (await fetch("/checkout/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId: Number(orderId), sessionId }) })).json();
+        if (r.paid) {
+          localStorage.removeItem("cart");
+          state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${orderId} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and the order is marked paid — every step metered. See it in your <a href="/account">account</a> and the live <a href="/metrics">metrics</a>.</p><div class="cta"><a class="btn" href="/account">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
+        } else {
+          state.innerHTML = `<h1>Payment not confirmed yet</h1><p class="tag center">We couldn't confirm order #${orderId}. If you just paid, give it a moment and refresh — or <a href="/checkout">return to checkout</a>.</p>`;
+        }
+      } catch (e) { state.innerHTML = '<h1>Something went wrong</h1><p class="tag center"><a href="/checkout">Back to checkout</a></p>'; }
+    })();
+  </script>
+</Layout>
