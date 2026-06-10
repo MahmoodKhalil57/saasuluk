@@ -43,12 +43,12 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
 
   test("custom operations: checkout applies a discount, validate previews it, and both are in the contract + metered", async () => {
     const doc = await (await app.request("/openapi.json")).json() as any;
-    for (const [path, op] of [["checkout", "checkout"], ["discount/validate", "validateDiscount"], ["search", "search"], ["analytics/summary", "analyticsSummary"]] as const) {
+    for (const [path, op] of [["checkout/order", "checkout"], ["discount/validate", "validateDiscount"], ["search", "search"], ["analytics/summary", "analyticsSummary"]] as const) {
       expect(doc.paths[path]?.requests[op]["x-suluk-cost"], `op not costed: ${op}`).toBeDefined();
     }
     await post("/product", { name: "Pro", slug: "pro", priceCents: 5000, status: "published", categoryId: 1 }, { "x-user": "c1" });
     await post("/discountCode", { code: "SAVE10", discountType: "percent", discountValue: 10, isActive: true }, {});
-    const co = await (await post("/checkout", { items: [{ productId: 1, qty: 2, priceCents: 5000 }], discountCode: "SAVE10" }, { "x-user": "c1", "x-suluk-action": "checkout-btn" })).json();
+    const co = await (await post("/checkout/order", { items: [{ productId: 1, qty: 2, priceCents: 5000 }], discountCode: "SAVE10" }, { "x-user": "c1", "x-suluk-action": "checkout-btn" })).json();
     expect(co.subtotalCents).toBe(10000);
     expect(co.totalCents).toBe(9000); // 10% off
     expect(co.discountApplied).toBe(true);

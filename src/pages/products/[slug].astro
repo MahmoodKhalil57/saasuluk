@@ -1,5 +1,8 @@
 ---
+export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
+import { PRODUCT_SLUGS } from "../../content-slugs";
+export function getStaticPaths() { return PRODUCT_SLUGS.map((slug) => ({ params: { slug } })); }
 const { slug } = Astro.params;
 ---
 <Layout title={`${slug} — saasuluk`}>

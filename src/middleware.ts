@@ -17,18 +17,17 @@ const getApp = async () => {
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 // every entity's CRUD path (e.g. /product, /order, /wishlistItem) + the infra + custom-operation prefixes.
 // Pages live at DISTINCT routes (plural: /products, /blogs, /faqs) so they never shadow a singular entity API.
+// Operation paths live at routes DISTINCT from any page so a static asset never shadows them on Cloudflare
+// (where assets are served before the worker and reject non-GET). Notably the checkout OPERATION is
+// `/checkout/order`, not `/checkout` — the latter is the checkout PAGE. So no path is both a page and an op.
 const HONO = [
   "/api", "/scalar", "/openapi.json", "/superadmin", "/cost",
   ...ENTITIES.map((e) => `/${lowerFirst(e.name)}`),
-  "/checkout", "/discount", "/search", "/analytics", "/recommendations", "/newsletter", "/avatar", "/tokens",
+  "/checkout/order", "/discount", "/search", "/analytics", "/recommendations", "/newsletter", "/avatar", "/tokens",
 ];
-// the rare path that names BOTH an Astro page and an API operation: the page is GET, the operation is POST.
-// GET → Astro (the page); any other method → Hono (the operation). Keeps /checkout working as both.
-const PAGE_GET_OVERRIDES = new Set(["/checkout"]);
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const path = context.url.pathname;
-  if (context.request.method === "GET" && PAGE_GET_OVERRIDES.has(path)) return next(); // serve the page
+  const path = context.url.pathname.replace(/(.)\/$/, "$1"); // normalize a trailing slash (prerender hits "/x/")
   if (HONO.some((p) => path === p || path.startsWith(p + "/"))) {
     return (await getApp()).fetch(context.request);
   }

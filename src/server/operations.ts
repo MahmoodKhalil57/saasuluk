@@ -70,7 +70,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
 
 /** The v4 path fragment for the custom operations — merged into the contract document. */
 export const OPERATION_PATHS: Record<string, unknown> = {
-  "checkout": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: { type: "object" }, status: 201 }) } },
+  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: { type: "object" }, status: 201 }) } },
   "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: { type: "object" } }) } },
   "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: { type: "object", properties: { q: { type: "string" } } } } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
@@ -249,7 +249,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     return c.body(svg, 200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
   };
 
-  app.post("/checkout", checkout);
+  app.post("/checkout/order", checkout); // NOT /checkout — that path is the checkout PAGE (a static asset), which would shadow a POST on Cloudflare
   app.post("/discount/validate", validateDiscount);
   app.get("/search", search);
   app.post("/review/:id/helpful", markReviewHelpful);

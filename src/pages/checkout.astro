@@ -1,4 +1,5 @@
 ---
+export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Checkout — saasuluk">
@@ -33,7 +34,7 @@ import Layout from "../layouts/Layout.astro";
     });
     document.getElementById("pay").addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
-      const r = await (await fetch("/checkout", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "place-order" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
+      const r = await (await fetch("/checkout/order", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "place-order" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
       localStorage.removeItem("cart"); discount = null; render();
       document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
     });

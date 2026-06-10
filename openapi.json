@@ -7406,7 +7406,7 @@
         }
       }
     },
-    "checkout": {
+    "checkout/order": {
       "requests": {
         "checkout": {
           "method": "post",
