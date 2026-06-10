@@ -1,8 +1,11 @@
 /**
- * saasuluk on Cloudflare Workers — the Suluk stack, D1-backed. The contract (v4 doc + cost + auth schemes)
- * is built at module load (ajv-free now that @suluk/core is lazy); the request path never validates, so it
- * runs inside the Worker eval restriction. Data is D1 (Drizzle d1 driver). /superadmin (which validates) is
- * served by the Bun-hosted build, not here.
+ * saasuluk on Cloudflare Workers — the full Suluk stack, D1-backed.
+ *  - the v4 contract (cost-annotated + auth securitySchemes), built at load (eval-free)
+ *  - Project CRUD on D1 (drizzle-orm/d1, async)
+ *  - a DURABLE cost meter: each operation's cost is persisted to a D1 cost_event row, so /cost accumulates
+ *    across isolates (per-user / operation / frontend-action / source)
+ *  - /scalar + /openapi.json, and the /superadmin cockpit (validateDocument is precompiled → Workers-safe)
+ * Static pages (landing/dashboard/pricing) are served by the assets binding; this worker owns everything else.
  */
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
@@ -10,10 +13,12 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { eq } from "drizzle-orm";
 import { tableToV4 } from "@suluk/drizzle";
 import { buildApp } from "@suluk/builder";
-import { annotateCosts, costMeter, MemoryCostSink, summarize, type CostModel } from "@suluk/cost";
+import { annotateCosts, computeCost, summarize, type CostModel, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
+import { adminApp } from "@suluk/admin";
+import { getAuth } from "./auth-d1";
 
 const project = sqliteTable("project", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -31,15 +36,24 @@ const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true })
 const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes });
 const ada = buildAda(document);
 
-type Env = { DB: D1Database };
+type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string };
 const app = new Hono<{ Bindings: Env }>();
-const sink = new MemoryCostSink(); // per-isolate; fine for a live demo
 
-app.use("*", costMeter({
-  sink, costs,
-  operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
-  principalOf: (c) => c.req.header("x-user") || undefined,
-}));
+// Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
+app.on(["GET", "POST"], "/api/auth/*", async (c) => {
+  try { return await getAuth(c.env).handler(c.req.raw); }
+  catch (e) { return c.json({ error: "auth unavailable", detail: String((e as Error)?.message ?? e) }, 503); }
+});
+
+// durable cost meter — persist each operation's cost to D1 so /cost accumulates across isolates.
+app.use("*", async (c, next) => {
+  await next();
+  const op = matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name;
+  if (!op) return;
+  const { breakdown, totalMicroUsd } = computeCost(costs[op], []);
+  await c.env.DB.prepare("INSERT INTO cost_event (at, principal, operation, action, total_micro_usd, breakdown) VALUES (?,?,?,?,?,?)")
+    .bind(Date.now(), c.req.header("x-user") ?? null, op, c.req.header("x-suluk-action") ?? null, totalMicroUsd, JSON.stringify(breakdown)).run();
+});
 
 const D = (c: { env: Env }) => drizzle(c.env.DB);
 app.get("/project", async (c) => c.json(await D(c).select().from(project).all()));
@@ -50,19 +64,13 @@ app.delete("/project/:id", async (c) => { await D(c).delete(project).where(eq(pr
 
 app.get("/scalar", () => scalarResponse(document));
 app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
-app.get("/cost", (c) => c.json(summarize(sink.events())));
+app.get("/cost", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT at, principal, operation, action, total_micro_usd, breakdown FROM cost_event ORDER BY at DESC LIMIT 2000").all();
+  const events: CostEvent[] = (results as Record<string, unknown>[]).map((r) => ({ at: Number(r.at), principal: (r.principal as string) ?? undefined, operation: r.operation as string, action: (r.action as string) ?? undefined, totalMicroUsd: Number(r.total_micro_usd), breakdown: JSON.parse(r.breakdown as string) }));
+  return c.json(summarize(events));
+});
+
+// the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker.
+app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => c.req.header("x-role") === "superadmin" }));
 app.get("/api/health", (c) => c.json({ ok: true, on: "cloudflare-workers", name: "saasuluk" }));
-app.get("/", (c) => c.html(`<!doctype html><html><head><meta charset="utf-8"/><title>saasuluk on Cloudflare</title>
-<style>body{font:15px ui-monospace,monospace;background:#0b0e14;color:#cdd6f4;max-width:640px;margin:60px auto;padding:0 20px}a{color:#8aadf4}b{color:#f5a97f}</style></head>
-<body><h1 style="color:#f5a97f">saasuluk · on Cloudflare</h1>
-<p>A SaaS API powered by <b>Suluk</b>, running on a Cloudflare Worker + <b>D1</b>. One typed contract → API, OpenAPI v4, Scalar docs, and per-user cost — all derived.</p>
-<ul>
-<li><a href="/scalar">/scalar</a> — the API docs (Scalar over the v4 document; shows declared cost + auth)</li>
-<li><a href="/openapi.json">/openapi.json</a> — the OpenAPI v4 document</li>
-<li><a href="/project">/project</a> — the domain resource (GET list; POST to create, with <code>x-user</code>)</li>
-<li><a href="/cost">/cost</a> — the raw cost ledger (per user / operation / action / source)</li>
-<li><a href="/api/health">/api/health</a></li>
-</ul>
-<p style="color:#9399b2">Deployed with the Suluk Cloudflare integration. <a href="https://mahmoodkhalil57.github.io/sig-moonwalk/">Suluk docs →</a></p>
-</body></html>`));
 export default app;

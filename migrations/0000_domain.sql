@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS project (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  owner_id TEXT,
+  status TEXT NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE IF NOT EXISTS cost_event (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  principal TEXT,
+  operation TEXT NOT NULL,
+  action TEXT,
+  total_micro_usd INTEGER NOT NULL,
+  breakdown TEXT NOT NULL
+);

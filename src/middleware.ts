@@ -1,14 +1,17 @@
 /**
- * The bridge: Astro owns the pages; the Suluk-powered Hono app owns the API, the docs, the admin, and the
- * cost ledger. This middleware routes those prefixes to Hono and lets everything else fall through to Astro.
+ * The bridge (Bun-hosted SSR mode): Astro owns the pages; the Suluk-powered Hono app owns the API, docs,
+ * admin, and cost. We import the server DYNAMICALLY so a static build (which runs partly under Node) doesn't
+ * pull bun:sqlite into the graph — on Cloudflare the static pages are assets and the Worker owns the API.
  */
 import { defineMiddleware } from "astro:middleware";
-import { createApp } from "./server/api";
 
-let appPromise: Promise<Awaited<ReturnType<typeof createApp>>["app"]> | undefined;
-const getApp = () => (appPromise ??= createApp().then((r) => r.app));
+let appPromise: Promise<{ fetch: (req: Request) => Response | Promise<Response> }> | undefined;
+const getApp = async () => {
+  if (!appPromise) appPromise = import("./server/api").then((m) => m.createApp()).then((r) => r.app);
+  return appPromise;
+};
 
-const HONO = ["/api", "/scalar", "/openapi.json", "/superadmin", "/cost", "/project"]; // domain entity bases go here too
+const HONO = ["/api", "/scalar", "/openapi.json", "/superadmin", "/cost", "/project"];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const path = context.url.pathname;

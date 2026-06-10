@@ -10,5 +10,7 @@
   "routes": [
     { "pattern": "saasuluk.saastemly.com", "custom_domain": true }
   ],
+  "assets": { "directory": "dist/client", "binding": "ASSETS" },
+  "vars": { "BETTER_AUTH_SECRET": "saasuluk-prod-secret-please-rotate-32x" },
   "observability": { "enabled": true }
 }
