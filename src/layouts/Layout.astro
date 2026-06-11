@@ -1,5 +1,7 @@
 ---
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
+import { altSchemesCss, ALT_SCHEMES } from "../theme";
+const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
 const { title = "saasuluk — the SaaS that ships itself", description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk." } = Astro.props;
 // The frontend is static (Cloudflare assets), so locale + theme are applied CLIENT-SIDE. We render the English
 // chrome with a data-i18n key on each label; the inline script swaps it to the stored locale and sets <html
@@ -28,7 +30,13 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script is:inline define:vars={{ DICT, RTL }}>
       (function () {
-        try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "light"; } catch (e) {}
+        try {
+          var tp = localStorage.getItem("theme") || "system"; // default: follow the OS (was hard light)
+          var sysDark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.dataset.theme = tp === "system" ? (sysDark ? "dark" : "light") : tp;
+          document.documentElement.dataset.themePref = tp;
+          var sc = localStorage.getItem("scheme"); if (sc) document.documentElement.dataset.scheme = sc; // color scheme
+        } catch (e) {}
         function curLang() { try { return localStorage.getItem("lang") || (document.cookie.match(/(?:^|; )lang=(\w+)/) || [])[1] || "en"; } catch (e) { return "en"; } }
         window.__applyLang = function (l) {
           var d = document.documentElement; d.lang = l; d.dir = (RTL.indexOf(l) >= 0 ? "rtl" : "ltr");
@@ -148,7 +156,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .cartsub { display:flex; justify-content:space-between; font-size:15px; margin-bottom:12px; }
       .cartsub span:last-child { font-weight:700; font-family:ui-monospace,monospace; }
       .cartdrawer-foot .btn { width:100%; justify-content:center; }
+      @media (max-width:560px){ #scheme{display:none} } /* keep the chrome uncrowded on small phones */
     </style>
+    <style is:global set:html={schemeCss}></style>
   </head>
   <body>
     <header class="site">
@@ -157,6 +167,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""}>{t("en", key)}</a>)}</nav>
         <div class="chrome">
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
+          <select id="scheme" aria-label="Color scheme" title="Color scheme"><option value="">Indigo</option>{ALT_SCHEMES.map((s) => <option value={s.name}>{s.label}</option>)}</select>
           <button id="theme" class="iconbtn" aria-label="Toggle theme">◐</button>
           <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer">🛒<span id="cartcount" class="cartcount" hidden>0</span></button>
           <a id="authlink" class="btn sm" href="/login">Sign in</a>
@@ -197,10 +208,31 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <script>import "../client/cart.ts";</script>
     <script is:inline>
       if (window.__applyLang) window.__applyLang(window.__lang0);
-      document.getElementById("theme").addEventListener("click", function () {
-        var next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-        document.documentElement.dataset.theme = next; try { localStorage.setItem("theme", next); } catch (e) {}
-      });
+      (function () {
+        var THEMES = ["light", "dark", "system"], ICON = { light: "◐", dark: "●", system: "◑" };
+        var mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+        function setTheme(pref) {
+          document.documentElement.dataset.theme = pref === "system" ? (mq && mq.matches ? "dark" : "light") : pref;
+          document.documentElement.dataset.themePref = pref;
+          try { localStorage.setItem("theme", pref); } catch (e) {}
+          var b = document.getElementById("theme"); if (b) { b.textContent = ICON[pref]; b.setAttribute("aria-label", "Theme: " + pref + " (click to change)"); }
+        }
+        var tbtn = document.getElementById("theme");
+        if (tbtn) {
+          setTheme(document.documentElement.dataset.themePref || "system"); // sync the icon to the resolved pref
+          tbtn.addEventListener("click", function () { var cur = document.documentElement.dataset.themePref || "system"; setTheme(THEMES[(THEMES.indexOf(cur) + 1) % 3]); });
+        }
+        if (mq) mq.addEventListener("change", function () { if ((document.documentElement.dataset.themePref || "system") === "system") setTheme("system"); });
+        var ssel = document.getElementById("scheme");
+        if (ssel) {
+          ssel.value = document.documentElement.dataset.scheme || "";
+          ssel.addEventListener("change", function (e) {
+            var v = e.target.value;
+            if (v) { document.documentElement.dataset.scheme = v; try { localStorage.setItem("scheme", v); } catch (x) {} }
+            else { delete document.documentElement.dataset.scheme; try { localStorage.removeItem("scheme"); } catch (x) {} }
+          });
+        }
+      })();
       document.getElementById("lang").addEventListener("change", function (e) {
         try { localStorage.setItem("lang", e.target.value); } catch (x) {}
         document.cookie = "lang=" + e.target.value + ";path=/;max-age=31536000;samesite=lax";
