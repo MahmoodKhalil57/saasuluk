@@ -184,6 +184,15 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .cartsub span:last-child { font-weight:700; font-family:ui-monospace,monospace; }
       .cartdrawer-foot .btn { width:100%; justify-content:center; }
       @media (max-width:560px){ #scheme{display:none} } /* keep the chrome uncrowded on small phones */
+      /* toasts (bottom-inline-end stack; logical props → flips for RTL) */
+      .toasts { position:fixed; bottom:20px; inset-inline-end:20px; z-index:60; display:flex; flex-direction:column; gap:10px; max-width:min(360px,calc(100vw - 40px)); pointer-events:none; }
+      .toast { pointer-events:auto; display:flex; align-items:center; gap:10px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-inline-start:3px solid var(--accent); border-radius:11px; padding:11px 13px; box-shadow:0 10px 34px rgba(16,16,40,.16); font-size:14px; transform:translateY(8px); opacity:0; transition:opacity .2s ease, transform .2s ease; }
+      .toast.in { opacity:1; transform:translateY(0); }
+      .toast.out { opacity:0; transform:translateY(8px); }
+      .toast-success { border-inline-start-color:#22c55e; } .toast-success .toast-ic { color:#22c55e; }
+      .toast-error { border-inline-start-color:#ef4444; } .toast-error .toast-ic { color:#ef4444; }
+      .toast-ic { font-weight:700; } .toast-msg { flex:1; } .toast-x { background:none; border:0; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:0 2px; }
+      .toast-x:hover { color:var(--fg); }
     </style>
     <style is:global set:html={schemeCss}></style>
   </head>
@@ -232,7 +241,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         <a id="cartcheckout" class="btn" href="/checkout" data-i18n="checkout" style="opacity:.45;pointer-events:none">Checkout</a>
       </div>
     </aside>
+    <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
     <script>import "../client/cart";</script>
+    <script>import "../client/toast";</script>
     <script is:inline>
       if (window.__applyLang) window.__applyLang(window.__lang0);
       (function () {

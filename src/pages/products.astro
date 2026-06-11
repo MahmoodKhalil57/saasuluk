@@ -37,7 +37,7 @@ import Layout from "../layouts/Layout.astro";
       g.querySelectorAll("[data-id]").forEach((b) => b.addEventListener("click", () => {
         const c = cart(), id = Number(b.dataset.id), ex = c.find((i) => i.productId === id);
         if (ex) ex.qty++; else c.push({ productId: id, qty: 1, priceCents: Number(b.dataset.price), name: b.dataset.name });
-        setCart(c); window.dispatchEvent(new Event("cart-changed")); b.textContent = "Added ✓"; setTimeout(() => (b.textContent = "Add to cart"), 900);
+        setCart(c); window.dispatchEvent(new Event("cart-changed")); if (window.toast) window.toast((b.dataset.name || "Item") + " added to cart", { type: "success" }); b.textContent = "Added ✓"; setTimeout(() => (b.textContent = "Add to cart"), 900);
       }));
     }
     async function load(q) {

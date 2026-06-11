@@ -40,6 +40,7 @@ import Layout from "../layouts/Layout.astro";
       const c = cart(); if (!c.length) return;
       const r = await (await fetch("/checkout/order", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "place-order" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
       localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; render();
+      if (window.toast) window.toast("Order #" + r.order.id + " placed — total " + money(r.totalCents), { type: "success" });
       document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
     });
     document.getElementById("stripe").addEventListener("click", async (e) => {
@@ -48,6 +49,7 @@ import Layout from "../layouts/Layout.astro";
       const r = await (await fetch("/checkout/pay", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "stripe-checkout" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
       if (r.url) { location.href = r.url; return; } // → Stripe hosted checkout
       e.target.disabled = false; e.target.textContent = "Pay with Stripe →";
+      if (window.toast) window.toast(r.error || "Could not start Stripe checkout.", { type: "error" });
       document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block;color:#e5484d">${r.error || "Could not start Stripe checkout."}</span>`;
     });
     // keep this page's cart table + total in sync when the shell drawer (or another tab) mutates the cart
