@@ -2,13 +2,17 @@
 export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
 import { SEED_PRODUCTS } from "../../server/seed";
+import { jsonLd } from "@suluk/builder";
 export function getStaticPaths() {
   return SEED_PRODUCTS.map((p) => ({ params: { slug: p.slug }, props: { product: p } }));
 }
 const { product } = Astro.props;
 const money = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
+// Product structured data → rich results. The detail page is prerendered from SEED_PRODUCTS, so this matches
+// exactly what's rendered (unlike the client-fetched lists), which is why JSON-LD belongs here and not on /faqs.
+const productLd = jsonLd("Product", { name: product.name, description: product.description, price: (product.priceCents / 100).toFixed(2), currency: "USD" });
 ---
-<Layout title={`${product.name} — saasuluk`} description={product.description}>
+<Layout title={`${product.name} — saasuluk`} description={product.description} jsonLd={productLd}>
   <p style="margin:6px 0 14px"><a href="/products" class="pill">← Store</a></p>
   <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start">
     <div style="width:300px; max-width:100%; aspect-ratio:1; border-radius:18px; background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,var(--panel)),var(--panel)); display:grid; place-items:center; border:1px solid var(--line)">
