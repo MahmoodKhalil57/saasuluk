@@ -39,7 +39,7 @@ import Layout from "../layouts/Layout.astro";
     document.getElementById("pay").addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
       const r = await (await fetch("/checkout/order", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "place-order" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
-      localStorage.removeItem("cart"); discount = null; render();
+      localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; render();
       document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
     });
     document.getElementById("stripe").addEventListener("click", async (e) => {
@@ -50,6 +50,8 @@ import Layout from "../layouts/Layout.astro";
       e.target.disabled = false; e.target.textContent = "Pay with Stripe →";
       document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block;color:#e5484d">${r.error || "Could not start Stripe checkout."}</span>`;
     });
+    // keep this page's cart table + total in sync when the shell drawer (or another tab) mutates the cart
+    window.addEventListener("cart-changed", render);
     render();
   </script>
 </Layout>

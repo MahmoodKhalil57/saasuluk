@@ -12,12 +12,13 @@ export const LOCALE_LABEL: Record<Locale, string> = { en: "English", es: "Españ
 type Key =
   | "home" | "products" | "blog" | "pricing" | "dashboard" | "account"
   | "faq" | "contact" | "about" | "metrics" | "docs" | "admin"
-  | "privacy" | "terms" | "license" | "tagline" | "search" | "addToCart" | "checkout";
+  | "privacy" | "terms" | "license" | "tagline" | "search" | "addToCart" | "checkout"
+  | "cart" | "subtotal" | "emptyCart";
 
 export const DICT: Record<Locale, Record<Key, string>> = {
-  en: { home: "Home", products: "Products", blog: "Blog", pricing: "Pricing", dashboard: "Dashboard", account: "Account", faq: "FAQ", contact: "Contact", about: "About", metrics: "Metrics", docs: "API Docs", admin: "Admin", privacy: "Privacy", terms: "Terms", license: "License", tagline: "every layer from one contract.", search: "Search", addToCart: "Add to cart", checkout: "Checkout" },
-  es: { home: "Inicio", products: "Productos", blog: "Blog", pricing: "Precios", dashboard: "Panel", account: "Cuenta", faq: "Preguntas", contact: "Contacto", about: "Acerca de", metrics: "Métricas", docs: "API Docs", admin: "Admin", privacy: "Privacidad", terms: "Términos", license: "Licencia", tagline: "cada capa desde un solo contrato.", search: "Buscar", addToCart: "Añadir al carrito", checkout: "Pagar" },
-  ar: { home: "الرئيسية", products: "المنتجات", blog: "المدونة", pricing: "الأسعار", dashboard: "لوحة التحكم", account: "الحساب", faq: "الأسئلة", contact: "اتصل بنا", about: "حول", metrics: "الإحصاءات", docs: "وثائق API", admin: "الإدارة", privacy: "الخصوصية", terms: "الشروط", license: "الرخصة", tagline: "كل طبقة من عقد واحد.", search: "بحث", addToCart: "أضف إلى السلة", checkout: "الدفع" },
+  en: { home: "Home", products: "Products", blog: "Blog", pricing: "Pricing", dashboard: "Dashboard", account: "Account", faq: "FAQ", contact: "Contact", about: "About", metrics: "Metrics", docs: "API Docs", admin: "Admin", privacy: "Privacy", terms: "Terms", license: "License", tagline: "every layer from one contract.", search: "Search", addToCart: "Add to cart", checkout: "Checkout", cart: "Cart", subtotal: "Subtotal", emptyCart: "Your cart is empty." },
+  es: { home: "Inicio", products: "Productos", blog: "Blog", pricing: "Precios", dashboard: "Panel", account: "Cuenta", faq: "Preguntas", contact: "Contacto", about: "Acerca de", metrics: "Métricas", docs: "API Docs", admin: "Admin", privacy: "Privacidad", terms: "Términos", license: "Licencia", tagline: "cada capa desde un solo contrato.", search: "Buscar", addToCart: "Añadir al carrito", checkout: "Pagar", cart: "Carrito", subtotal: "Subtotal", emptyCart: "Tu carrito está vacío." },
+  ar: { home: "الرئيسية", products: "المنتجات", blog: "المدونة", pricing: "الأسعار", dashboard: "لوحة التحكم", account: "الحساب", faq: "الأسئلة", contact: "اتصل بنا", about: "حول", metrics: "الإحصاءات", docs: "وثائق API", admin: "الإدارة", privacy: "الخصوصية", terms: "الشروط", license: "الرخصة", tagline: "كل طبقة من عقد واحد.", search: "بحث", addToCart: "أضف إلى السلة", checkout: "الدفع", cart: "السلة", subtotal: "المجموع الفرعي", emptyCart: "سلتك فارغة." },
 };
 
 export const isLocale = (v: unknown): v is Locale => typeof v === "string" && (LOCALES as readonly string[]).includes(v);

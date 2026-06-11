@@ -46,6 +46,7 @@ const money = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
       const ex = c.find((i) => i.productId === product.id);
       if (ex) ex.qty++; else c.push({ productId: product.id, qty: 1, priceCents: product.priceCents, name: product.name });
       localStorage.setItem("cart", JSON.stringify(c));
+      window.dispatchEvent(new Event("cart-changed"));
       document.getElementById("cartmsg").textContent = "Added to cart ✓ — go to checkout when ready.";
     });
     async function loadReviews() {
