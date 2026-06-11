@@ -147,6 +147,16 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect([200, 404]).toContain((await post("/review/1/helpful", {}, { "x-user": "fan" })).status);
   });
 
+  test("real validations are ENFORCED at runtime (not just graded): bad input is rejected, good input passes", async () => {
+    // slug must be lowercase-dash (pattern) — "Bad Slug!" is rejected; "x-2" passes
+    expect([400, 422]).toContain((await post("/product", { name: "X", slug: "Bad Slug!", priceCents: 10, status: "published" }, adminH())).status);
+    expect((await post("/product", { name: "X2", slug: "x-2", priceCents: 10, status: "published" }, adminH())).status).toBe(201);
+    // rating is bounded 1–5 (maximum) — 99 is rejected
+    expect([400, 422]).toContain((await post("/review", { productId: 1, rating: 99, title: "Nope" }, { "x-user": "rater" })).status);
+    // a display field rejects angle brackets (stored-XSS guard)
+    expect([400, 422]).toContain((await post("/product", { name: "<script>x</script>", slug: "xss", priceCents: 10, status: "published" }, adminH())).status);
+  });
+
   test("hardening (@suluk/harden): the contract is graded + GATED — our input surface is fully bounded (A)", async () => {
     const document = await (await app.request("/openapi.json")).json() as any;
     // the CI gate (the hard incentive): throws if our authored surface regresses below A (auth = third-party, excluded)

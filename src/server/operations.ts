@@ -15,6 +15,7 @@ import { customerParams, subscriptionParams, meterEventParams } from "@suluk/str
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
+import { v } from "./validations";
 
 /** SHA-256 of an API key (Web Crypto — Worker-safe). We store only the hash; the plaintext is shown once. */
 export async function hashKey(key: string): Promise<string> {
@@ -132,28 +133,29 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   connectBilling: write(60), reportUsage: write(40),
 };
 
-// typed input bodies for the custom ops (so @suluk/harden grades them — a bare {type:"object"} is a free-form bag).
-const obj = (properties: Record<string, unknown>) => ({ type: "object", additionalProperties: false, properties });
-const cartLine = obj({ productId: { type: "integer" }, qty: { type: "integer" }, priceCents: { type: "integer" } });
-const payLine = obj({ productId: { type: "integer" }, qty: { type: "integer" } });
+// typed input bodies for the custom ops with REAL bounds (validations.ts) — a bare {type:"object"} is a free-form bag.
+const obj = (properties: Record<string, unknown>, required?: string[]) => ({ type: "object", additionalProperties: false, properties, ...(required ? { required } : {}) });
+const ID = 1_000_000_000_000;
+const cartLine = obj({ productId: v.int(1, ID), qty: v.int(1, 1000), priceCents: v.cents() });
+const payLine = obj({ productId: v.int(1, ID), qty: v.int(1, 1000) });
 
 /** The v4 path fragment for the custom operations — merged into the contract document (then hardened below). */
 export const OPERATION_PATHS: Record<string, unknown> = {
-  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: { type: "integer" }, items: { type: "array", items: cartLine }, discountCode: { type: "string" } }), status: 201 }) } },
-  "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: obj({ code: { type: "string" }, subtotalCents: { type: "integer" } }) }) } },
-  "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: { type: "string" } }) } }) } },
+  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: v.int(1, ID), items: { type: "array", maxItems: 200, items: cartLine }, discountCode: v.code(40) }), status: 201 }) } },
+  "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: obj({ code: v.code(40), subtotalCents: v.cents(100_000_000_000) }, ["code"]) }) } },
+  "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
   "analytics/summary": { requests: { analyticsSummary: jsonOp("get", "Store summary (orders, revenue, customers)") } },
   "analytics/revenue": { requests: { analyticsRevenue: jsonOp("get", "Revenue per day (last 30d)") } },
   "analytics/top-products": { requests: { analyticsTopProducts: jsonOp("get", "Best-selling products") } },
-  "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string" } }, required: ["productId"] } } }) } },
-  "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: { type: "string", format: "email" } }), status: 201 }) } },
-  "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: { type: "string" } }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
-  "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: { type: "string" } }), status: 201 }) } },
+  "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string", maxLength: 16, pattern: "^[0-9]+$" } }, required: ["productId"] } } }) } },
+  "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
+  "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
+  "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
-  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", items: payLine }, discountCode: { type: "string" } }) }) } },
-  "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: obj({ orderId: { type: "integer" }, sessionId: { type: "string" } }) }) } },
-  "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: { type: "string", format: "email" } }) }) } },
+  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40) }) }) } },
+  "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: obj({ orderId: v.int(1, ID), sessionId: v.line(255, "^[A-Za-z0-9_]+$") }, ["orderId", "sessionId"]) }) } },
+  "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: v.email() }) }) } },
   "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object", additionalProperties: false } }) } },
 };
 

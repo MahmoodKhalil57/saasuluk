@@ -10,6 +10,7 @@ import type { CostModel } from "@suluk/cost";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { AccessMode } from "./access";
 import { hardenSchema } from "./harden-schema";
+import { applyValidations } from "./validations";
 import * as s from "./schema";
 
 const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
@@ -56,10 +57,11 @@ export const ENTITIES: EntityDef[] = [
   { name: "Project", table: s.project, ownerCol: "ownerId", access: "owned", r: 12, w: 40 },
 ];
 
-/** The entity list for `buildApp` (each entity's CREATE/insert shape → CRUD routes + v4 schemas), HARDENED:
- *  the Drizzle projection gives bare types, so we add baseline bounds (maxLength + a control-char-rejecting pattern,
- *  numeric/array caps, closed objects) — @suluk/harden flags the gaps; this is the answer. See harden-schema.ts. */
-export const entitySchemas = ENTITIES.map((e) => ({ name: e.name, schema: hardenSchema(tableToV4(e.table).insert) }));
+/** The entity list for `buildApp` (each entity's CREATE/insert shape → CRUD routes + v4 schemas). The Drizzle
+ *  projection gives bare types; we layer REASONABLE per-field validations (validations.ts) — slugs, emails, rating
+ *  1–5, sane caps, no `<>` in display fields — then hardenSchema only fills any remaining gap with a floor. These
+ *  are enforced at runtime (the API rejects invalid input), so they're real security, not just a grade. */
+export const entitySchemas = ENTITIES.map((e) => ({ name: e.name, schema: hardenSchema(applyValidations(e.name, tableToV4(e.table).insert)) }));
 
 /** The cost map — 5 operations per entity, keyed by operation name (list/get/create/update/delete<Name>). */
 export const costs: Record<string, CostModel> = Object.fromEntries(
