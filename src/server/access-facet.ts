@@ -34,14 +34,12 @@ export function annotateAccess(doc: OpenAPIv4Document): OpenAPIv4Document {
     const requests = (pi as { requests?: Record<string, Record<string, unknown>> }).requests ?? {};
     for (const [name, req] of Object.entries(requests)) {
       const m = /^(list|get|create|update|delete)([A-Z]\w*)$/.exec(name);
+      const def = m ? tableByEntity[m[2]] : undefined; // only a REAL entity claims the CRUD branch (else e.g. createToken collides)
       let facet: AccessFacet | undefined;
-      if (m) {
-        const def = tableByEntity[m[2]];
-        if (def) {
-          const rule = policyFor(def.access, def.ownerCol)[m[1] as "list" | "get" | "create" | "update" | "delete"];
-          facet = { requires: RULE_TO_REQUIRES[rule], ...(rule === "owner" ? { scope: "owner" as const } : {}) };
-        }
-      } else if (OP_ACCESS[name]) {
+      if (m && def) {
+        const rule = policyFor(def.access, def.ownerCol)[m[1] as "list" | "get" | "create" | "update" | "delete"];
+        facet = { requires: RULE_TO_REQUIRES[rule], ...(rule === "owner" ? { scope: "owner" as const } : {}) };
+      } else if (OP_ACCESS[name]) { // custom ops, incl. those whose name matches the CRUD shape (createToken → Token has no table)
         facet = OP_ACCESS[name];
       }
       if (facet) req["x-suluk-access"] = facet;

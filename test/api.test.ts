@@ -98,6 +98,10 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
   });
 
   test("developer portal: an API token is generated once, authenticates a Bearer request, owner-stamps + meters, then revokes", async () => {
+    // SECURITY regression: createToken's name matches the CRUD regex (create+Token), so its facet was dropped and
+    // anon could MINT a live token (adversarial review wh7os6uu0). Anon must now be denied (annotateAccess fix +
+    // deny-by-default). createToken requires authentication.
+    expect((await post("/tokens/create", { name: "anon-mint" }, {})).status).toBe(401);
     const tok = await (await post("/tokens/create", { name: "CI" }, { "x-user": "dev-1" })).json();
     expect(tok.token).toMatch(/^sk_/);
     expect(tok.prefix.length).toBeLessThan(tok.token.length); // only a prefix is shown in listings
