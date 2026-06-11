@@ -18,6 +18,7 @@ import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/co
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
+import { referenceResponse } from "@suluk/reference";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
@@ -126,7 +127,8 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/scalar", () => scalarResponse(document));
+app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference" })); // PRIMARY docs: v4 rendered AS v4
+app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view
 app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
 app.get("/cost", async (c) => {
   // SCOPED to the caller (no cross-tenant ledger dump). A VERIFIED superadmin sees the whole store ledger.

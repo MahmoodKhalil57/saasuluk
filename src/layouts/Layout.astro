@@ -5,11 +5,11 @@ const { title = "saasuluk — the SaaS that ships itself", description = "Auth, 
 // chrome with a data-i18n key on each label; the inline script swaps it to the stored locale and sets <html
 // lang/dir> (RTL for Arabic). One dictionary (src/i18n.ts) feeds both the render and the client.
 type Key = Parameters<typeof t>[1];
-const nav: [string, Key][] = [["/products", "products"], ["/pricing", "pricing"], ["/blogs", "blog"], ["/about", "about"], ["/scalar", "docs"]];
+const nav: [string, Key][] = [["/products", "products"], ["/pricing", "pricing"], ["/blogs", "blog"], ["/about", "about"], ["/reference", "docs"]];
 const footerCols: { head: string; links: [string, Key | string][] }[] = [
   { head: "Product", links: [["/products", "products"], ["/pricing", "pricing"], ["/metrics", "metrics"], ["/dashboard", "dashboard"]] },
   { head: "Resources", links: [["/blogs", "blog"], ["/faqs", "faq"], ["/about", "about"], ["/contact", "contact"]] },
-  { head: "Developers", links: [["/scalar", "docs"], ["/openapi.json", "OpenAPI Spec"], ["/superadmin", "admin"], ["/cost", "Cost ledger"]] },
+  { head: "Developers", links: [["/reference", "API reference (v4)"], ["/scalar", "Scalar · 3.1 view"], ["/openapi.json", "OpenAPI v4 doc"], ["/superadmin", "admin"], ["/cost", "Cost ledger"]] },
   { head: "Legal", links: [["/terms", "terms"], ["/privacy", "privacy"], ["/license", "license"]] },
 ];
 const path = Astro.url.pathname;

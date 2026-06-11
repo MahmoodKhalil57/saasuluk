@@ -8,6 +8,7 @@ import { Hono } from "hono";
 import { mount, type RouteContract } from "@suluk/hono";
 import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
+import { referenceResponse } from "@suluk/reference";
 import { adminApp } from "@suluk/admin";
 import { costMeter, MemoryCostSink, summarize } from "@suluk/cost";
 import { stripeProvider, type StripeLike } from "@suluk/stripe";
@@ -61,7 +62,8 @@ export async function createApp() {
   }));
   mount(app, routes);                                                                            // contract-derived CRUD
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
-  app.get("/scalar", () => scalarResponse(document));                                            // docs (cost + auth shown)
+  app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference" })); // PRIMARY docs: the v4 doc rendered AS v4 (cost facet + requests-shape)
+  app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view (Scalar renders OpenAPI 3.x)
   app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
   app.get("/cost", (c) => {                                                                      // raw cost ledger — SCOPED to the caller (a VERIFIED superadmin sees all)
     const who = principal(c);

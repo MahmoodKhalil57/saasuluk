@@ -146,8 +146,16 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect([200, 404]).toContain((await post("/review/1/helpful", {}, { "x-user": "fan" })).status);
   });
 
-  test("Scalar renders the docs", async () => {
+  test("Scalar renders the docs (the 3.1 compatibility view)", async () => {
     expect(await (await app.request("/scalar")).text()).toContain("Scalar.createApiReference");
+  });
+
+  test("/reference renders the contract NATIVELY as v4 — cost facet + requests-shape, not a 3.1 downgrade", async () => {
+    const html = await (await app.request("/reference")).text();
+    expect(html).toContain("OpenAPI 4.0.0-candidate"); // the real identity, not 3.1.0
+    expect(html).not.toContain("3.1.0");
+    expect(html).toContain("⛁");                        // the cost facet surfaced as a first-class badge
+    expect(html).toContain("createProduct");            // the by-name request handle (the v4 requests-shape)
   });
 
   test("domain CRUD over Drizzle, with cost metered (user + frontend action + source)", async () => {
