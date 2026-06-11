@@ -193,6 +193,11 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .toast-error { border-inline-start-color:#ef4444; } .toast-error .toast-ic { color:#ef4444; }
       .toast-ic { font-weight:700; } .toast-msg { flex:1; } .toast-x { background:none; border:0; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:0 2px; }
       .toast-x:hover { color:var(--fg); }
+      /* loading skeletons (shimmer placeholder; respects reduced-motion) */
+      .skel { position:relative; overflow:hidden; background:var(--bg-soft); border-radius:8px; }
+      .skel::after { content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--fg) 7%,transparent),transparent); animation:shimmer 1.3s infinite; }
+      @keyframes shimmer { 100% { transform:translateX(100%); } }
+      @media (prefers-reduced-motion:reduce){ .skel::after{ animation:none } }
     </style>
     <style is:global set:html={schemeCss}></style>
   </head>

@@ -40,7 +40,18 @@ import Layout from "../layouts/Layout.astro";
         setCart(c); window.dispatchEvent(new Event("cart-changed")); if (window.toast) window.toast((b.dataset.name || "Item") + " added to cart", { type: "success" }); b.textContent = "Added ✓"; setTimeout(() => (b.textContent = "Add to cart"), 900);
       }));
     }
+    function skeleton(n) {
+      document.getElementById("grid").innerHTML = Array.from({ length: n }, () => `<div class="card" style="padding:0;overflow:hidden">
+        <div class="skel" style="aspect-ratio:16/10;border-radius:0"></div>
+        <div style="padding:16px 18px">
+          <div class="skel" style="height:18px;width:70%;margin-bottom:11px"></div>
+          <div class="skel" style="height:13px;width:96%;margin-bottom:6px"></div>
+          <div class="skel" style="height:13px;width:55%"></div>
+          <div style="display:flex;justify-content:space-between;margin-top:16px"><div class="skel" style="height:24px;width:58px"></div><div class="skel" style="height:30px;width:92px;border-radius:9px"></div></div>
+        </div></div>`).join("");
+    }
     async function load(q) {
+      skeleton(6); // perceived-perf: shimmer placeholders until the fetch resolves
       const data = await (await fetch(q ? `/search?q=${encodeURIComponent(q)}` : "/product")).json();
       render((q ? data.products : data).filter((p) => p.status === "published").sort((a, b) => a.priceCents - b.priceCents));
     }

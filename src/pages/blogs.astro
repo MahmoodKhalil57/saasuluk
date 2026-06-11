@@ -8,7 +8,15 @@ import Layout from "../layouts/Layout.astro";
   <div id="posts" style="margin-top:18px"></div>
   <script is:inline>
     const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "";
+    function skeleton(n) {
+      document.getElementById("posts").innerHTML = Array.from({ length: n }, () => `<article class="card" style="margin-bottom:12px">
+        <div class="skel" style="height:20px;width:55%;margin-bottom:9px"></div>
+        <div class="skel" style="height:11px;width:90px;margin-bottom:11px"></div>
+        <div class="skel" style="height:13px;width:97%;margin-bottom:6px"></div>
+        <div class="skel" style="height:13px;width:80%"></div></article>`).join("");
+    }
     async function load() {
+      skeleton(4); // shimmer placeholders until the fetch resolves
       const posts = (await (await fetch("/post")).json()).filter((p) => p.status === "published").sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
       document.getElementById("posts").innerHTML = posts.length ? posts.map((p) => `
         <article class="card" style="margin-bottom:12px">
