@@ -182,6 +182,21 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect((await app.request("/superadmin", { headers: adminH() })).status).toBe(200);
   });
 
+  test("L2 dynamic document (council-ratified): canonical is full + auth-free; ?as= is a provable SUBSET; /api/whoami", async () => {
+    const canonical = await (await app.request("/openapi.json")).json() as any;
+    const anon = await (await app.request("/openapi.json?as=anon")).json() as any;
+    const ops = (d: any) => { const s = new Set<string>(); for (const p of Object.values<any>(d.paths)) for (const n of Object.keys(p.requests ?? {})) s.add(n); return s; };
+    const canonOps = ops(canonical), anonOps = ops(anon);
+    expect(anonOps.size).toBeLessThan(canonOps.size);                 // strictly fewer — admin/auth ops hidden
+    for (const n of anonOps) expect(canonOps.has(n)).toBe(true);      // NON-ADDITIVE subset (council invariant #2): every projected op exists in canonical
+    expect(canonOps.has("createProduct")).toBe(true);                 // admin op is IN canonical (full attack surface visible)
+    expect(anonOps.has("createProduct")).toBe(false);                 // but hidden from the anon projection
+    expect(anon["x-suluk-projection"]).toMatchObject({ canonical: "/openapi.json", derived: true, scope: "anon" }); // self-describing (#7)
+    expect(typeof anon["x-suluk-projection"].canonicalHash).toBe("string");
+    expect(canonical["x-suluk-projection"]).toBeUndefined();          // canonical is authoritative, not a projection
+    expect((await (await app.request("/api/whoami")).json()).viewer).toBe("anon"); // anon session → anon view
+  });
+
   test("config health (@suluk/env): admin-only, projects the registry, never leaks values", async () => {
     expect((await app.request("/config")).status).toBe(403); // not admin
     const r = await app.request("/config", { headers: adminH() });

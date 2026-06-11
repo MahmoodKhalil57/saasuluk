@@ -26,12 +26,14 @@ import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, prin
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess } from "../src/server/access-facet";
+import { projectDocument, requestedViewer, viewerOf, docHash } from "../src/server/project";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
 built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
 const document = annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes })); // cost + access facets
+const CANON_HASH = docHash(document); // canonical hash — the L2 projection's integrity pointer (council wcavrm7zk)
 const ada = buildAda(document);
 
 type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string };
@@ -130,9 +132,13 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost" })); // PRIMARY docs: v4 rendered AS v4
+app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" })); // PRIMARY docs + L2 live view
 app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view
-app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
+app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c as unknown as Context) }));           // renderer auto-selects this viewer's lens (L2)
+app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as= → a provable-subset PROJECTION
+  const viewer = requestedViewer(c as unknown as Context, c.req.query("as"));
+  return c.json((viewer ? projectDocument(document, viewer, CANON_HASH) : document) as unknown as Record<string, unknown>);
+});
 app.get("/cost", async (c) => {
   // SCOPED to the caller (no cross-tenant ledger dump). A VERIFIED superadmin sees the whole store ledger.
   const who = principal(c);
