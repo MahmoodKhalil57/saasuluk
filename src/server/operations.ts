@@ -211,6 +211,10 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
 
   const markReviewHelpful = async (c: Context) => {
     const dz = dbFor(c);
+    // require an authenticated principal — so the +1 is attributable + cost-metered, not anonymous vote-stuffing.
+    // (Full one-vote-per-(review,principal) dedup would need a votes table; this closes the trivial anon replay.)
+    const who = principal(c);
+    if (!who) return c.json({ error: "Sign in to mark a review helpful." }, 401);
     const id = Number(c.req.param("id"));
     await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
     const r = await dz.select().from(review).where(eq(review.id, id)).get();
@@ -295,8 +299,12 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   const revokeToken = async (c: Context) => {
     const dz = dbFor(c);
     const id = Number(c.req.param("id"));
-    await dz.update(apiToken).set({ revokedAt: Date.now() }).where(eq(apiToken.id, id)).run();
-    return c.json({ revoked: true, id });
+    const who = principal(c);
+    // SCOPED: you can only revoke YOUR OWN token (eq id AND userId) — without this any caller could revoke any
+    // user's token by id. A foreign/anonymous caller matches nothing → 404 (honest: it wasn't yours to revoke).
+    const res = (await dz.update(apiToken).set({ revokedAt: Date.now() }).where(and(eq(apiToken.id, id), eq(apiToken.userId, who))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+    const changed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+    return changed ? c.json({ revoked: true, id }) : c.json({ error: "not found" }, 404);
   };
 
   // real Stripe Checkout — via the REST API over fetch (no SDK → Worker-safe). Creates a pending order + a

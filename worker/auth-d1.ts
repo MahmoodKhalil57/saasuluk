@@ -5,6 +5,7 @@ import { betterAuth } from "better-auth";
 import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
 import { D1Dialect } from "kysely-d1";
 import { sendEmailAsync, brandedEmail } from "../src/server/email";
+import { superadminEmails } from "../src/server/access";
 
 export interface AuthEnv {
   DB: D1Database;
@@ -13,6 +14,7 @@ export interface AuthEnv {
   GOOGLE_CLIENT_SECRET?: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  SUPERADMIN_EMAILS?: string;
 }
 const cache = new WeakMap<object, ReturnType<typeof betterAuth>>();
 
@@ -28,6 +30,13 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
     socialProviders: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
       : undefined,
+    // promote a SUPERADMIN_EMAILS address to role:"admin" at sign-up (the verified admin the access layer checks).
+    databaseHooks: {
+      user: { create: { before: async (user: { email?: string }) => {
+        const admins = superadminEmails(env.SUPERADMIN_EMAILS);
+        return { data: user.email && admins.includes(user.email.toLowerCase()) ? { ...user, role: "admin" } : user };
+      } } },
+    },
     plugins: [
       bearer(),
       admin(),

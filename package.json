@@ -16,6 +16,7 @@
     "build:worker": "bun build worker/worker.ts --outfile worker/dist/worker.js --format esm",
     "db:migrate:remote": "wrangler d1 execute saasuluk-db --file=./migrations/0000_domain.sql --remote",
     "db:seed:remote": "bun run gen:seed && wrangler d1 execute saasuluk-db --file=./scripts/seed.sql --remote",
+    "promote:admins": "bun run scripts/promote-admins.ts",
     "deploy": "bun run build && bun run build:worker && wrangler deploy"
   },
   "dependencies": {

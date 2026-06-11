@@ -3,13 +3,28 @@ import { validateDocument } from "@suluk/core";
 import { createApp } from "../src/server/api";
 
 let app: Awaited<ReturnType<typeof createApp>>["app"];
-beforeAll(async () => { app = (await createApp()).app; });
+let adminCookie = ""; // a VERIFIED superadmin session (email in SUPERADMIN_EMAILS) — the only way to be admin
+beforeAll(async () => {
+  process.env.SUPERADMIN_EMAILS = '["admin@test.dev"]'; // the access layer reads this allowlist at app build
+  app = (await createApp()).app;
+  // sign up the allowlisted email → the databaseHook promotes it to role:"admin", and its session is admin.
+  const res = await app.request("/api/auth/sign-up/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "admin@test.dev", password: "test-password-123", name: "Admin" }) });
+  const set = res.headers.getSetCookie?.() ?? (res.headers.get("set-cookie") ? [res.headers.get("set-cookie") as string] : []);
+  adminCookie = set.map((c) => c.split(";")[0]).join("; ");
+});
+const adminH = () => ({ cookie: adminCookie }); // headers that authenticate as the verified superadmin
 
 const post = (p: string, body: unknown, h: Record<string, string> = {}) =>
   app.request(p, { method: "POST", headers: { "content-type": "application/json", ...h }, body: JSON.stringify(body) });
+const patch = (p: string, body: unknown, h: Record<string, string> = {}) =>
+  app.request(p, { method: "PATCH", headers: { "content-type": "application/json", ...h }, body: JSON.stringify(body) });
 
 describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one contract)", () => {
   test("health", async () => { expect((await app.request("/api/health")).status).toBe(200); });
+
+  test("a verified superadmin session was established (the access layer's admin identity)", () => {
+    expect(adminCookie.length).toBeGreaterThan(0);
+  });
 
   test("the v4 document is valid + carries cost (x-suluk-cost) + auth securitySchemes", async () => {
     const doc = await (await app.request("/openapi.json")).json() as any;
@@ -29,14 +44,15 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
   });
 
   test("a new entity serves real Drizzle CRUD, owner-stamped + cost-metered (generic, not hand-written)", async () => {
-    const created = await post("/product", { name: "Widget", slug: "widget", priceCents: 1999, status: "published" }, { "x-user": "u9", "x-suluk-action": "add-product" });
+    // the catalog is admin-write — an admin creates a product (public entity, no owner stamp)
+    const created = await post("/product", { name: "Widget", slug: "widget", priceCents: 1999, status: "published" }, { ...adminH(), "x-suluk-action": "add-product" });
     expect(created.status).toBe(201);
     expect((await created.json()).name).toBe("Widget");
     expect(((await (await app.request("/product")).json()) as unknown[]).length).toBeGreaterThan(0);
     // an owned entity stamps the caller as customerId without the client sending it
     const order = await post("/order", { totalCents: 1999, status: "pending" }, { "x-user": "u9" });
     expect((await order.json()).customerId).toBe("u9");
-    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
+    const cost = await (await app.request("/cost", { headers: adminH() })).json() as any;
     expect(cost.byPrincipal.u9).toBeGreaterThan(0);
     expect(cost.byAction["add-product"]).toBeGreaterThan(0);
   });
@@ -46,8 +62,8 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     for (const [path, op] of [["checkout/order", "checkout"], ["discount/validate", "validateDiscount"], ["search", "search"], ["analytics/summary", "analyticsSummary"]] as const) {
       expect(doc.paths[path]?.requests[op]["x-suluk-cost"], `op not costed: ${op}`).toBeDefined();
     }
-    await post("/product", { name: "Pro", slug: "pro", priceCents: 5000, status: "published", categoryId: 1 }, { "x-user": "c1" });
-    await post("/discountCode", { code: "SAVE10", discountType: "percent", discountValue: 10, isActive: true }, {});
+    await post("/product", { name: "Pro", slug: "pro", priceCents: 5000, status: "published", categoryId: 1 }, adminH());
+    await post("/discountCode", { code: "SAVE10", discountType: "percent", discountValue: 10, isActive: true }, adminH());
     const co = await (await post("/checkout/order", { items: [{ productId: 1, qty: 2, priceCents: 5000 }], discountCode: "SAVE10" }, { "x-user": "c1", "x-suluk-action": "checkout-btn" })).json();
     expect(co.subtotalCents).toBe(10000);
     expect(co.totalCents).toBe(9000); // 10% off
@@ -57,12 +73,12 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(v.valid).toBe(true); expect(v.newTotalCents).toBe(9000);
     const v2 = await post("/discount/validate", { code: "NOPE" }, {});
     expect(v2.status).toBe(422);
-    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
+    const cost = await (await app.request("/cost", { headers: adminH() })).json() as any;
     expect(cost.byAction["checkout-btn"]).toBeGreaterThan(0);
   });
 
   test("custom operations: search, analytics, newsletter (idempotent), avatar (derived SVG)", async () => {
-    await post("/product", { name: "Findable", slug: "find", priceCents: 100, status: "published" }, {});
+    await post("/product", { name: "Findable", slug: "find", priceCents: 100, status: "published" }, adminH());
     expect((await (await app.request("/search?q=Findable")).json()).products.length).toBeGreaterThan(0);
     expect((await (await app.request("/analytics/summary")).json()).products).toBeGreaterThan(0);
     expect((await (await app.request("/analytics/top-products")).json()).topProducts).toBeDefined();
@@ -80,10 +96,13 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     // a Bearer token authenticates with NO x-user header — the row is owner-stamped to the token's user
     const made = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "via-token" }) })).json();
     expect(made.ownerId).toBe("dev-1");
-    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
+    const cost = await (await app.request("/cost", { headers: adminH() })).json() as any;
     expect(cost.byPrincipal["dev-1"]).toBeGreaterThan(0);
-    // revoke → the same token no longer authenticates
-    await post(`/tokens/${tok.id}/revoke`, {}, {});
+    // another user can't revoke dev-1's token (owner-scoped) → 404, and the token still works
+    expect((await post(`/tokens/${tok.id}/revoke`, {}, { "x-user": "someone-else" })).status).toBe(404);
+    const still = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "still" }) })).json();
+    expect(still.ownerId).toBe("dev-1"); // the foreign revoke didn't touch it
+    expect((await post(`/tokens/${tok.id}/revoke`, {}, { "x-user": "dev-1" })).status).toBe(200); // the owner revokes
     const after = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "after" }) })).json();
     expect(after.ownerId).toBeNull();
   });
@@ -95,9 +114,36 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(((await (await app.request("/order", { headers: { "x-user": "bob" } })).json()) as { id: number }[]).some((o) => o.id === a.id)).toBe(false);
     expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "bob" } })).status).toBe(404);
     await app.request(`/order/${a.id}`, { method: "DELETE", headers: { "x-user": "bob" } });
-    expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "alice" } })).status).toBe(200); // bob's delete was a no-op
+    expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "alice" } })).status).toBe(200); // bob's delete couldn't touch it
     // an UNidentified caller sees nothing (no cross-tenant dump)
     expect(((await (await app.request("/billingAccount")).json()) as unknown[]).length).toBe(0);
+  });
+
+  test("ACCESS: catalog + discounts are admin-write — no minting, no vandalism, no self-mark-paid, no code leak", async () => {
+    // the underpayment vector: a self-minted near-100%-off code. CLOSED — discountCode is admin-only.
+    expect((await post("/discountCode", { code: "FREE99", discountType: "percent", discountValue: 99, isActive: true }, {})).status).toBe(403);
+    expect((await post("/discountCode", { code: "FREE99", discountType: "percent", discountValue: 99, isActive: true }, { "x-user": "mallory" })).status).toBe(403);
+    // listing every discount code (a leak) is admin-only
+    expect((await app.request("/discountCode")).status).toBe(403);
+    // catalog vandalism — anyone deleting/creating a store product. CLOSED.
+    expect((await app.request("/product/1", { method: "DELETE" })).status).toBe(403);
+    expect((await post("/product", { name: "spam", slug: "spam" }, { "x-user": "nobody" })).status).toBe(403);
+    // a user can PLACE an order but can't PATCH it to paid (status changes are system/admin-only)
+    const o = await (await post("/order", { totalCents: 999, status: "pending" }, { "x-user": "mallory" })).json();
+    expect((await patch(`/order/${o.id}`, { status: "paid" }, { "x-user": "mallory" })).status).toBe(403);
+    expect((await (await app.request(`/order/${o.id}`, { headers: { "x-user": "mallory" } })).json()).status).toBe("pending");
+    // a VERIFIED superadmin CAN manage the catalog + discounts
+    expect((await post("/discountCode", { code: "ADMIN50", discountType: "percent", discountValue: 50, isActive: true }, adminH())).status).toBe(201);
+    expect((await post("/product", { name: "Admin Product", slug: "admin-product", priceCents: 100, status: "published" }, adminH())).status).toBe(201);
+    // public submissions: anyone may submit contact/newsletter, but only an admin reads them
+    expect((await post("/contactSubmission", { name: "Q", email: "q@x.com", subject: "Hello", message: "hi" }, {})).status).toBe(201);
+    expect((await app.request("/contactSubmission")).status).toBe(403);
+    expect((await app.request("/contactSubmission", { headers: adminH() })).status).toBe(200);
+    // reviews are public-read, owner-write — everyone sees them
+    expect((await app.request("/review")).status).toBe(200);
+    // marking a review helpful requires auth (no anonymous vote-stuffing — a custom op, but still principal-gated)
+    expect((await post("/review/1/helpful", {}, {})).status).toBe(401);
+    expect([200, 404]).toContain((await post("/review/1/helpful", {}, { "x-user": "fan" })).status);
   });
 
   test("Scalar renders the docs", async () => {
@@ -109,15 +155,16 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(created.status).toBe(201);
     expect((await created.json()).name).toBe("Acme");
     expect(((await (await app.request("/project", { headers: { "x-user": "u1" } })).json()) as unknown[]).length).toBeGreaterThan(0);
-    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
+    const cost = await (await app.request("/cost", { headers: adminH() })).json() as any;
     expect(cost.byPrincipal.u1).toBeGreaterThan(0);
     expect(cost.byAction["new-project-button"]).toBeGreaterThan(0);
     expect(cost.bySource.compute).toBeGreaterThan(0);
   });
 
-  test("/superadmin cockpit is mounted + gated", async () => {
+  test("/superadmin cockpit is mounted + gated on a verified superadmin (not a spoofable header)", async () => {
     expect((await app.request("/superadmin")).status).toBe(403);
-    expect((await app.request("/superadmin", { headers: { "x-role": "superadmin" } })).status).toBe(200);
+    expect((await app.request("/superadmin", { headers: { "x-role": "superadmin" } })).status).toBe(403); // header is NOT enough
+    expect((await app.request("/superadmin", { headers: adminH() })).status).toBe(200);
   });
 
   test("Better Auth is mounted at /api/auth/* (handled, not our 404)", async () => {

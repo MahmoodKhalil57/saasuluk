@@ -9,12 +9,21 @@ import { betterAuth } from "better-auth";
 import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
 import { sqlite } from "./db";
 import { sendEmailAsync, brandedEmail } from "./email";
+import { superadminEmails } from "./access";
 
 export const auth = betterAuth({
   database: sqlite,
   emailAndPassword: { enabled: true },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me-in-prod",
   baseURL: process.env.BASE_URL ?? "http://localhost:3000",
+  // a SUPERADMIN_EMAILS address is promoted to role:"admin" at sign-up — so the verified session that the access
+  // layer checks is backed by a real admin row (the admin plugin's APIs work for them too). Idempotent + merge.
+  databaseHooks: {
+    user: { create: { before: async (user: { email?: string }) => {
+      const admins = superadminEmails(process.env.SUPERADMIN_EMAILS);
+      return { data: user.email && admins.includes(user.email.toLowerCase()) ? { ...user, role: "admin" } : user };
+    } } },
+  },
   // Google OAuth — enabled when the keys are present (Sign in with Google). Add the callback
   // <baseURL>/api/auth/callback/google to the Google OAuth app's authorized redirect URIs.
   socialProviders: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -34,14 +43,17 @@ export const auth = betterAuth({
   ],
 });
 
-/** Best-effort: create Better Auth's tables (so sign-up works locally). Real deploys run `better-auth migrate`. */
+/** Create Better Auth's tables (user/session/account/verification) in the in-memory dev DB so sign-up + sessions
+ *  work locally. (The Worker uses D1, migrated separately.) The migration helper moved to `better-auth/db/migration`
+ *  in v1.6 — importing the old `better-auth/db` path silently no-op'd, which left dev auth non-functional. */
 export async function ensureAuthTables(): Promise<boolean> {
   try {
-    const { getMigrations } = await import("better-auth/db");
+    const { getMigrations } = await import("better-auth/db/migration");
     const { runMigrations } = await getMigrations(auth.options as Parameters<typeof getMigrations>[0]);
     await runMigrations();
     return true;
-  } catch {
+  } catch (e) {
+    console.warn("[auth] table migration failed — live auth flows won't work locally:", (e as Error).message);
     return false; // auth routes still mount; live flows need the migration
   }
 }

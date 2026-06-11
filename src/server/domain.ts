@@ -8,6 +8,7 @@
 import { tableToV4 } from "@suluk/drizzle";
 import type { CostModel } from "@suluk/cost";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
+import type { AccessMode } from "./access";
 import * as s from "./schema";
 
 const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
@@ -17,8 +18,15 @@ export interface EntityDef {
   /** PascalCase singular — drives the operation names (list/get/create/update/delete + the path). */
   name: string;
   table: SQLiteTable;
-  /** the column to stamp with the caller's `x-user` on create (a user-owned resource); omit for public/admin entities. */
+  /** the column to stamp with the caller's principal on create (a user-owned resource); omit for public entities. */
   ownerCol?: string;
+  /**
+   * who may read/write each row (enforced by both CRUD factories — see access.ts). Defaults to `owned` when an
+   * ownerCol is present, else `public`. Set EXPLICITLY where the default is unsafe: catalog/content is `public`
+   * (world-read, admin-write), discount codes are `admin` (a self-minted 99%-off code is an underpayment vector),
+   * orders are `ownedAppend` (you place one but can't flip it to paid), billing is `ownedReadonly`.
+   */
+  access?: AccessMode;
   /** per-call cost weights (read µUSD, write µUSD); delete is charged at ~60% of a write. */
   r: number;
   w: number;
@@ -26,25 +34,25 @@ export interface EntityDef {
 
 /** The registry. Order is cosmetic (it sorts the docs/admin); the names must be unique + PascalCase. */
 export const ENTITIES: EntityDef[] = [
-  // ecommerce
-  { name: "Category", table: s.category, r: 8, w: 30 },
-  { name: "Product", table: s.product, r: 10, w: 45 },
-  { name: "Variant", table: s.variant, r: 8, w: 30 },
-  { name: "DiscountCode", table: s.discountCode, r: 8, w: 30 },
-  { name: "Cart", table: s.cart, ownerCol: "customerId", r: 10, w: 35 },
-  { name: "Order", table: s.order, ownerCol: "customerId", r: 12, w: 60 },
-  { name: "Review", table: s.review, ownerCol: "customerId", r: 8, w: 40 },
-  { name: "WishlistItem", table: s.wishlistItem, ownerCol: "customerId", r: 8, w: 25 },
-  // content / marketing
-  { name: "Post", table: s.post, ownerCol: "authorId", r: 8, w: 45 },
-  { name: "Faq", table: s.faq, r: 6, w: 25 },
-  { name: "NewsletterSubscriber", table: s.newsletterSubscriber, r: 6, w: 20 },
-  { name: "ContactSubmission", table: s.contactSubmission, r: 6, w: 20 },
-  { name: "Media", table: s.media, r: 6, w: 25 },
-  // platform
-  { name: "ApiToken", table: s.apiToken, ownerCol: "userId", r: 8, w: 30 },
-  { name: "BillingAccount", table: s.billingAccount, ownerCol: "principal", r: 8, w: 30 },
-  { name: "Project", table: s.project, ownerCol: "ownerId", r: 12, w: 40 },
+  // ecommerce — catalog is public-read/admin-write; carts/orders/reviews are user data
+  { name: "Category", table: s.category, access: "public", r: 8, w: 30 },
+  { name: "Product", table: s.product, access: "public", r: 10, w: 45 },
+  { name: "Variant", table: s.variant, access: "public", r: 8, w: 30 },
+  { name: "DiscountCode", table: s.discountCode, access: "admin", r: 8, w: 30 }, // never world-writable: free money
+  { name: "Cart", table: s.cart, ownerCol: "customerId", access: "owned", r: 10, w: 35 },
+  { name: "Order", table: s.order, ownerCol: "customerId", access: "ownedAppend", r: 12, w: 60 }, // can't self-mark paid
+  { name: "Review", table: s.review, ownerCol: "customerId", access: "review", r: 8, w: 40 }, // public-read, owner-write
+  { name: "WishlistItem", table: s.wishlistItem, ownerCol: "customerId", access: "owned", r: 8, w: 25 },
+  // content / marketing — posts/faqs are admin-published; contact/newsletter are public submissions
+  { name: "Post", table: s.post, ownerCol: "authorId", access: "public", r: 8, w: 45 },
+  { name: "Faq", table: s.faq, access: "public", r: 6, w: 25 },
+  { name: "NewsletterSubscriber", table: s.newsletterSubscriber, access: "submit", r: 6, w: 20 },
+  { name: "ContactSubmission", table: s.contactSubmission, access: "submit", r: 6, w: 20 },
+  { name: "Media", table: s.media, access: "public", r: 6, w: 25 },
+  // platform — tokens/projects are owned; billing is owner-read but system-written
+  { name: "ApiToken", table: s.apiToken, ownerCol: "userId", access: "owned", r: 8, w: 30 },
+  { name: "BillingAccount", table: s.billingAccount, ownerCol: "principal", access: "ownedReadonly", r: 8, w: 30 },
+  { name: "Project", table: s.project, ownerCol: "ownerId", access: "owned", r: 12, w: 40 },
 ];
 
 /** The entity list for `buildApp` (each entity's CREATE/insert shape → CRUD routes + v4 schemas). */
@@ -61,9 +69,9 @@ export const costs: Record<string, CostModel> = Object.fromEntries(
   ]),
 );
 
-/** name → { table, ownerCol } — how the API binds a generic CRUD handler to each contract-generated route. */
-export const tableByEntity: Record<string, { table: SQLiteTable; ownerCol?: string }> = Object.fromEntries(
-  ENTITIES.map((e) => [e.name, { table: e.table, ownerCol: e.ownerCol }]),
+/** name → { table, ownerCol, access } — how the API binds a generic CRUD handler to each contract-generated route. */
+export const tableByEntity: Record<string, { table: SQLiteTable; ownerCol?: string; access?: AccessMode }> = Object.fromEntries(
+  ENTITIES.map((e) => [e.name, { table: e.table, ownerCol: e.ownerCol, access: e.access }]),
 );
 
 /** every domain table — for `tableComponents` (the component schemas in the standalone openapi.json gen). */

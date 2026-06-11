@@ -16,6 +16,7 @@ import { buildContract, costs } from "./contract";
 import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal } from "./operations";
+import { isAdmin, superadminEmails } from "./access";
 import { db } from "./db";
 
 export async function createApp() {
@@ -23,6 +24,7 @@ export async function createApp() {
   const { built, document } = await buildContract();
   const sink = new MemoryCostSink();
   const ada = buildAda(document);
+  const admins = superadminEmails(process.env.SUPERADMIN_EMAILS); // verified-superadmin allowlist (read at app build)
 
   // bind a real Drizzle CRUD handler to EVERY contract-generated route, by entity. One generic factory covers
   // the whole domain — `list/get/create/update/delete<Entity>` → crudHandlers(table) for that entity.
@@ -34,7 +36,7 @@ export async function createApp() {
     const def = tableByEntity[entity];
     if (!def) return r;
     let h = handlerCache.get(entity);
-    if (!h) { h = crudHandlers(def.table, def.ownerCol); handlerCache.set(entity, h); }
+    if (!h) { h = crudHandlers(def.table, def.ownerCol, def.access); handlerCache.set(entity, h); }
     return { ...r, handler: h[verb as keyof CrudHandlers] as RouteContract["handler"] };
   });
 
@@ -44,7 +46,10 @@ export async function createApp() {
     const h = c.req.header("authorization");
     if (h?.startsWith("Bearer sk_")) { const u = await verifyApiToken(db, h); if (u) c.set("tokenUser", u); }
     else if (c.req.header("cookie")) {
-      try { const s = await auth.api.getSession({ headers: c.req.raw.headers }) as { user?: { id?: string } } | null; if (s?.user?.id) c.set("sessionUser", s.user.id); } catch { /* anonymous */ }
+      try {
+        const s = await auth.api.getSession({ headers: c.req.raw.headers }) as { user?: { id?: string; email?: string } } | null;
+        if (s?.user?.id) { c.set("sessionUser", s.user.id); if (s.user.email && admins.includes(s.user.email.toLowerCase())) c.set("isAdmin", true); } // verified superadmin
+      } catch { /* anonymous */ }
     }
     await next();
   });
@@ -57,12 +62,12 @@ export async function createApp() {
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
   app.get("/scalar", () => scalarResponse(document));                                            // docs (cost + auth shown)
   app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
-  app.get("/cost", (c) => {                                                                      // raw cost ledger — SCOPED to the caller (superadmin sees all)
+  app.get("/cost", (c) => {                                                                      // raw cost ledger — SCOPED to the caller (a VERIFIED superadmin sees all)
     const who = principal(c);
     const all = sink.events();
-    return c.json(summarize(c.req.header("x-role") === "superadmin" ? all : all.filter((e) => e.principal === who)));
+    return c.json(summarize(isAdmin(c) ? all : all.filter((e) => e.principal === who)));
   });
-  app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => c.req.header("x-role") === "superadmin" })); // /superadmin
+  app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c) })); // /superadmin (verified session, not a header)
   app.post("/api/stripe/webhook", async (c) => {                                                 // Stripe billing
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) return c.json({ error: "stripe not configured (set STRIPE_SECRET_KEY)" }, 503);
