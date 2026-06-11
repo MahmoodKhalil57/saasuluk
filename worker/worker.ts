@@ -25,12 +25,13 @@ import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/serve
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
+import { annotateAccess } from "../src/server/access-facet";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
 built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
-const document = mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes });
+const document = annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes })); // cost + access facets
 const ada = buildAda(document);
 
 type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string };
@@ -129,7 +130,7 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference" })); // PRIMARY docs: v4 rendered AS v4
+app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost" })); // PRIMARY docs: v4 rendered AS v4
 app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view
 app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
 app.get("/cost", async (c) => {
@@ -141,7 +142,9 @@ app.get("/cost", async (c) => {
     : c.env.DB.prepare("SELECT at, principal, operation, action, total_micro_usd, breakdown FROM cost_event WHERE principal = ? ORDER BY at DESC LIMIT 2000").bind(who ?? " ");
   const { results } = await stmt.all();
   const events: CostEvent[] = (results as Record<string, unknown>[]).map((r) => ({ at: Number(r.at), principal: (r.principal as string) ?? undefined, operation: r.operation as string, action: (r.action as string) ?? undefined, totalMicroUsd: Number(r.total_micro_usd), breakdown: JSON.parse(r.breakdown as string) }));
-  return c.json(summarize(events));
+  const opStats: Record<string, { count: number; totalMicroUsd: number }> = {};                  // per-op {count,total} → declared-vs-actual drift in /reference
+  for (const e of events) { const o = (opStats[e.operation] ??= { count: 0, totalMicroUsd: 0 }); o.count++; o.totalMicroUsd += e.totalMicroUsd; }
+  return c.json({ ...summarize(events), opStats });
 });
 
 // the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker. Gated on a VERIFIED

@@ -150,12 +150,19 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(await (await app.request("/scalar")).text()).toContain("Scalar.createApiReference");
   });
 
-  test("/reference renders the contract NATIVELY as v4 — cost facet + requests-shape, not a 3.1 downgrade", async () => {
+  test("/reference renders the contract NATIVELY as v4 — cost + access projection + requests-shape, not a 3.1 downgrade", async () => {
     const html = await (await app.request("/reference")).text();
     expect(html).toContain("OpenAPI 4.0.0-candidate"); // the real identity, not 3.1.0
     expect(html).not.toContain("3.1.0");
     expect(html).toContain("⛁");                        // the cost facet surfaced as a first-class badge
     expect(html).toContain("createProduct");            // the by-name request handle (the v4 requests-shape)
+    // the View-as access projection (x-suluk-access derived from the access model)
+    expect(html).toContain("View as");
+    expect(html).toContain('id="reachability"');        // the reachability matrix
+    const create = html.slice(html.indexOf('id="op-createProduct"'), html.indexOf('id="op-createProduct"') + 300);
+    expect(create).toContain('data-reach="admin"');     // admin-only op — hidden from anon/user by the lens
+    const list = html.slice(html.indexOf('id="op-listProduct"'), html.indexOf('id="op-listProduct"') + 300);
+    expect(list).toContain('data-reach="anon user admin"'); // public op — reachable by everyone
   });
 
   test("domain CRUD over Drizzle, with cost metered (user + frontend action + source)", async () => {

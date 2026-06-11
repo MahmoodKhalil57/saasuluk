@@ -64,13 +64,15 @@ export async function createApp() {
   }));
   mount(app, routes);                                                                            // contract-derived CRUD
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
-  app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference" })); // PRIMARY docs: the v4 doc rendered AS v4 (cost facet + requests-shape)
+  app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost" })); // PRIMARY docs: v4 rendered AS v4 (cost + access + requests-shape)
   app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view (Scalar renders OpenAPI 3.x)
   app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
   app.get("/cost", (c) => {                                                                      // raw cost ledger — SCOPED to the caller (a VERIFIED superadmin sees all)
     const who = principal(c);
-    const all = sink.events();
-    return c.json(summarize(isAdmin(c) ? all : all.filter((e) => e.principal === who)));
+    const events = isAdmin(c) ? sink.events() : sink.events().filter((e) => e.principal === who);
+    const opStats: Record<string, { count: number; totalMicroUsd: number }> = {};                // per-op {count,total} → declared-vs-actual drift in /reference
+    for (const e of events) { const o = (opStats[e.operation] ??= { count: 0, totalMicroUsd: 0 }); o.count++; o.totalMicroUsd += e.totalMicroUsd; }
+    return c.json({ ...summarize(events), opStats });
   });
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c) })); // /superadmin (verified session, not a header)
   app.get("/config", (c) => {                                                                   // config health (@suluk/env) — one registry, projected

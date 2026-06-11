@@ -11,6 +11,7 @@ import { authSecuritySchemes, ingestAuthOpenAPI, mergeAuth } from "@suluk/better
 import type { OpenAPIv4Document } from "@suluk/core";
 import { entitySchemas, costs as domainCosts } from "./domain";
 import { OPERATION_PATHS, OPERATION_COSTS } from "./operations";
+import { annotateAccess } from "./access-facet";
 import { auth } from "./auth";
 
 // the cost meter (api.ts) and the docs share ONE model: CRUD costs (domain) + the custom-operation costs.
@@ -22,7 +23,7 @@ export interface Contract { built: BuiltApp; document: OpenAPIv4Document }
 export async function buildContract(): Promise<Contract> {
   const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API", version: "0.1.0" } });
   built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
-  let document = annotateCosts(built.backend.document, costs);
+  let document = annotateAccess(annotateCosts(built.backend.document, costs)); // cost + access as contract facets
 
   const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
   try {
