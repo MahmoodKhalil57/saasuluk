@@ -23,6 +23,7 @@ import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
+import { configHealth, renderConfigHealth } from "../src/server/env";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
@@ -142,6 +143,14 @@ app.get("/cost", async (c) => {
 // the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker. Gated on a VERIFIED
 // superadmin session (SUPERADMIN_EMAILS), not a spoofable header — it surfaces the whole store's cost ledger.
 app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => isAdmin(c as unknown as Context) }));
+
+// config health (@suluk/env) — one declared registry (src/server/env.ts) projected into the admin surface. The
+// browser gets the premium HTML panel; an API client gets JSON. Values are NEVER returned — presence only.
+app.get("/config", (c) => {
+  if (!isAdmin(c)) return c.json({ error: "forbidden" }, 403);
+  const h = configHealth(c.env as unknown as Record<string, string | undefined>);
+  return (c.req.header("accept") ?? "").includes("text/html") ? c.html(renderConfigHealth(h)) : c.json(h);
+});
 app.get("/api/health", (c) => c.json({ ok: true, on: "cloudflare-workers", name: "saasuluk" }));
 
 // Stripe webhook — verifies the signature with Web Crypto (no SDK) and marks the order paid on completion.

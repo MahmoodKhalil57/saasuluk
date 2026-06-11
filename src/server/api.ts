@@ -17,6 +17,7 @@ import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal } from "./operations";
 import { isAdmin, superadminEmails } from "./access";
+import { configHealth, renderConfigHealth } from "./env";
 import { db } from "./db";
 
 export async function createApp() {
@@ -68,6 +69,11 @@ export async function createApp() {
     return c.json(summarize(isAdmin(c) ? all : all.filter((e) => e.principal === who)));
   });
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c) })); // /superadmin (verified session, not a header)
+  app.get("/config", (c) => {                                                                   // config health (@suluk/env) — one registry, projected
+    if (!isAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    const h = configHealth(process.env as Record<string, string | undefined>);
+    return (c.req.header("accept") ?? "").includes("text/html") ? c.html(renderConfigHealth(h)) : c.json(h);
+  });
   app.post("/api/stripe/webhook", async (c) => {                                                 // Stripe billing
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) return c.json({ error: "stripe not configured (set STRIPE_SECRET_KEY)" }, 503);

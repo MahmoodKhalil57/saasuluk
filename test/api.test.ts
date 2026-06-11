@@ -167,6 +167,21 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect((await app.request("/superadmin", { headers: adminH() })).status).toBe(200);
   });
 
+  test("config health (@suluk/env): admin-only, projects the registry, never leaks values", async () => {
+    expect((await app.request("/config")).status).toBe(403); // not admin
+    const r = await app.request("/config", { headers: adminH() });
+    expect(r.status).toBe(200);
+    const h = await r.json() as any;
+    expect(h.vars.some((v: any) => v.name === "STRIPE_SECRET_KEY")).toBe(true);
+    expect(h.surfaces.cloudflare).toContain("STRIPE_METERED_PRICE_ID");
+    // the manifest carries presence/health, NEVER the secret value
+    expect(JSON.stringify(h)).not.toContain(process.env.BETTER_AUTH_SECRET ?? "no-secret-set-xyz");
+    expect(h.vars.every((v: any) => !("value" in v))).toBe(true);
+    // the HTML panel renders for a browser
+    const html = await (await app.request("/config", { headers: { ...adminH(), accept: "text/html" } })).text();
+    expect(html).toContain("Configuration health");
+  });
+
   test("Better Auth is mounted at /api/auth/* (handled, not our 404)", async () => {
     const r = await app.request("/api/auth/reference");
     expect(r.status).not.toBe(404); // Better Auth handles it (the OpenAPI reference UI)
