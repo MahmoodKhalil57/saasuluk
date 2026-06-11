@@ -43,9 +43,11 @@ import Layout from "../layouts/Layout.astro";
       $("msg").textContent = "";
     }
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.tab)));
+    // preserve where the user came from (?redirectTo=…), open-redirect-guarded (same-origin relative only).
+    const redirectTo = (function () { try { const p = new URLSearchParams(location.search).get("redirectTo"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/account"; } catch (e) { return "/account"; } })();
     document.getElementById("google").addEventListener("click", async () => {
       try {
-        const r = await fetch("/api/auth/sign-in/social", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ provider: "google", callbackURL: "/account" }) });
+        const r = await fetch("/api/auth/sign-in/social", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ provider: "google", callbackURL: redirectTo }) });
         const d = await r.json();
         if (d && d.url) location.href = d.url; else $("msg").innerHTML = '<span style="color:#e5484d">Google sign-in isn\'t configured for this site yet.</span>';
       } catch (e) { $("msg").innerHTML = '<span style="color:#e5484d">Could not start Google sign-in.</span>'; }
@@ -58,13 +60,13 @@ import Layout from "../layouts/Layout.astro";
       const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "…";
       try {
         if (mode === "magic") {
-          const r = await fetch("/api/auth/sign-in/magic-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, callbackURL: "/account" }) });
+          const r = await fetch("/api/auth/sign-in/magic-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, callbackURL: redirectTo }) });
           if (r.ok) ok("Check your email for a sign-in link. (In dev it logs to the server console.)"); else err("Could not send the link.");
         } else {
           const path = mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
           const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(mode === "signup" ? { email, password, name: name || email.split("@")[0] } : { email, password }) });
           const data = await r.json().catch(() => ({}));
-          if (r.ok && data.user) { ok("Signed in — redirecting…"); setTimeout(() => (location.href = "/account"), 500); }
+          if (r.ok && data.user) { ok("Signed in — redirecting…"); setTimeout(() => (location.href = redirectTo), 500); }
           else err(data.message || data.error?.message || "Invalid email or password.");
         }
       } catch (x) { err("Something went wrong."); }

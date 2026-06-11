@@ -7,6 +7,7 @@
  */
 import { betterAuth } from "better-auth";
 import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
+import { emailVerificationConfig } from "@suluk/better-auth";
 import { sqlite } from "./db";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { superadminEmails } from "./access";
@@ -14,6 +15,13 @@ import { superadminEmails } from "./access";
 export const auth = betterAuth({
   database: sqlite,
   emailAndPassword: { enabled: true },
+  // frictionless activation (@suluk/better-auth): verify-on-sign-up + auto-sign-in after the user clicks the link.
+  // Not REQUIRED (sign-up still works immediately), so this adds a verified email without blocking the flow.
+  emailVerification: emailVerificationConfig({
+    sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
+      sendEmailAsync({ to: user.email, subject: "Verify your saasuluk email", html: brandedEmail("Verify your email", `<p>Confirm your address to activate your account.</p><p><a href="${url}" style="color:#f5a97f">Verify email</a></p>`) });
+    },
+  }),
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me-in-prod",
   baseURL: process.env.BASE_URL ?? "http://localhost:3000",
   // a SUPERADMIN_EMAILS address is promoted to role:"admin" at sign-up — so the verified session that the access

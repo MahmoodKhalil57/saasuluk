@@ -3,6 +3,7 @@
  *  Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_*, RESEND_API_KEY) come from the Worker env (wrangler secrets). */
 import { betterAuth } from "better-auth";
 import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
+import { emailVerificationConfig } from "@suluk/better-auth";
 import { D1Dialect } from "kysely-d1";
 import { sendEmailAsync, brandedEmail } from "../src/server/email";
 import { superadminEmails } from "../src/server/access";
@@ -24,6 +25,12 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
   const auth = betterAuth({
     database: { dialect: new D1Dialect({ database: env.DB }), type: "sqlite" },
     emailAndPassword: { enabled: true },
+    // frictionless activation (@suluk/better-auth) — verify-on-sign-up + auto-sign-in after; not required.
+    emailVerification: emailVerificationConfig({
+      sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
+        sendEmailAsync({ to: user.email, subject: "Verify your saasuluk email", html: brandedEmail("Verify your email", `<p>Confirm your address to activate your account.</p><p><a href="${url}" style="color:#6366f1">Verify email</a></p>`) });
+      },
+    }),
     secret: env.BETTER_AUTH_SECRET ?? "saasuluk-dev-secret-change-me-32chars!",
     baseURL: "https://saasuluk.saastemly.com",
     trustedOrigins: ["https://saasuluk.saastemly.com"],
