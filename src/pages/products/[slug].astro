@@ -61,8 +61,15 @@ const productLd = jsonLd("Product", { name: product.name, description: product.d
     }
     document.getElementById("review").addEventListener("submit", async (e) => {
       e.preventDefault();
-      await fetch("/review", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user" }, body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value, status: "published" }) });
-      e.target.reset(); loadReviews();
+      const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true; // prevent a duplicate review
+      try {
+        const r = await fetch("/review", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user" }, body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value, status: "published" }) });
+        if (!r.ok) throw new Error("Could not submit your review.");
+        e.target.reset(); loadReviews();
+        if (window.toast) window.toast("Review submitted ✓", { type: "success" });
+      } catch (err) {
+        if (window.toast) window.toast(err.message || "Could not submit your review.", { type: "error" });
+      } finally { btn.disabled = false; }
     });
     (async () => {
       const rel = await (await fetch(`/recommendations/${product.id}`)).json();

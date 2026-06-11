@@ -22,16 +22,29 @@ import Layout from "../layouts/Layout.astro";
   <script is:inline>
     document.getElementById("contact").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const f = e.target;
-      const r = await fetch("/contactSubmission", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "contact-form" }, body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }) });
-      document.getElementById("cmsg").innerHTML = r.ok ? `<span class="card" style="display:inline-block">✓ Thanks — we'll be in touch.</span>` : "Something went wrong.";
-      if (r.ok) f.reset();
+      const f = e.target, btn = f.querySelector("button[type=submit]");
+      btn.disabled = true; // prevent a duplicate submission
+      try {
+        const r = await fetch("/contactSubmission", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "contact-form" }, body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }) });
+        if (!r.ok) throw new Error("Something went wrong.");
+        document.getElementById("cmsg").innerHTML = `<span class="card" style="display:inline-block">✓ Thanks — we'll be in touch.</span>`;
+        f.reset();
+        if (window.toast) window.toast("Message sent ✓", { type: "success" });
+      } catch (err) {
+        document.getElementById("cmsg").textContent = "Could not send — please try again.";
+        if (window.toast) window.toast(err.message || "Could not send your message.", { type: "error" });
+      } finally { btn.disabled = false; }
     });
     document.getElementById("news").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const r = await (await fetch("/newsletter/subscribe", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "newsletter" }, body: JSON.stringify({ email: e.target.email.value }) })).json();
-      document.getElementById("nmsg").textContent = r.subscribed ? (r.already ? "You're already subscribed ✓" : "Subscribed ✓") : "Enter a valid email.";
-      if (r.subscribed) e.target.reset();
+      const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
+      try {
+        const r = await (await fetch("/newsletter/subscribe", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "newsletter" }, body: JSON.stringify({ email: e.target.email.value }) })).json();
+        document.getElementById("nmsg").textContent = r.subscribed ? (r.already ? "You're already subscribed ✓" : "Subscribed ✓") : "Enter a valid email.";
+        if (r.subscribed) e.target.reset();
+      } catch (err) {
+        document.getElementById("nmsg").textContent = "Could not subscribe — please try again.";
+      } finally { btn.disabled = false; }
     });
   </script>
 </Layout>
