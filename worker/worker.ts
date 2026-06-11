@@ -19,6 +19,7 @@ import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
+import { generateSdk } from "@suluk/sdk";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
@@ -133,7 +134,8 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" })); // PRIMARY docs + L2 live view
+app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs + L2 live view + SDK
+app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK from the contract
 app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view
 app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c as unknown as Context) }));           // renderer auto-selects this viewer's lens (L2)
 app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as= → a provable-subset PROJECTION

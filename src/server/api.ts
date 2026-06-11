@@ -9,6 +9,7 @@ import { mount, type RouteContract } from "@suluk/hono";
 import { buildAda, matchRequest } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
+import { generateSdk } from "@suluk/sdk";
 import { adminApp } from "@suluk/admin";
 import { costMeter, MemoryCostSink, summarize } from "@suluk/cost";
 import { stripeProvider, type StripeLike } from "@suluk/stripe";
@@ -66,7 +67,8 @@ export async function createApp() {
   mount(app, routes);                                                                            // contract-derived CRUD
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
   const canonHash = docHash(document);
-  app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" })); // PRIMARY docs: v4 AS v4 + L2 live per-user view
+  app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs: v4 AS v4 + L2 live view + SDK download
+  app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK, generated from the contract
   app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view (Scalar renders OpenAPI 3.x)
   app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c) }));                                 // the renderer auto-selects this viewer's lens (L2)
   app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as=me|anon|user|admin → a provable-subset PROJECTION

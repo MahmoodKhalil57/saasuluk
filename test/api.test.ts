@@ -166,6 +166,20 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect((await (await app.request("/reference")).text())).toContain("🛡 Hardening"); // surfaced in /reference (the soft incentive)
   });
 
+  test("downloadable TypeScript SDK (@suluk/sdk): /sdk.ts generates a typed ofetch client from the contract", async () => {
+    const r = await app.request("/sdk.ts");
+    expect(r.headers.get("content-type")).toContain("typescript");
+    expect(r.headers.get("content-disposition")).toContain("saasuluk-sdk.ts");
+    const ts = await r.text();
+    expect(ts).toContain("export function createClient");
+    expect(ts).toContain('from "ofetch"');
+    expect(ts).toContain("product: {");                 // entity-grouped methods (named-request identity)
+    expect(ts).toContain("create: Object.assign");
+    expect(ts).toContain("$manifest:");                 // the v4 superpowers manifest (for agents/tooling)
+    expect(ts).toMatch(/requires: "(anyone|admin)"/);    // access facet as inert metadata
+    expect((await (await app.request("/reference")).text())).toContain("⬇ TypeScript SDK"); // the download affordance
+  });
+
   test("Scalar renders the docs (the 3.1 compatibility view)", async () => {
     expect(await (await app.request("/scalar")).text()).toContain("Scalar.createApiReference");
   });
