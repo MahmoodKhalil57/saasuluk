@@ -187,6 +187,17 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .cartsub { display:flex; justify-content:space-between; font-size:15px; margin-bottom:12px; }
       .cartsub span:last-child { font-weight:700; font-family:ui-monospace,monospace; }
       .cartdrawer-foot .btn { width:100%; justify-content:center; }
+      /* mobile nav drawer — slides from the START edge (opposite the cart), RTL-aware; hamburger shows < 760px */
+      .navtoggle { display:none; font-size:16px; }
+      @media (max-width:760px){ .navtoggle { display:inline-grid; place-items:center; } }
+      .mobilenav { position:fixed; top:0; inset-inline-start:0; z-index:41; width:min(300px,86vw); height:100dvh; display:flex; flex-direction:column; background:var(--panel); border-inline-end:1px solid var(--line); box-shadow:18px 0 50px rgba(16,16,40,.18); transform:translateX(-100%); transition:transform .24s cubic-bezier(.4,0,.2,1); }
+      [dir="rtl"] .mobilenav { box-shadow:-18px 0 50px rgba(16,16,40,.18); transform:translateX(100%); }
+      .mobilenav.open { transform:translateX(0); }
+      .mobilenav-head { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line); }
+      .mobilenav nav { display:flex; flex-direction:column; padding:10px 12px; gap:2px; }
+      .mobilenav nav a { color:var(--fg); padding:11px 14px; border-radius:9px; font-weight:500; font-size:15px; }
+      .mobilenav nav a:hover, .mobilenav nav a.on { background:var(--bg-soft); text-decoration:none; }
+      .mobilenav nav a.on { color:var(--accent); }
       @media (max-width:560px){ #scheme{display:none} } /* keep the chrome uncrowded on small phones */
       /* toasts (bottom-inline-end stack; logical props → flips for RTL) */
       .toasts { position:fixed; bottom:20px; inset-inline-end:20px; z-index:60; display:flex; flex-direction:column; gap:10px; max-width:min(360px,calc(100vw - 40px)); pointer-events:none; }
@@ -211,8 +222,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <header class="site">
       <div class="wrap">
         <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
-        <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""}>{t("en", key)}</a>)}</nav>
+        <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
         <div class="chrome">
+          <button id="navtoggle" class="iconbtn navtoggle" aria-label="Menu" aria-expanded="false" aria-controls="mobilenav" aria-haspopup="dialog">☰</button>
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
           <select id="scheme" aria-label="Color scheme" title="Color scheme"><option value="">Indigo</option>{ALT_SCHEMES.map((s) => <option value={s.name}>{s.label}</option>)}</select>
           <button id="theme" class="iconbtn" aria-label="Toggle theme">◐</button>
@@ -240,6 +252,12 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       </div>
     </footer>
     <!-- cart drawer (populated by the bundled @suluk/nano-stores module below) -->
+    <!-- mobile navigation drawer (the desktop nav is hidden < 760px; @suluk/nano-stores createDrawer drives it) -->
+    <div id="navback" class="cartback" hidden></div>
+    <aside id="mobilenav" class="mobilenav" role="dialog" aria-modal="true" aria-label="Navigation" aria-hidden="true" hidden>
+      <div class="mobilenav-head"><a class="brand" href="/"><span class="dot">s</span> saasuluk</a><button id="navclose" class="iconbtn" aria-label="Close menu">✕</button></div>
+      <nav>{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
+    </aside>
     <div id="cartback" class="cartback" hidden></div>
     <aside id="cartdrawer" class="cartdrawer" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-hidden="true" hidden>
       <div class="cartdrawer-head">

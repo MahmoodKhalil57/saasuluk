@@ -5,7 +5,23 @@
  *   - scroll-reveal for any [data-reveal] element (staggered, reduced-motion-gated by the base CSS).
  * Both degrade gracefully and are no-ops under reduced-motion (the CSS neutralizes the transitions).
  */
-import { createProgressBar, revealOnScroll } from "@suluk/nano-stores";
+import { createProgressBar, revealOnScroll, createDrawer } from "@suluk/nano-stores";
+
+function mobileNav() {
+  const drawer = document.getElementById("mobilenav");
+  const back = document.getElementById("navback");
+  const toggle = document.getElementById("navtoggle");
+  const closeBtn = document.getElementById("navclose");
+  if (!drawer || !back || !toggle) return;
+  const chrome = () => [document.querySelector("header.site"), document.querySelector("main"), document.querySelector("footer.site")].filter(Boolean) as HTMLElement[];
+  const d = createDrawer({ drawer, backdrop: back, inertTargets: chrome, initialFocus: () => closeBtn });
+  const sync = () => toggle.setAttribute("aria-expanded", String(d.isOpen()));
+  toggle.addEventListener("click", () => { d.toggle(); sync(); });
+  closeBtn?.addEventListener("click", () => { d.close(); sync(); });
+  back.addEventListener("click", () => { d.close(); sync(); });
+  drawer.addEventListener("click", (e) => { if ((e.target as HTMLElement).closest("a")) { d.close(); sync(); } }); // close after picking a link
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && d.isOpen()) { d.close(); sync(); } });
+}
 
 function navProgress() {
   let bar = document.querySelector(".navprogress") as HTMLElement | null;
@@ -30,6 +46,7 @@ function navProgress() {
 
 function init() {
   navProgress();
+  mobileNav();
   revealOnScroll(); // reveals [data-reveal] elements present at load (server-rendered sections)
 }
 
