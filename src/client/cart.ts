@@ -7,12 +7,16 @@
  * they just dispatch a `cart-changed` event after writing, and the store reconciles. Cross-tab stays in sync
  * via the native `storage` event (handled inside the store).
  */
-import { createCartStore } from "@suluk/nano-stores";
+import { createCartStore, createDiscountStore } from "@suluk/nano-stores";
 import { fmtMoney } from "./format";
 
 const cart = createCartStore({ storageKey: "cart" });
-// expose for the (few) inline handlers that prefer calling the store directly over hand-writing localStorage.
-(window as unknown as { cart?: typeof cart }).cart = cart;
+// the cart's companion: a persisted, cross/same-tab-synced applied discount, so a code entered on checkout
+// survives navigation + refresh. The checkout inline script reads/writes it through window.discount.
+const discount = createDiscountStore({ storageKey: "discount" });
+// expose for the inline handlers that prefer calling the stores directly over hand-writing localStorage.
+(window as unknown as { cart?: typeof cart; discount?: typeof discount }).cart = cart;
+(window as unknown as { cart?: typeof cart; discount?: typeof discount }).discount = discount;
 
 const money = (c: number) => fmtMoney(c); // locale-aware (Eastern-Arabic numerals for ar, locale currency)
 const el = (id: string) => document.getElementById(id);

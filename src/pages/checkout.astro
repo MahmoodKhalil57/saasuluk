@@ -21,9 +21,11 @@ import Layout from "../layouts/Layout.astro";
   <script is:inline>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
-    let discount = null;
+    // restore any applied discount the store persisted (survives navigation / refresh / another tab)
+    let discount = (window.discount && window.discount.get()) || null; // { code, type, value } | null
     function subtotal() { return cart().reduce((s, i) => s + i.priceCents * i.qty, 0); }
-    function applyLocal(sub) { if (!discount?.valid) return sub; return discount.discountType === "percent" ? Math.max(0, Math.round(sub * (100 - discount.discountValue) / 100)) : Math.max(0, sub - discount.discountValue); }
+    function applyLocal(sub) { if (!discount) return sub; return discount.type === "percent" ? Math.max(0, Math.round(sub * (100 - discount.value) / 100)) : Math.max(0, sub - discount.value); }
+    const discLabel = (d) => d.type === "percent" ? d.value + "% off" : money(d.value) + " off";
     function render() {
       const c = cart();
       document.getElementById("lines").innerHTML = c.length ? c.map((i) => `<tr><td>${i.name || "#" + i.productId}</td><td>${i.qty}</td><td>${money(i.priceCents * i.qty)}</td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">Cart is empty — <a href="/products">browse products</a>.</td></tr>`;
@@ -43,8 +45,9 @@ import Layout from "../layouts/Layout.astro";
       applyBtn.disabled = true; // guard against double-apply
       try {
         const r = await postJson("/discount/validate", { code, subtotalCents: subtotal() });
-        discount = r.valid ? { ...r, code } : null;
-        document.getElementById("discMsg").textContent = r.valid ? `✓ ${r.discountType === "percent" ? r.discountValue + "% off" : money(r.discountValue) + " off"}` : `✗ ${r.reason || "invalid"}`;
+        if (r.valid) { discount = { code, type: r.discountType, value: r.discountValue }; if (window.discount) window.discount.apply(discount); }
+        else { discount = null; if (window.discount) window.discount.clear(); }
+        document.getElementById("discMsg").textContent = r.valid ? "✓ " + discLabel(discount) : `✗ ${r.reason || "invalid"}`;
         render();
       } catch (err) {
         if (window.toast) window.toast(err.message || "Could not validate the code.", { type: "error" });
@@ -56,7 +59,7 @@ import Layout from "../layouts/Layout.astro";
       try {
         const r = await postJson("/checkout/order", { items: c, discountCode: discount?.code }, "place-order");
         if (!r.order) throw new Error(r.error || "Order failed.");
-        localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; render(); // clear ONLY on success
+        localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; if (window.discount) window.discount.clear(); render(); // clear ONLY on success
         if (window.toast) window.toast("Order #" + r.order.id + " placed — total " + money(r.totalCents), { type: "success" });
         document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
       } catch (err) {
@@ -76,6 +79,8 @@ import Layout from "../layouts/Layout.astro";
         document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block;color:#e5484d">${err.message || "Could not start Stripe checkout."}</span>`;
       }
     });
+    // reflect a restored discount in the input + message on load
+    if (discount) { document.getElementById("code").value = discount.code; document.getElementById("discMsg").textContent = "✓ " + discLabel(discount); }
     // keep this page's cart table + total in sync when the shell drawer (or another tab) mutates the cart
     window.addEventListener("cart-changed", render);
     render();
