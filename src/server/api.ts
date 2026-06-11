@@ -5,7 +5,18 @@
  * to a Cloudflare Worker (Hono is native there).
  */
 import { Hono } from "hono";
-import { mount, enforceAccess, type RouteContract } from "@suluk/hono";
+import { mount, enforceAccess, enforceRateLimit, type RouteContract } from "@suluk/hono";
+
+/** Per-operation rate budgets (saastarter-parity: abuse protection on the money + write paths). Undeclared ops fall
+ *  to a generous blanket. Keyed by operation name. NOTE: MemoryRateLimitStore is per-process — correct on the dev
+ *  server; the Worker needs a Durable Object / KV-backed store for true cross-isolate limiting. */
+const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number; key: "ip" }> = {
+  checkout: { windowMs: 60000, maxRequests: 60, key: "ip" },
+  payCheckout: { windowMs: 60000, maxRequests: 30, key: "ip" },
+  validateDiscount: { windowMs: 60000, maxRequests: 60, key: "ip" },
+  createContactSubmission: { windowMs: 60000, maxRequests: 20, key: "ip" },
+  createReview: { windowMs: 60000, maxRequests: 20, key: "ip" },
+};
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
@@ -67,6 +78,11 @@ export async function createApp() {
     accessOf: (op) => access[op],
     principal: (c) => principal(c),
     isAdmin: (c) => isAdmin(c),
+  }));
+  app.use("*", enforceRateLimit({                                                               // 429 + Retry-After (RFC-9457) on the declared money/write ops + a blanket default
+    operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
+    rateLimitOf: (op) => RATE_LIMITS[op],
+    defaultFacet: { windowMs: 60000, maxRequests: 300, key: "ip" },                              // generous blanket so every op has basic protection
   }));
   app.use("*", costMeter({                                                                      // meter every op (after the gate — don't meter a rejected request)
     sink, costs,

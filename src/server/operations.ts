@@ -171,12 +171,13 @@ for (const pi of Object.values(OPERATION_PATHS) as { requests?: Record<string, R
 /** Validate a discount code against the table: must exist, be active, not expired, and under its usage cap. */
 async function resolveDiscount(dz: Dz, raw: string): Promise<ResolvedDiscount> {
   const code = String(raw ?? "").toUpperCase().trim();
-  if (!code) return { valid: false, reason: "empty code" };
+  // human, actionable reasons (saastarter-parity: discount errors tell the shopper what to do, not a code)
+  if (!code) return { valid: false, reason: "Enter a discount code." };
   const d = await dz.select().from(discountCode).where(eq(discountCode.code, code)).get();
-  if (!d) return { valid: false, reason: "unknown code" };
-  if (!d.isActive) return { valid: false, reason: "inactive" };
-  if (d.expiresAt && Number(d.expiresAt) < Date.now()) return { valid: false, reason: "expired" };
-  if (d.maxUses != null && Number(d.currentUses) >= Number(d.maxUses)) return { valid: false, reason: "usage limit reached" };
+  if (!d) return { valid: false, reason: "That code isn’t recognized." };
+  if (!d.isActive) return { valid: false, reason: "This code is no longer active." };
+  if (d.expiresAt && Number(d.expiresAt) < Date.now()) return { valid: false, reason: "This code has expired." };
+  if (d.maxUses != null && Number(d.currentUses) >= Number(d.maxUses)) return { valid: false, reason: "This code has reached its usage limit." };
   return { valid: true, discountType: d.discountType, discountValue: Number(d.discountValue) };
 }
 

@@ -343,6 +343,17 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
   test("Stripe webhook endpoint exists (rejects an unsigned request: 400 when configured, 503 when not)", async () => {
     expect([400, 503]).toContain((await post("/api/stripe/webhook", {})).status);
   });
+
+  test("rate limit (@suluk/hono enforceRateLimit): past the budget → 429 + Retry-After (RFC-9457)", async () => {
+    // createContactSubmission is budgeted at 20/min; hammer it past the limit (public op, no other test uses it)
+    let last: Response | undefined;
+    for (let i = 0; i < 22; i++) last = await post("/contactSubmission", { name: "x", email: "x@y.z", subject: "s", message: "m" });
+    expect(last!.status).toBe(429);
+    expect(last!.headers.get("retry-after")).toBeTruthy();
+    const body = await last!.json();
+    expect(body.status).toBe(429);
+    expect(body.error).toBe("rate_limited"); // the shared RFC-9457 problem envelope
+  });
 });
 
 describe("list query (@suluk/drizzle parseListQuery): pagination/sort/filter — projected to the contract, OPT-IN", () => {
