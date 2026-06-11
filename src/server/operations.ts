@@ -13,6 +13,7 @@ import { product, post, order, cart, review, discountCode, newsletterSubscriber,
 import { sendEmailAsync, brandedEmail } from "./email";
 import { customerParams, subscriptionParams, meterEventParams } from "@suluk/stripe";
 import { restStripe } from "./stripe-rest";
+import { METER_EVENT_DEFAULT } from "./env";
 
 /** SHA-256 of an API key (Web Crypto — Worker-safe). We store only the hash; the plaintext is shown once. */
 export async function hashKey(key: string): Promise<string> {
@@ -397,7 +398,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
 
   const reportUsage = async (c: Context) => {
     const key = secret(c, "STRIPE_SECRET_KEY");
-    const eventName = secret(c, "STRIPE_METER_EVENT_NAME") ?? "saasuluk_cost";
+    const eventName = secret(c, "STRIPE_METER_EVENT_NAME") ?? METER_EVENT_DEFAULT;
     if (!key) return c.json({ error: "Stripe is not configured." }, 503);
     const who = principal(c);
     if (!who) return c.json({ error: "Sign in first." }, 401);

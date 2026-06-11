@@ -18,7 +18,7 @@ import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal } from "./operations";
 import { isAdmin, superadminEmails } from "./access";
-import { configHealth, renderConfigHealth } from "./env";
+import { configHealth, renderConfigHealth, loadConfig } from "./env";
 import { db } from "./db";
 
 export async function createApp() {
@@ -27,6 +27,8 @@ export async function createApp() {
   const sink = new MemoryCostSink();
   const ada = buildAda(document);
   const admins = superadminEmails(process.env.SUPERADMIN_EMAILS); // verified-superadmin allowlist (read at app build)
+  const { problem } = loadConfig(process.env as Record<string, string | undefined>); // validate config vs the registry — warn loud, don't crash
+  if (problem) console.warn("[saasuluk config]", problem);
 
   // bind a real Drizzle CRUD handler to EVERY contract-generated route, by entity. One generic factory covers
   // the whole domain — `list/get/create/update/delete<Entity>` → crudHandlers(table) for that entity.

@@ -10,20 +10,37 @@
  */
 import { defineEnv, type ManifestEntry, type HealthStatus } from "@suluk/env";
 
+/** The Stripe Billing Meter event name default — ONE source (registry default + the operations.ts fallback both read it). */
+export const METER_EVENT_DEFAULT = "saasuluk_cost";
+
 export const env = defineEnv({
   BETTER_AUTH_SECRET:      { secret: true, required: true, surfaces: ["local", "cloudflare"], description: "Better Auth signing secret (openssl rand -base64 32)" },
   BASE_URL:                { default: "http://localhost:3000", surfaces: ["local", "preview"], description: "Public base URL (dev)" },
+  PORT:                    { default: "3000", surfaces: ["local"], description: "Dev API server port (src/server/main.ts)" },
   STRIPE_SECRET_KEY:       { secret: true, surfaces: ["local", "cloudflare"], description: "Stripe API key — enables checkout + usage billing" },
   STRIPE_PUBLISHABLE_KEY:  { surfaces: ["local", "cloudflare"], description: "Stripe publishable key (client)" },
   STRIPE_WEBHOOK_SECRET:   { secret: true, surfaces: ["cloudflare", "local"], description: "Stripe webhook signing secret (whsec_…)" },
-  STRIPE_METER_EVENT_NAME: { default: "saasuluk_cost", surfaces: ["cloudflare"], description: "Stripe Billing Meter event name" },
+  STRIPE_METER_EVENT_NAME: { default: METER_EVENT_DEFAULT, surfaces: ["cloudflare"], description: "Stripe Billing Meter event name" },
   STRIPE_METERED_PRICE_ID: { surfaces: ["cloudflare"], description: "Stripe metered Price id for usage billing" },
   RESEND_API_KEY:          { secret: true, surfaces: ["local", "cloudflare"], description: "Resend API key — outbound email (magic links, newsletter)" },
   EMAIL_FROM:              { default: "saasuluk <onboarding@resend.dev>", surfaces: ["local", "cloudflare"], description: "From address for outbound email" },
   GOOGLE_CLIENT_ID:        { surfaces: ["local", "cloudflare"], description: "Google OAuth client id" },
   GOOGLE_CLIENT_SECRET:    { secret: true, surfaces: ["local", "cloudflare"], description: "Google OAuth client secret" },
   SUPERADMIN_EMAILS:       { surfaces: ["local", "cloudflare"], description: 'JSON array of admin emails, e.g. ["you@example.com"]' },
+  // build/script-only knobs (declared so /config doesn't under-report what the code reads)
+  CATALOG_BASE:            { surfaces: ["ci"], description: "Base URL the catalog-sync script fetches live prices from" },
+  FORCE:                   { surfaces: ["ci"], description: "Set to 1 to force re-creating Stripe prices in sync-catalog" },
 });
+
+/**
+ * Validate a runtime env bag against the registry, applying defaults — WITHOUT crashing the app. Returns the typed
+ * config plus any problem (a missing required var). Call at startup to fail LOUD (a warning) rather than silent: a
+ * missing BETTER_AUTH_SECRET used to fall back to a known dev secret in prod; now it's surfaced.
+ */
+export function loadConfig(runtime: Record<string, string | undefined>): { config: ReturnType<typeof env.parse> | null; problem: string | null } {
+  try { return { config: env.parse(runtime), problem: null }; }
+  catch (e) { return { config: null, problem: (e as Error).message }; }
+}
 
 export interface ConfigHealth { surfaces: { cloudflare: string[]; local: string[] }; vars: ManifestEntry[] }
 

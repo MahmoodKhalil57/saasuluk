@@ -24,7 +24,7 @@ import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
-import { configHealth, renderConfigHealth } from "../src/server/env";
+import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
@@ -46,7 +46,9 @@ app.on(["GET", "POST"], "/api/auth/*", async (c) => {
 // cookie. (principal() falls back to the x-user header only when neither is present — anonymous demo.) When the
 // session belongs to a SUPERADMIN_EMAILS address, mark the request admin — the ONLY way to be admin (never a
 // spoofable header), which is what gates the catalog/discount write surface, /cost (all), and /superadmin.
+let configChecked = false; // once-per-isolate: validate config against the @suluk/env registry, warn (don't crash)
 app.use("*", async (c, next) => {
+  if (!configChecked) { configChecked = true; const { problem } = loadConfig(c.env as unknown as Record<string, string | undefined>); if (problem) console.warn("[saasuluk config]", problem); }
   const admins = superadminEmails(c.env.SUPERADMIN_EMAILS);
   const h = c.req.header("authorization");
   if (h?.startsWith("Bearer sk_")) { const u = await verifyApiToken(drizzle(c.env.DB), h); if (u) c.set("tokenUser", u); }
@@ -204,6 +206,6 @@ export default {
   fetch: app.fetch,
   async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<unknown>) => void }) {
     if (!env.STRIPE_SECRET_KEY) return;
-    ctx.waitUntil(sweepBillingUsage(drizzle(env.DB), env.STRIPE_SECRET_KEY, env.STRIPE_METER_EVENT_NAME ?? "saasuluk_cost").catch(() => ({ swept: 0, reported: 0 })));
+    ctx.waitUntil(sweepBillingUsage(drizzle(env.DB), env.STRIPE_SECRET_KEY, env.STRIPE_METER_EVENT_NAME ?? METER_EVENT_DEFAULT).catch(() => ({ swept: 0, reported: 0 })));
   },
 };
