@@ -159,9 +159,9 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     // the View-as access projection (x-suluk-access derived from the access model)
     expect(html).toContain("View as");
     expect(html).toContain('id="reachability"');        // the reachability matrix
-    const create = html.slice(html.indexOf('id="op-createProduct"'), html.indexOf('id="op-createProduct"') + 300);
+    const ci = html.indexOf('data-op="createProduct"'); const create = html.slice(ci - 220, ci + 40);
     expect(create).toContain('data-reach="admin"');     // admin-only op — hidden from anon/user by the lens
-    const list = html.slice(html.indexOf('id="op-listProduct"'), html.indexOf('id="op-listProduct"') + 300);
+    const li = html.indexOf('data-op="listProduct"'); const list = html.slice(li - 220, li + 40);
     expect(list).toContain('data-reach="anon user admin"'); // public op — reachable by everyone
   });
 
