@@ -2,7 +2,11 @@
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
 import { altSchemesCss, ALT_SCHEMES } from "../theme";
 import { seoMeta, jsonLd } from "@suluk/builder";
+import { renderBaseCss } from "@suluk/theme";
 const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
+// the a11y + motion contract (focus-visible rings, reduced-motion, aria-invalid, sr-only/skip-link, shake/reveal/
+// nav-progress) — inherited from @suluk/theme, pointed at saasuluk's own color vars.
+const baseCss = renderBaseCss({ ring: "var(--accent)", destructive: "#ef4444" });
 const { title = "saasuluk — the SaaS that ships itself", description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk.", image, keywords, ogType, noindex, jsonLd: pageJsonLd } = Astro.props;
 // SEO is PROJECTED from @suluk/builder's seoMeta/jsonLd (originated — no saastarter equivalent): one resolve →
 // the full og/twitter/canonical set + WebSite/Organization structured data, rendered server-side into <head>.
@@ -129,7 +133,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .pill.accent { background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); border-color:color-mix(in srgb,var(--accent) 24%,transparent); }
       /* forms + tables */
       input,select,textarea { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; font-size:15px; transition:border-color .15s, box-shadow .15s; }
-      input:focus,select:focus,textarea:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
+      input:focus-visible,select:focus-visible,textarea:focus-visible { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
       table { width:100%; border-collapse:collapse; } th,td { text-align:start; padding:11px 12px; border-bottom:1px solid var(--line); font-size:14.5px; } th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
       /* hero */
       .hero { text-align:center; padding:72px 0 32px; position:relative; }
@@ -200,8 +204,10 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       @media (prefers-reduced-motion:reduce){ .skel::after{ animation:none } }
     </style>
     <style is:global set:html={schemeCss}></style>
+    <style is:global set:html={baseCss}></style>
   </head>
   <body>
+    <a class="skip-link" href="#main-content" data-i18n="skipToContent">Skip to content</a>
     <header class="site">
       <div class="wrap">
         <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
@@ -215,7 +221,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         </div>
       </div>
     </header>
-    <main><div class="wrap"><slot /></div></main>
+    <main id="main-content"><div class="wrap"><slot /></div></main>
     <footer class="site">
       <div class="wrap">
         <div class="cols">
