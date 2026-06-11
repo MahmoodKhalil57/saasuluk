@@ -177,6 +177,13 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(ts).toContain("create: Object.assign");
     expect(ts).toContain("$manifest:");                 // the v4 superpowers manifest (for agents/tooling)
     expect(ts).toMatch(/requires: "(anyone|admin)"/);    // access facet as inert metadata
+    // COMPLETE validations: the SDK ships the contract's JSON Schemas AS DATA + a generic, eval-free engine
+    expect(ts).toContain('import { Validator } from "@cfworker/json-schema"');
+    expect(ts).toContain("export const schemas = {");   // schemas shipped as data, not transpiled
+    expect(ts).toContain('"~standard"');                 // each input is a Standard Schema (portable)
+    expect(ts).toMatch(/"maxLength":\d+/);                // the hardened maxLength caps reached the schema, verbatim
+    expect(ts).toMatch(/parse\([\w$]+Input, body\)/);     // input validated through the schema before send
+    expect(ts).toContain("validate?: boolean");          // toggle (default on)
     expect((await (await app.request("/reference")).text())).toContain("⬇ TypeScript SDK"); // the download affordance
   });
 
