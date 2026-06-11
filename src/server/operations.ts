@@ -11,7 +11,7 @@ import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
 import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
-import { customerParams, subscriptionParams, meterEventParams } from "@suluk/stripe";
+import { customerParams, subscriptionParams, meterEventParams, computeDiscountAmount, type Discount } from "@suluk/stripe";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
@@ -180,11 +180,13 @@ async function resolveDiscount(dz: Dz, raw: string): Promise<ResolvedDiscount> {
   return { valid: true, discountType: d.discountType, discountValue: Number(d.discountValue) };
 }
 
-/** Apply a resolved discount to a cents total (percent → proportional; fixed → flat cents off). Never negative. */
+/** Apply a resolved discount to a cents total via @suluk/stripe's tested money primitive: computeDiscountAmount is
+ *  poison-guarded (non-finite → 0) and CLAMPED to [0, total] (a discount can never exceed the order or go negative),
+ *  so the order total is `total − discount`. Replaces the hand-rolled math with one shared, conformance-tested core. */
 function applyDiscount(totalCents: number, d: ResolvedDiscount): number {
-  if (!d.valid) return totalCents;
-  if (d.discountType === "percent") return Math.max(0, Math.round(totalCents * (100 - (d.discountValue ?? 0)) / 100));
-  return Math.max(0, totalCents - (d.discountValue ?? 0));
+  if (!d.valid || !d.discountType) return totalCents;
+  const discount: Discount = { type: d.discountType, value: d.discountValue ?? 0 };
+  return totalCents - computeDiscountAmount(totalCents, discount);
 }
 
 const itemsTotal = (items: LineItem[]) => items.reduce((s, it) => s + (Number(it.priceCents) || 0) * (Number(it.qty) || 1), 0);
