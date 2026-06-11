@@ -29,28 +29,52 @@ import Layout from "../layouts/Layout.astro";
       document.getElementById("lines").innerHTML = c.length ? c.map((i) => `<tr><td>${i.name || "#" + i.productId}</td><td>${i.qty}</td><td>${money(i.priceCents * i.qty)}</td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">Cart is empty — <a href="/products">browse products</a>.</td></tr>`;
       document.getElementById("total").textContent = money(applyLocal(subtotal()));
     }
-    document.getElementById("apply").addEventListener("click", async () => {
-      const code = document.getElementById("code").value.trim();
-      const r = await (await fetch("/discount/validate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, subtotalCents: subtotal() }) })).json();
-      discount = r.valid ? { ...r, code } : null;
-      document.getElementById("discMsg").textContent = r.valid ? `✓ ${r.discountType === "percent" ? r.discountValue + "% off" : money(r.discountValue) + " off"}` : `✗ ${r.reason || "invalid"}`;
-      render();
+    const applyBtn = document.getElementById("apply"), payBtn = document.getElementById("pay"), stripeBtn = document.getElementById("stripe");
+    // POST JSON, throwing a useful Error on a network failure, a non-2xx, or a non-JSON body — so every handler
+    // can show a real message instead of dying on `(await fetch()).json()` or assuming a success shape.
+    async function postJson(url, body, action) {
+      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", ...(action ? { "x-suluk-action": action } : {}) }, body: JSON.stringify(body) });
+      let data = null; try { data = await res.json(); } catch (e) {}
+      if (!res.ok) throw new Error((data && data.error) || ("Request failed (" + res.status + ")"));
+      return data || {};
+    }
+    applyBtn.addEventListener("click", async () => {
+      const code = document.getElementById("code").value.trim(); if (!code) return;
+      applyBtn.disabled = true; // guard against double-apply
+      try {
+        const r = await postJson("/discount/validate", { code, subtotalCents: subtotal() });
+        discount = r.valid ? { ...r, code } : null;
+        document.getElementById("discMsg").textContent = r.valid ? `✓ ${r.discountType === "percent" ? r.discountValue + "% off" : money(r.discountValue) + " off"}` : `✗ ${r.reason || "invalid"}`;
+        render();
+      } catch (err) {
+        if (window.toast) window.toast(err.message || "Could not validate the code.", { type: "error" });
+      } finally { applyBtn.disabled = false; }
     });
-    document.getElementById("pay").addEventListener("click", async () => {
+    payBtn.addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
-      const r = await (await fetch("/checkout/order", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "place-order" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
-      localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; render();
-      if (window.toast) window.toast("Order #" + r.order.id + " placed — total " + money(r.totalCents), { type: "success" });
-      document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
+      const label = payBtn.textContent; payBtn.disabled = true; payBtn.textContent = "Placing…"; // double-submit guard
+      try {
+        const r = await postJson("/checkout/order", { items: c, discountCode: discount?.code }, "place-order");
+        if (!r.order) throw new Error(r.error || "Order failed.");
+        localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; render(); // clear ONLY on success
+        if (window.toast) window.toast("Order #" + r.order.id + " placed — total " + money(r.totalCents), { type: "success" });
+        document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
+      } catch (err) {
+        if (window.toast) window.toast(err.message || "Could not place the order.", { type: "error" }); // cart preserved
+      } finally { payBtn.disabled = false; payBtn.textContent = label; }
     });
-    document.getElementById("stripe").addEventListener("click", async (e) => {
+    stripeBtn.addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
-      e.target.disabled = true; e.target.textContent = "Redirecting to Stripe…";
-      const r = await (await fetch("/checkout/pay", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", "x-suluk-action": "stripe-checkout" }, body: JSON.stringify({ items: c, discountCode: discount?.code }) })).json();
-      if (r.url) { location.href = r.url; return; } // → Stripe hosted checkout
-      e.target.disabled = false; e.target.textContent = "Pay with Stripe →";
-      if (window.toast) window.toast(r.error || "Could not start Stripe checkout.", { type: "error" });
-      document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block;color:#e5484d">${r.error || "Could not start Stripe checkout."}</span>`;
+      stripeBtn.disabled = true; stripeBtn.textContent = "Redirecting to Stripe…";
+      try {
+        const r = await postJson("/checkout/pay", { items: c, discountCode: discount?.code }, "stripe-checkout");
+        if (r.url) { location.href = r.url; return; } // success → leave the page (button stays disabled)
+        throw new Error(r.error || "Could not start Stripe checkout.");
+      } catch (err) {
+        stripeBtn.disabled = false; stripeBtn.textContent = "Pay with Stripe →";
+        if (window.toast) window.toast(err.message || "Could not start Stripe checkout.", { type: "error" });
+        document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block;color:#e5484d">${err.message || "Could not start Stripe checkout."}</span>`;
+      }
     });
     // keep this page's cart table + total in sync when the shell drawer (or another tab) mutates the cart
     window.addEventListener("cart-changed", render);
