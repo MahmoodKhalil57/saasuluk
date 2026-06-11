@@ -4,8 +4,8 @@
  *
  * ACCESS: each entity declares an access MODE in the registry (src/server/domain.ts → access.ts). The mode maps
  * to a per-operation rule that this factory enforces uniformly:
- *  - `owner` rules SCOPE the query to the caller's principal (token/session, then the x-user fallback) — a caller
- *    only ever sees/mutates their own rows; an unauthenticated caller is scoped to null (lists empty, gets 404).
+ *  - `owner` rules REQUIRE a verified caller (anon → 401, matching x-suluk-access: authenticated) and SCOPE the
+ *    query to that caller's principal (token/session, then the x-user fallback) — they only see/mutate their own rows.
  *  - `admin` rules HARD-DENY (403) unless the caller is a verified superadmin — this is what closes the
  *    world-writable holes (mint a discount code, delete a catalog product, PATCH an order to "paid").
  * Without an explicit access mode the default is owned (if ownerCol) or public — see access.ts.
@@ -20,7 +20,7 @@ import { policyFor, gate, type AccessMode } from "./access";
 type AnyRow = Record<string, unknown>;
 const numId = (c: Context) => Number(c.req.param("id"));
 const pk = (table: SQLiteTable) => (table as unknown as { id: SQLiteColumn }).id;
-const forbidden = (c: Context) => c.json({ error: "forbidden" }, 403);
+const denied = (c: Context, g: { status?: 401 | 403 }) => c.json({ error: g.status === 401 ? "unauthorized" : "forbidden" }, g.status ?? 403); // 401 anon vs 403 forbidden
 
 export interface CrudHandlers {
   list: (c: Context) => Response | Promise<Response>;
@@ -42,19 +42,19 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: Acc
   return {
     list: (c) => {
       const g = gate(c, policy.list, principal(c));
-      if (!g.ok) return forbidden(c);
+      if (!g.ok) return denied(c, g);
       const w = scoped(c, g.scopeOwner, false);
       return c.json(w ? db.select().from(table).where(w).all() : db.select().from(table).all());
     },
     get: (c) => {
       const g = gate(c, policy.get, principal(c));
-      if (!g.ok) return forbidden(c);
+      if (!g.ok) return denied(c, g);
       const r = db.select().from(table).where(scoped(c, g.scopeOwner, true)!).get();
       return r ? c.json(r) : c.json({ error: "not found" }, 404);
     },
     create: async (c) => {
       const g = gate(c, policy.create, principal(c));
-      if (!g.ok) return forbidden(c);
+      if (!g.ok) return denied(c, g);
       const body = (await c.req.json().catch(() => ({}))) as AnyRow;
       const owner = ownerCol ? { [ownerCol]: principal(c) } : {}; // stamp the creator/owner (author for content)
       const r = db.insert(table).values({ ...body, ...owner } as never).returning().get();
@@ -62,7 +62,7 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: Acc
     },
     update: async (c) => {
       const g = gate(c, policy.update, principal(c));
-      if (!g.ok) return forbidden(c);
+      if (!g.ok) return denied(c, g);
       const body = (await c.req.json().catch(() => ({}))) as AnyRow;
       delete body.id; if (ownerCol) delete body[ownerCol]; // never let the client move a row's id or its owner
       const w = scoped(c, g.scopeOwner, true)!;
@@ -72,7 +72,7 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: Acc
     },
     delete: (c) => {
       const g = gate(c, policy.delete, principal(c));
-      if (!g.ok) return forbidden(c);
+      if (!g.ok) return denied(c, g);
       db.delete(table).where(scoped(c, g.scopeOwner, true)!).run();
       return c.body(null, 204);
     },

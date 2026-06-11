@@ -20,6 +20,7 @@ import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
+import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
@@ -87,7 +88,7 @@ function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
   const policy = policyFor(access, ownerCol);
   const dz = (c: Context<{ Bindings: Env }>) => drizzle(c.env.DB);
   const rid = (c: Context) => Number(c.req.param("id"));
-  const forbidden = (c: Context) => c.json({ error: "forbidden" }, 403);
+  const forbidden = (c: Context, g: { status?: 401 | 403 }) => c.json({ error: g.status === 401 ? "unauthorized" : "forbidden" }, g.status ?? 403); // 401 anon vs 403 forbidden — the wire enforces x-suluk-access
   const scoped = (c: Context, scopeOwner: boolean, withPk: boolean) => {
     const own = scopeOwner && ownerCol ? eq(cols[ownerCol], principal(c)) : undefined;
     const id = withPk ? eq(pk, rid(c)) : undefined;
@@ -95,26 +96,26 @@ function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
   };
   return {
     list: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.list, principal(c)); if (!g.ok) return forbidden(c);
+      const g = gate(c, policy.list, principal(c)); if (!g.ok) return forbidden(c, g);
       const w = scoped(c, g.scopeOwner, false);
       return c.json(await (w ? dz(c).select().from(table).where(w) : dz(c).select().from(table)).all());
     },
     get: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.get, principal(c)); if (!g.ok) return forbidden(c);
+      const g = gate(c, policy.get, principal(c)); if (!g.ok) return forbidden(c, g);
       const r = await dz(c).select().from(table).where(scoped(c, g.scopeOwner, true)!); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404);
     },
     create: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.create, principal(c)); if (!g.ok) return forbidden(c);
+      const g = gate(c, policy.create, principal(c)); if (!g.ok) return forbidden(c, g);
       const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; const owner = ownerCol ? { [ownerCol]: principal(c) } : {};
       const r = await dz(c).insert(table).values({ ...b, ...owner } as never).returning(); return c.json(r[0], 201);
     },
     update: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.update, principal(c)); if (!g.ok) return forbidden(c);
+      const g = gate(c, policy.update, principal(c)); if (!g.ok) return forbidden(c, g);
       const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; delete b.id; if (ownerCol) delete b[ownerCol];
       const w = scoped(c, g.scopeOwner, true)!; await dz(c).update(table).set(b as never).where(w); const r = await dz(c).select().from(table).where(w); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404);
     },
     delete: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.delete, principal(c)); if (!g.ok) return forbidden(c);
+      const g = gate(c, policy.delete, principal(c)); if (!g.ok) return forbidden(c, g);
       await dz(c).delete(table).where(scoped(c, g.scopeOwner, true)!); return c.body(null, 204);
     },
   };
@@ -135,8 +136,9 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/reference", (c) => referenceResponse(isAdmin(c) ? document : scrubSource(document), { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs + L2 live view + SDK; provenance (↗ src) shown to the maintainer (admin) only
+app.get("/reference", (c) => referenceResponse(isAdmin(c) ? document : scrubSource(document), { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts", conformanceUrl: "/conformance.test.ts" })); // PRIMARY docs + L2 live view + SDK + conformance suite; provenance (↗ src) shown to the maintainer (admin) only
 app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK from the contract
+app.get("/conformance.test.ts", (c) => new Response(generateTests(isAdmin(c) ? document : scrubSource(document), { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk.conformance.test.ts"' } })); // a runnable suite asserting the SERVER ENFORCES the contract (access on the wire, status, schema, cost)
 app.get("/scalar", () => scalarResponse(scrubSource(document)));                                // 3.1 compatibility view (external — no provenance)
 app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c as unknown as Context) }));           // renderer auto-selects this viewer's lens (L2)
 app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as= → a provable-subset PROJECTION

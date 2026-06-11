@@ -37,17 +37,21 @@ export function policyFor(access: AccessMode | undefined, ownerCol?: string): Po
 export const isAdmin = (c: Context): boolean => c.get("isAdmin") === true;
 
 /**
- * Decide whether a caller may run an op (per the rule) and whether to scope the query to their own rows.
- * The `owner` rule NEVER blocks — it scopes: an unauthenticated caller is scoped to a null principal, so a list
- * returns [] and a get/update/delete matches nothing (404), exactly the tenant-isolation the demo expects. Only
- * `admin`/`none` rules hard-deny (403), so the catalog/discount/billing write surfaces are genuinely closed.
+ * Decide whether a caller may run an op (per the rule), whether to scope the query to their own rows, and — when
+ * denied — the honest status. The `owner` rule REQUIRES a verified caller: an anonymous caller (no principal) is
+ * denied 401, because the op declares `x-suluk-access: authenticated` and the WIRE must enforce what the contract
+ * claims (C022 inv.3) — a null-scoped empty 200 would let the facet lie. A signed-in caller is scoped to their own
+ * rows (admin sees all). `admin`/`none` rules hard-deny 403. Verified by @suluk/testgen's wire-conformance suite.
  */
-export function gate(c: Context, rule: Rule, _principal: string | null): { ok: boolean; scopeOwner: boolean } {
+export function gate(c: Context, rule: Rule, principal: string | null): { ok: boolean; scopeOwner: boolean; status?: 401 | 403 } {
   switch (rule) {
     case "any": return { ok: true, scopeOwner: false };
-    case "owner": return { ok: true, scopeOwner: !isAdmin(c) }; // admin sees all; everyone else only their own
-    case "admin": return { ok: isAdmin(c), scopeOwner: false };
-    default: return { ok: false, scopeOwner: false };
+    case "owner":
+      if (isAdmin(c)) return { ok: true, scopeOwner: false };                  // admin sees all
+      if (!principal) return { ok: false, scopeOwner: false, status: 401 };    // owner op needs a verified caller (anon → 401)
+      return { ok: true, scopeOwner: true };                                   // signed-in: scoped to their own rows
+    case "admin": return { ok: isAdmin(c), scopeOwner: false, status: 403 };
+    default: return { ok: false, scopeOwner: false, status: 403 };
   }
 }
 

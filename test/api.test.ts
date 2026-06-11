@@ -109,8 +109,8 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     const still = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "still" }) })).json();
     expect(still.ownerId).toBe("dev-1"); // the foreign revoke didn't touch it
     expect((await post(`/tokens/${tok.id}/revoke`, {}, { "x-user": "dev-1" })).status).toBe(200); // the owner revokes
-    const after = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "after" }) })).json();
-    expect(after.ownerId).toBeNull();
+    const after = await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "after" }) });
+    expect(after.status).toBe(401); // the revoked token no longer authenticates → the owner op REJECTS it (not a silent null-owned row)
   });
 
   test("SECURITY: owner-scoped CRUD — a user can't see, read, or delete another user's owned rows", async () => {
@@ -121,8 +121,9 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "bob" } })).status).toBe(404);
     await app.request(`/order/${a.id}`, { method: "DELETE", headers: { "x-user": "bob" } });
     expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "alice" } })).status).toBe(200); // bob's delete couldn't touch it
-    // an UNidentified caller sees nothing (no cross-tenant dump)
-    expect(((await (await app.request("/billingAccount")).json()) as unknown[]).length).toBe(0);
+    // an UNidentified caller is REJECTED on an owner op (401) — the wire enforces x-suluk-access: authenticated,
+    // so the facet can't lie (caught by @suluk/testgen's conformance suite; stronger than a null-scoped empty 200).
+    expect((await app.request("/billingAccount")).status).toBe(401);
   });
 
   test("ACCESS: catalog + discounts are admin-write — no minting, no vandalism, no self-mark-paid, no code leak", async () => {
@@ -190,6 +191,22 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(ts).toMatch(/parse\([\w$]+Input, body\)/);     // input validated through the schema before send
     expect(ts).toContain("validate?: boolean");          // toggle (default on)
     expect((await (await app.request("/reference")).text())).toContain("⬇ TypeScript SDK"); // the download affordance
+  });
+
+  test("downloadable conformance suite (@suluk/testgen): /conformance.test.ts is the contract's claims, executable", async () => {
+    const r = await app.request("/conformance.test.ts");
+    expect(r.headers.get("content-type")).toContain("typescript");
+    expect(r.headers.get("content-disposition")).toContain("saasuluk.conformance.test.ts");
+    const ts = await r.text();
+    expect(ts).toContain('import { Validator } from "@cfworker/json-schema"');
+    expect(ts).toContain("async function call(method: string, path: string");        // a fetch-based suite
+    // the ceiling-raiser: the server must ENFORCE x-suluk-access on the wire (a non-public op denies anon a 2xx)
+    expect(ts).toContain("access — ENFORCED: anon gets NO success");
+    expect(ts).toMatch(/expect\(\[200, 201, 204\],[^)]*\)\.not\.toContain\(r\.status\)/);
+    expect(ts).toContain("access — public: anon is NOT auth-blocked");                 // public ops reachable
+    expect(ts).toContain("createProduct");                                            // a known admin op is covered
+    expect(ts).not.toContain("?as=");                                                 // asserts the WIRE, never a projection
+    expect((await (await app.request("/reference")).text())).toContain("⬇ Conformance tests"); // the download affordance
   });
 
   test("Scalar renders the docs (the 3.1 compatibility view)", async () => {
