@@ -34,8 +34,8 @@ const productLd = jsonLd("Product", { name: product.name, description: product.d
   <h2>Reviews</h2>
   <div id="reviews"><p style="color:var(--muted)">Loading reviews…</p></div>
   <form id="review" style="margin-top:14px; display:grid; gap:8px; max-width:480px">
-    <div style="display:flex; gap:8px"><input name="title" placeholder="Review title" required style="flex:1" /><select name="rating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
-    <textarea name="body" placeholder="Your thoughts…" rows="3"></textarea>
+    <div style="display:flex; gap:8px"><input name="title" placeholder="Review title" aria-label="Review title" required style="flex:1" /><select name="rating" aria-label="Rating (1-5 stars)"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+    <textarea name="body" placeholder="Your thoughts…" aria-label="Review text" rows="3"></textarea>
     <button class="btn" type="submit" style="justify-self:start">Submit review</button>
   </form>
 

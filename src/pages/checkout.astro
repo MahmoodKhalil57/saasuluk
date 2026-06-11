@@ -7,7 +7,7 @@ import Layout from "../layouts/Layout.astro";
   <p class="tag">Your cart → an <b>Order</b> via the <code>/checkout</code> operation: it resolves the discount, computes the total, and is metered like everything else.</p>
   <table style="margin-top:16px"><thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody id="lines"></tbody></table>
   <div style="display:flex; gap:8px; margin:14px 0; align-items:center; flex-wrap:wrap">
-    <input id="code" placeholder="Discount code (try SAVE10)" />
+    <input id="code" placeholder="Discount code (try SAVE10)" aria-label="Discount code" />
     <button class="btn ghost" id="apply">Apply</button>
     <span id="discMsg" style="color:var(--muted); font-size:13px"></span>
   </div>

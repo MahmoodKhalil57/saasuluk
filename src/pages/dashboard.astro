@@ -8,7 +8,7 @@ import Layout from "../layouts/Layout.astro";
   <div class="grid" id="stats" style="margin-top:20px"></div>
   <h2>Projects</h2>
   <form id="new" style="display:flex; gap:8px; margin-bottom:12px; max-width:440px">
-    <input name="name" placeholder="New project name" required style="flex:1" />
+    <input name="name" placeholder="New project name" aria-label="New project name" required style="flex:1" />
     <button class="btn" type="submit">+ Create</button>
   </form>
   <table><thead><tr><th>ID</th><th>Name</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>

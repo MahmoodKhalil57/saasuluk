@@ -17,9 +17,9 @@ import Layout from "../layouts/Layout.astro";
       </button>
       <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px; margin-bottom:14px"><span style="flex:1; height:1px; background:var(--line)"></span>or<span style="flex:1; height:1px; background:var(--line)"></span></div>
       <form id="form" style="display:grid; gap:11px">
-        <input id="name" name="name" placeholder="Your name" autocomplete="name" style="display:none" />
-        <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email" required />
-        <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" minlength="8" required />
+        <input id="name" name="name" placeholder="Your name" aria-label="Your name" autocomplete="name" style="display:none" />
+        <input id="email" name="email" type="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required />
+        <input id="password" name="password" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password" minlength="8" required />
         <button class="btn" type="submit" style="justify-content:center; margin-top:4px">Sign in</button>
       </form>
       <p id="msg" style="margin:14px 0 0; font-size:14px"></p>

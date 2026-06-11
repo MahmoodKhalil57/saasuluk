@@ -16,7 +16,7 @@ import Layout from "../layouts/Layout.astro";
   <h2>Wishlist</h2>
   <div class="grid" id="wishlist"></div>
   <h2>API tokens (developer)</h2>
-  <form id="tok" style="display:flex; gap:8px; margin-bottom:8px"><input name="name" placeholder="Token name" required /><button class="btn" type="submit">+ Create</button></form>
+  <form id="tok" style="display:flex; gap:8px; margin-bottom:8px"><input name="name" placeholder="Token name" aria-label="API token name" required /><button class="btn" type="submit">+ Create</button></form>
   <p id="newtok"></p>
   <table><thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th></th></tr></thead><tbody id="tokens"></tbody></table>
   <script is:inline>

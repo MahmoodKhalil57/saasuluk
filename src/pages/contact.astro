@@ -6,16 +6,16 @@ import Layout from "../layouts/Layout.astro";
   <h1>Contact us</h1>
   <p class="tag">Submissions become a <b>ContactSubmission</b> entity (visible in <a href="/superadmin">/superadmin</a>). The newsletter is its own entity too.</p>
   <form id="contact" style="display:grid; gap:10px; max-width:520px; margin-top:18px">
-    <input name="name" placeholder="Your name" required />
-    <input name="email" type="email" placeholder="you@example.com" required />
-    <input name="subject" placeholder="Subject" required />
-    <textarea name="message" placeholder="How can we help?" rows="5" required></textarea>
+    <input name="name" placeholder="Your name" aria-label="Your name" required />
+    <input name="email" type="email" placeholder="you@example.com" aria-label="Email address" required />
+    <input name="subject" placeholder="Subject" aria-label="Subject" required />
+    <textarea name="message" placeholder="How can we help?" aria-label="Message" rows="5" required></textarea>
     <button class="btn" type="submit" style="justify-self:start">Send message</button>
     <p id="cmsg"></p>
   </form>
   <h2>Newsletter</h2>
   <form id="news" style="display:flex; gap:8px; max-width:520px">
-    <input name="email" type="email" placeholder="you@example.com" required style="flex:1" />
+    <input name="email" type="email" placeholder="you@example.com" aria-label="Email address for newsletter" required style="flex:1" />
     <button class="btn ghost" type="submit">Subscribe</button>
   </form>
   <p id="nmsg" style="color:var(--muted);font-size:13px;margin-top:6px"></p>
