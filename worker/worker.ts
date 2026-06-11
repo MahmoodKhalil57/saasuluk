@@ -26,13 +26,14 @@ import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, prin
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess } from "../src/server/access-facet";
+import { hardenDocument } from "../src/server/harden-schema";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "../src/server/project";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
 built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
-const document = annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes })); // cost + access facets
+const document = hardenDocument(annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes }))); // cost + access facets + baseline hardening
 const CANON_HASH = docHash(document); // canonical hash — the L2 projection's integrity pointer (council wcavrm7zk)
 const ada = buildAda(document);
 

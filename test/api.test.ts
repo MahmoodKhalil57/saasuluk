@@ -1,5 +1,6 @@
 import { test, expect, describe, beforeAll } from "bun:test";
 import { validateDocument } from "@suluk/core";
+import { assertGrade } from "@suluk/harden";
 import { createApp } from "../src/server/api";
 
 let app: Awaited<ReturnType<typeof createApp>>["app"];
@@ -144,6 +145,15 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     // marking a review helpful requires auth (no anonymous vote-stuffing — a custom op, but still principal-gated)
     expect((await post("/review/1/helpful", {}, {})).status).toBe(401);
     expect([200, 404]).toContain((await post("/review/1/helpful", {}, { "x-user": "fan" })).status);
+  });
+
+  test("hardening (@suluk/harden): the contract is graded + GATED — our input surface is fully bounded (A)", async () => {
+    const document = await (await app.request("/openapi.json")).json() as any;
+    // the CI gate (the hard incentive): throws if our authored surface regresses below A (auth = third-party, excluded)
+    const audit = assertGrade(document, "A", { ignore: (uri: string) => uri.toLowerCase().includes("auth") });
+    expect(audit.grade).toBe("A");
+    expect(audit.bySeverity.high).toBe(0);
+    expect((await (await app.request("/reference")).text())).toContain("🛡 Hardening"); // surfaced in /reference (the soft incentive)
   });
 
   test("Scalar renders the docs (the 3.1 compatibility view)", async () => {

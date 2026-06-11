@@ -12,6 +12,7 @@ import type { OpenAPIv4Document } from "@suluk/core";
 import { entitySchemas, costs as domainCosts } from "./domain";
 import { OPERATION_PATHS, OPERATION_COSTS } from "./operations";
 import { annotateAccess } from "./access-facet";
+import { hardenDocument } from "./harden-schema";
 import { auth } from "./auth";
 
 // the cost meter (api.ts) and the docs share ONE model: CRUD costs (domain) + the custom-operation costs.
@@ -33,5 +34,5 @@ export async function buildContract(): Promise<Contract> {
   } catch {
     document = mergeAuth(document, {}, { securitySchemes }); // at least the schemes, if ingest fails
   }
-  return { built, document };
+  return { built, document: hardenDocument(document) }; // baseline-harden every input schema doc-wide (incl. path params)
 }
