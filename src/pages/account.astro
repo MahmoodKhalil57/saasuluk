@@ -21,8 +21,8 @@ import Layout from "../layouts/Layout.astro";
   <table><thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th></th></tr></thead><tbody id="tokens"></tbody></table>
   <script is:inline>
     let USER = "demo-user";
-    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
-    const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "—";
+    const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
+    const when = (t) => t ? (window.fmtDate ? window.fmtDate(Number(t)) : new Date(Number(t)).toLocaleDateString()) : "—";
     async function resolveSession() {
       try {
         const s = await (await fetch("/api/auth/get-session", { credentials: "same-origin" })).json();

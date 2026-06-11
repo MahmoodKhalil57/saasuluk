@@ -8,12 +8,13 @@
  * via the native `storage` event (handled inside the store).
  */
 import { createCartStore } from "@suluk/nano-stores";
+import { fmtMoney } from "./format";
 
 const cart = createCartStore({ storageKey: "cart" });
 // expose for the (few) inline handlers that prefer calling the store directly over hand-writing localStorage.
 (window as unknown as { cart?: typeof cart }).cart = cart;
 
-const money = (c: number) => "$" + (Number(c || 0) / 100).toFixed(2);
+const money = (c: number) => fmtMoney(c); // locale-aware (Eastern-Arabic numerals for ar, locale currency)
 const el = (id: string) => document.getElementById(id);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 // re-run Layout's translator over freshly-injected [data-i18n] nodes so the drawer follows the active locale.
@@ -53,6 +54,8 @@ function wire() {
     }
   };
   cart.$items.subscribe(renderLines);
+  // re-render localized money when the language switches (the store values don't change, so subscriptions won't fire)
+  window.addEventListener("locale-changed", () => { renderLines(); if (subEl) subEl.textContent = money(cart.$subtotalCents.get()); });
   cart.$subtotalCents.subscribe((s) => {
     if (subEl) subEl.textContent = money(s);
     if (checkout) {

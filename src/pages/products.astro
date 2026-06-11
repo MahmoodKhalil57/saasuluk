@@ -13,7 +13,7 @@ import Layout from "../layouts/Layout.astro";
   </form>
   <div class="grid" id="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>
   <script is:inline>
-    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(c % 100 ? 2 : 0);
+    const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
     const setCart = (c) => localStorage.setItem("cart", JSON.stringify(c));
     const esc = (s) => String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));

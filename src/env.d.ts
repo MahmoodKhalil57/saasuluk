@@ -12,4 +12,8 @@ interface Window {
   /** Layout's locale text-swapper + the resolved initial locale */
   __applyLang?: (locale: string) => void;
   __lang0?: string;
+  /** locale-aware formatters (Eastern-Arabic numerals + locale currency/dates) — see src/client/format.ts */
+  fmtMoney?: (cents: number, currency?: string) => string;
+  fmtNum?: (n: number) => string;
+  fmtDate?: (value: number | string | Date) => string;
 }

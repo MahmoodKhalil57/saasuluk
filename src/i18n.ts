@@ -4,10 +4,23 @@
  * a `t()` lookup, read by the Layout from a `lang` cookie. Extend by adding keys (and page-body strings) to
  * DICT — the pattern is the same. RTL is handled by `dir` on <html> so logical CSS just works.
  */
+import { defineLocales } from "@suluk/i18n";
+
 export const LOCALES = ["en", "es", "ar"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const RTL: Locale[] = ["ar"];
 export const LOCALE_LABEL: Record<Locale, string> = { en: "English", es: "Español", ar: "العربية" };
+
+/** The @suluk/i18n locale model — the MECHANISM (dir + numberingSystem) feeding the Intl formatters; the DICT
+ *  below stays the app's chrome CONTENT. `ar` declares numberingSystem "arab" → money/dates render ٠١٢٣. */
+export const LOCALE_CONFIG = defineLocales({
+  default: "en",
+  locales: [
+    { code: "en", label: "English" },
+    { code: "es", label: "Español" },
+    { code: "ar", label: "العربية", dir: "rtl", numberingSystem: "arab" },
+  ],
+});
 
 type Key =
   | "home" | "products" | "blog" | "pricing" | "dashboard" | "account"

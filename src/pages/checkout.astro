@@ -19,7 +19,7 @@ import Layout from "../layouts/Layout.astro";
   <p style="color:var(--muted); font-size:13px; margin-top:8px">Stripe is in test mode — use card <code>4242 4242 4242 4242</code>, any future date + CVC.</p>
   <p id="result" style="margin-top:10px"></p>
   <script is:inline>
-    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
     let discount = null;
     function subtotal() { return cart().reduce((s, i) => s + i.priceCents * i.qty, 0); }

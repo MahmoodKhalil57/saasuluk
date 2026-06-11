@@ -14,7 +14,7 @@ import Layout from "../layouts/Layout.astro";
   <h2>Cost ledger (what the app spent)</h2>
   <pre id="cost" class="card" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12.5px"></pre>
   <script is:inline>
-    const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
+    const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     async function load() {
       const r = await fetch("/analytics/summary");
       if (r.status === 401 || r.status === 403) { // analytics are admin-only — the wire enforces x-suluk-access

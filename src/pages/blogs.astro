@@ -7,7 +7,7 @@ import Layout from "../layouts/Layout.astro";
   <p class="tag">Posts are a <b>Post</b> entity — authored in <a href="/superadmin">/superadmin</a>, served by the contract, rendered here.</p>
   <div id="posts" style="margin-top:18px"></div>
   <script is:inline>
-    const when = (t) => t ? new Date(Number(t)).toLocaleDateString() : "";
+    const when = (t) => t ? (window.fmtDate ? window.fmtDate(Number(t)) : new Date(Number(t)).toLocaleDateString()) : "";
     function skeleton(n) {
       document.getElementById("posts").innerHTML = Array.from({ length: n }, () => `<article class="card" style="margin-bottom:12px">
         <div class="skel" style="height:20px;width:55%;margin-bottom:9px"></div>

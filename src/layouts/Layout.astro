@@ -253,6 +253,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       </div>
     </aside>
     <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+    <script>import "../client/format";</script>
     <script>import "../client/cart";</script>
     <script>import "../client/toast";</script>
     <script is:inline>
@@ -286,6 +287,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         try { localStorage.setItem("lang", e.target.value); } catch (x) {}
         document.cookie = "lang=" + e.target.value + ";path=/;max-age=31536000;samesite=lax";
         if (window.__applyLang) window.__applyLang(e.target.value);
+        window.dispatchEvent(new Event("locale-changed")); // re-render localized money/dates (cart drawer + pages)
       });
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
       // session-aware header: swap "Sign in" for the user's avatar when a Better Auth session exists.
