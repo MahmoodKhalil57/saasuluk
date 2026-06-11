@@ -86,8 +86,10 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
   test("custom operations: search, analytics, newsletter (idempotent), avatar (derived SVG)", async () => {
     await post("/product", { name: "Findable", slug: "find", priceCents: 100, status: "published" }, adminH());
     expect((await (await app.request("/search?q=Findable")).json()).products.length).toBeGreaterThan(0);
-    expect((await (await app.request("/analytics/summary")).json()).products).toBeGreaterThan(0);
-    expect((await (await app.request("/analytics/top-products")).json()).topProducts).toBeDefined();
+    // analytics expose revenue/customers → admin-only, ENFORCED on the wire (@suluk/hono enforceAccess): anon 401, admin 200
+    expect((await app.request("/analytics/summary")).status).toBe(401);
+    expect((await (await app.request("/analytics/summary", { headers: adminH() })).json()).products).toBeGreaterThan(0);
+    expect((await (await app.request("/analytics/top-products", { headers: adminH() })).json()).topProducts).toBeDefined();
     const n1 = await post("/newsletter/subscribe", { email: "x@y.com" }, {}); expect(n1.status).toBe(201);
     const n2 = await (await post("/newsletter/subscribe", { email: "x@y.com" }, {})).json(); expect(n2.already).toBe(true); // idempotent
     const av = await app.request("/avatar?seed=alice");
@@ -128,12 +130,13 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
 
   test("ACCESS: catalog + discounts are admin-write — no minting, no vandalism, no self-mark-paid, no code leak", async () => {
     // the underpayment vector: a self-minted near-100%-off code. CLOSED — discountCode is admin-only.
-    expect((await post("/discountCode", { code: "FREE99", discountType: "percent", discountValue: 99, isActive: true }, {})).status).toBe(403);
+    // ENFORCED on the wire by @suluk/hono enforceAccess: anon → 401 (authenticate first, RFC 7235), signed-in-non-admin → 403 (forbidden).
+    expect((await post("/discountCode", { code: "FREE99", discountType: "percent", discountValue: 99, isActive: true }, {})).status).toBe(401);
     expect((await post("/discountCode", { code: "FREE99", discountType: "percent", discountValue: 99, isActive: true }, { "x-user": "mallory" })).status).toBe(403);
     // listing every discount code (a leak) is admin-only
-    expect((await app.request("/discountCode")).status).toBe(403);
+    expect((await app.request("/discountCode")).status).toBe(401);
     // catalog vandalism — anyone deleting/creating a store product. CLOSED.
-    expect((await app.request("/product/1", { method: "DELETE" })).status).toBe(403);
+    expect((await app.request("/product/1", { method: "DELETE" })).status).toBe(401);
     expect((await post("/product", { name: "spam", slug: "spam" }, { "x-user": "nobody" })).status).toBe(403);
     // a user can PLACE an order but can't PATCH it to paid (status changes are system/admin-only)
     const o = await (await post("/order", { totalCents: 999, status: "pending" }, { "x-user": "mallory" })).json();
@@ -144,7 +147,7 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect((await post("/product", { name: "Admin Product", slug: "admin-product", priceCents: 100, status: "published" }, adminH())).status).toBe(201);
     // public submissions: anyone may submit contact/newsletter, but only an admin reads them
     expect((await post("/contactSubmission", { name: "Q", email: "q@x.com", subject: "Hello", message: "hi" }, {})).status).toBe(201);
-    expect((await app.request("/contactSubmission")).status).toBe(403);
+    expect((await app.request("/contactSubmission")).status).toBe(401); // anon read of submissions → authenticate first
     expect((await app.request("/contactSubmission", { headers: adminH() })).status).toBe(200);
     // reviews are public-read, owner-write — everyone sees them
     expect((await app.request("/review")).status).toBe(200);

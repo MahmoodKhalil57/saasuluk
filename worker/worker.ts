@@ -12,7 +12,7 @@ import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { and, eq } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
-import { mount, type RouteContract } from "@suluk/hono";
+import { mount, enforceAccess, type RouteContract } from "@suluk/hono";
 import { buildApp } from "@suluk/builder";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
@@ -27,7 +27,7 @@ import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/serve
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
-import { annotateAccess } from "../src/server/access-facet";
+import { annotateAccess, accessIndex } from "../src/server/access-facet";
 import { annotateSource } from "../src/server/source-facet";
 import { hardenDocument } from "../src/server/harden-schema";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "../src/server/project";
@@ -39,6 +39,7 @@ const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true })
 const document = hardenDocument(annotateSource(annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes })))); // cost + access + source (provenance) facets + baseline hardening
 const CANON_HASH = docHash(document); // canonical hash — the L2 projection's integrity pointer (council wcavrm7zk)
 const ada = buildAda(document);
+const access = accessIndex(document); // op → x-suluk-access, for the wire enforcer
 
 type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; isAdmin?: boolean } }>();
@@ -67,6 +68,15 @@ app.use("*", async (c, next) => {
   }
   await next();
 });
+
+// WIRE-enforce x-suluk-access (C022 inv.3) — the facet is load-bearing on custom ops too, not just CRUD. Runs
+// before the meter so a rejected request isn't billed.
+app.use("*", enforceAccess({
+  operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
+  accessOf: (op) => access[op],
+  principal: (c) => principal(c),
+  isAdmin: (c) => isAdmin(c as unknown as Context),
+}));
 
 // durable cost meter — persist each operation's cost to D1 so /cost accumulates across isolates.
 app.use("*", async (c, next) => {

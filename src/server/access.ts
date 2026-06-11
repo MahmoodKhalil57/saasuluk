@@ -50,7 +50,9 @@ export function gate(c: Context, rule: Rule, principal: string | null): { ok: bo
       if (isAdmin(c)) return { ok: true, scopeOwner: false };                  // admin sees all
       if (!principal) return { ok: false, scopeOwner: false, status: 401 };    // owner op needs a verified caller (anon → 401)
       return { ok: true, scopeOwner: true };                                   // signed-in: scoped to their own rows
-    case "admin": return { ok: isAdmin(c), scopeOwner: false, status: 403 };
+    case "admin":
+      if (!principal) return { ok: false, scopeOwner: false, status: 401 };    // authenticate first (RFC 7235: 401 no-auth)
+      return { ok: isAdmin(c), scopeOwner: false, status: 403 };                // signed-in but not admin → forbidden
     default: return { ok: false, scopeOwner: false, status: 403 };
   }
 }

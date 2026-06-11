@@ -15,11 +15,13 @@ export interface AccessFacet { requires: "anyone" | "authenticated" | "admin"; s
 
 const RULE_TO_REQUIRES = { any: "anyone", owner: "authenticated", admin: "admin", none: "admin" } as const;
 
-/** Custom (non-CRUD) operations — mirrors the actual gating in operations.ts / api.ts / worker.ts. */
+/** Custom (non-CRUD) operations. The declared access is ENFORCED on the wire by @suluk/hono's enforceAccess
+ *  (api.ts / worker.ts) — so these facets are load-bearing, not decorative. */
 const OP_ACCESS: Record<string, AccessFacet> = {
   checkout: { requires: "anyone" }, payCheckout: { requires: "anyone" }, confirmCheckout: { requires: "anyone" },
   validateDiscount: { requires: "anyone" }, search: { requires: "anyone" }, recommendRelated: { requires: "anyone" },
-  analyticsSummary: { requires: "anyone" }, analyticsRevenue: { requires: "anyone" }, analyticsTopProducts: { requires: "anyone" },
+  // store analytics expose revenue / customer counts / order data — admin-only (was public; enforced via the gate now).
+  analyticsSummary: { requires: "admin" }, analyticsRevenue: { requires: "admin" }, analyticsTopProducts: { requires: "admin" },
   subscribeNewsletter: { requires: "anyone" }, generateAvatar: { requires: "anyone" },
   markReviewHelpful: { requires: "authenticated" },
   createToken: { requires: "authenticated" }, revokeToken: { requires: "authenticated", scope: "owner" },
@@ -46,4 +48,15 @@ export function annotateAccess(doc: OpenAPIv4Document): OpenAPIv4Document {
     }
   }
   return doc;
+}
+
+/** Operation name → its declared x-suluk-access facet (read from the stamped document). Feeds @suluk/hono's
+ *  enforceAccess so the WIRE honors what each op declares — making the facet load-bearing on custom ops too. */
+export function accessIndex(doc: OpenAPIv4Document): Record<string, AccessFacet> {
+  const idx: Record<string, AccessFacet> = {};
+  for (const pi of Object.values(doc.paths ?? {})) {
+    const requests = (pi as { requests?: Record<string, { ["x-suluk-access"]?: AccessFacet }> }).requests ?? {};
+    for (const [name, req] of Object.entries(requests)) if (req["x-suluk-access"]) idx[name] = req["x-suluk-access"];
+  }
+  return idx;
 }

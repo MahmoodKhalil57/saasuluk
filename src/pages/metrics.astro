@@ -4,7 +4,8 @@ import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Metrics — saasuluk">
   <h1>Metrics</h1>
-  <p class="tag">Store analytics — derived from <b>Order</b> rows by the <code>/analytics/*</code> operations, plus the live <code>/cost</code> ledger. (saastarter wires Recharts + admin routes; here it is three contract operations.)</p>
+  <p class="tag">Store analytics — derived from <b>Order</b> rows by the <code>/analytics/*</code> operations (declared <code>x-suluk-access: admin</code> and ENFORCED on the wire), plus the live <code>/cost</code> ledger. (saastarter wires Recharts + admin routes; here it is three contract operations.)</p>
+  <div id="gate" class="card" style="display:none;margin-top:18px;border-color:var(--accent)"></div>
   <div class="grid" id="summary" style="margin-top:18px"></div>
   <h2>Revenue (last 30 days)</h2>
   <div id="revenue" class="card"></div>
@@ -15,7 +16,16 @@ import Layout from "../layouts/Layout.astro";
   <script is:inline>
     const money = (c) => "$" + (Number(c || 0) / 100).toFixed(2);
     async function load() {
-      const s = await (await fetch("/analytics/summary")).json();
+      const r = await fetch("/analytics/summary");
+      if (r.status === 401 || r.status === 403) { // analytics are admin-only — the wire enforces x-suluk-access
+        const g = document.getElementById("gate");
+        g.style.display = "block";
+        g.innerHTML = `<b>Admin-only.</b> Store revenue and customer analytics are <code>x-suluk-access: admin</code>, enforced on the wire (you got <b>${r.status}</b>). Sign in as a superadmin (and open <a href="/superadmin">/superadmin</a>) to view them — exactly the access model saastarter ships.`;
+        for (const id of ["summary", "revenue", "top"]) document.getElementById(id).innerHTML = "";
+        document.getElementById("cost").textContent = JSON.stringify(await (await fetch("/cost")).json(), null, 2); // /cost is owner-scoped, still readable
+        return;
+      }
+      const s = await r.json();
       document.getElementById("summary").innerHTML = [["Orders", s.orders], ["Paid", s.paidOrders], ["Revenue", money(s.revenueCents)], ["Customers", s.customers], ["Products", s.products]].map(([k, v]) => `<div class="card"><p style="margin:0;font-size:12px">${k}</p><b style="font-family:inherit;font-size:22px">${v}</b></div>`).join("");
       const rev = (await (await fetch("/analytics/revenue")).json()).series || [];
       const max = Math.max(1, ...rev.map((d) => d.revenueCents));

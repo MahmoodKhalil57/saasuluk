@@ -5,7 +5,7 @@
  * to a Cloudflare Worker (Hono is native there).
  */
 import { Hono } from "hono";
-import { mount, type RouteContract } from "@suluk/hono";
+import { mount, enforceAccess, type RouteContract } from "@suluk/hono";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
@@ -20,6 +20,7 @@ import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal } from "./operations";
 import { isAdmin, superadminEmails } from "./access";
+import { accessIndex } from "./access-facet";
 import { configHealth, renderConfigHealth, loadConfig } from "./env";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "./project";
 import { db } from "./db";
@@ -29,6 +30,7 @@ export async function createApp() {
   const { built, document } = await buildContract();
   const sink = new MemoryCostSink();
   const ada = buildAda(document);
+  const access = accessIndex(document); // op → x-suluk-access, for the wire enforcer
   const admins = superadminEmails(process.env.SUPERADMIN_EMAILS); // verified-superadmin allowlist (read at app build)
   const { problem } = loadConfig(process.env as Record<string, string | undefined>); // validate config vs the registry — warn loud, don't crash
   if (problem) console.warn("[saasuluk config]", problem);
@@ -60,7 +62,13 @@ export async function createApp() {
     }
     await next();
   });
-  app.use("*", costMeter({                                                                      // meter every op
+  app.use("*", enforceAccess({                                                                  // WIRE-enforce x-suluk-access (C022 inv.3) — makes the facet load-bearing on custom ops too
+    operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
+    accessOf: (op) => access[op],
+    principal: (c) => principal(c),
+    isAdmin: (c) => isAdmin(c),
+  }));
+  app.use("*", costMeter({                                                                      // meter every op (after the gate — don't meter a rejected request)
     sink, costs,
     operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
     principalOf: (c) => principal(c) || undefined,                                              // verified token/session, else x-user
