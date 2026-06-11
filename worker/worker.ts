@@ -16,7 +16,7 @@ import { mount, type RouteContract } from "@suluk/hono";
 import { buildApp } from "@suluk/builder";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
-import { buildAda, matchRequest } from "@suluk/core";
+import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
@@ -27,6 +27,7 @@ import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, prin
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess } from "../src/server/access-facet";
+import { annotateSource } from "../src/server/source-facet";
 import { hardenDocument } from "../src/server/harden-schema";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "../src/server/project";
 
@@ -34,7 +35,7 @@ const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
 built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
-const document = hardenDocument(annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes }))); // cost + access facets + baseline hardening
+const document = hardenDocument(annotateSource(annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes })))); // cost + access + source (provenance) facets + baseline hardening
 const CANON_HASH = docHash(document); // canonical hash — the L2 projection's integrity pointer (council wcavrm7zk)
 const ada = buildAda(document);
 
@@ -134,14 +135,18 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs + L2 live view + SDK
+app.get("/reference", (c) => referenceResponse(isAdmin(c) ? document : scrubSource(document), { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs + L2 live view + SDK; provenance (↗ src) shown to the maintainer (admin) only
 app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK from the contract
-app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view
+app.get("/scalar", () => scalarResponse(scrubSource(document)));                                // 3.1 compatibility view (external — no provenance)
 app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c as unknown as Context) }));           // renderer auto-selects this viewer's lens (L2)
 app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as= → a provable-subset PROJECTION
   const viewer = requestedViewer(c as unknown as Context, c.req.query("as"));
-  return c.json((viewer ? projectDocument(document, viewer, CANON_HASH) : document) as unknown as Record<string, unknown>);
+  const doc = viewer ? projectDocument(document, viewer, CANON_HASH) : document;
+  return c.json((isAdmin(c) ? doc : scrubSource(doc)) as unknown as Record<string, unknown>);   // scrub x-suluk-source from external views (council: internal-layout disclosure)
 });
+app.get("/source", (c) => isAdmin(c)                                                            // DERIVED provenance reverse index (admin/maintainer only — never stored on the doc)
+  ? c.json({ coverage: sourceCoverage(document), index: sourceIndex(document) })
+  : c.json({ error: "forbidden" }, 403));
 app.get("/cost", async (c) => {
   // SCOPED to the caller (no cross-tenant ledger dump). A VERIFIED superadmin sees the whole store ledger.
   const who = principal(c);

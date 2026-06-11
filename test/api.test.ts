@@ -1,13 +1,18 @@
 import { test, expect, describe, beforeAll } from "bun:test";
-import { validateDocument } from "@suluk/core";
+import { validateDocument, sourceIndex, sourceCoverage, sourceKey, type OpenAPIv4Document } from "@suluk/core";
 import { assertGrade } from "@suluk/harden";
 import { createApp } from "../src/server/api";
+import * as schema from "../src/server/schema";
+import { OPERATION_PATHS } from "../src/server/operations";
 
 let app: Awaited<ReturnType<typeof createApp>>["app"];
+let document: OpenAPIv4Document; // the in-memory canonical (source-bearing) — for the provenance staleness gate
 let adminCookie = ""; // a VERIFIED superadmin session (email in SUPERADMIN_EMAILS) — the only way to be admin
 beforeAll(async () => {
   process.env.SUPERADMIN_EMAILS = '["admin@test.dev"]'; // the access layer reads this allowlist at app build
-  app = (await createApp()).app;
+  const created = await createApp();
+  app = created.app;
+  document = created.document;
   // sign up the allowlisted email → the databaseHook promotes it to role:"admin", and its session is admin.
   const res = await app.request("/api/auth/sign-up/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "admin@test.dev", password: "test-password-123", name: "Admin" }) });
   const set = res.headers.getSetCookie?.() ?? (res.headers.get("set-cookie") ? [res.headers.get("set-cookie") as string] : []);
@@ -236,6 +241,59 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(typeof anon["x-suluk-projection"].canonicalHash).toBe("string");
     expect(canonical["x-suluk-projection"]).toBeUndefined();          // canonical is authoritative, not a projection
     expect((await (await app.request("/api/whoami")).json()).viewer).toBe("anon"); // anon session → anon view
+  });
+
+  describe("provenance (x-suluk-source, council whuovh6gs L2): stamped, traceable, scrubbed from external views", () => {
+    const opEntries = (d: any) => Object.entries(d.paths as Record<string, any>).flatMap(([path, pi]) => Object.entries(pi.requests ?? {}).map(([name, req]) => ({ path, name, req: req as any })));
+
+    test("every operation is STAMPED with a stable file#symbol source pointer (full coverage)", () => {
+      const cov = sourceCoverage(document);
+      expect(cov.total).toBeGreaterThan(0);
+      expect(cov.stamped).toBe(cov.total);                                       // no op left unstamped
+      expect((document as any).paths.product.requests.createProduct["x-suluk-source"]) // CRUD → the Drizzle table
+        .toMatchObject({ file: "src/server/schema.ts", symbol: "product", kind: "drizzle-table" });
+      expect(opEntries(document).find((o) => o.name === "checkout")!.req["x-suluk-source"]) // custom → operations.ts
+        .toMatchObject({ file: "src/server/operations.ts", symbol: "checkout", kind: "operation" });
+    });
+
+    test("STALENESS GATE: every source pointer resolves to a real authored symbol (no rotting pointers)", () => {
+      const exports = new Set(Object.keys(schema));                              // the real schema.ts exports
+      const customOps = new Set(Object.values(OPERATION_PATHS).flatMap((pi: any) => Object.keys(pi.requests ?? {})));
+      const stale: string[] = [];
+      for (const { name, req } of opEntries(document)) {
+        const src = req["x-suluk-source"];
+        if (!src) { stale.push(`${name}: unstamped`); continue; }
+        if (src.kind === "drizzle-table" && !exports.has(src.symbol)) stale.push(`${name} → schema.ts#${src.symbol}`);
+        else if (src.kind === "operation" && !customOps.has(src.symbol)) stale.push(`${name} → operations.ts#${src.symbol}`);
+        else if (src.kind === "better-auth" && src.file !== "src/server/auth.ts") stale.push(`${name} → ${src.file}`);
+      }
+      expect(stale).toEqual([]); // a non-empty list = a pointer drifted out of sync with the source (CI catches it)
+    });
+
+    test("the DERIVED reverse index groups operations by source (a table → its CRUD fan-out)", () => {
+      const idx = sourceIndex(document);
+      const product = idx.find((g) => sourceKey(g) === "src/server/schema.ts#product");
+      expect(product).toBeDefined();
+      const names = new Set(product!.operations.map((o) => o.name));
+      for (const op of ["listProduct", "getProduct", "createProduct", "updateProduct", "deleteProduct"]) expect(names.has(op)).toBe(true);
+    });
+
+    test("SCRUBBED from external views: anon /openapi.json keeps cost but not source; /source is admin-only (403)", async () => {
+      const anon = await (await app.request("/openapi.json")).json() as any;
+      expect(anon.paths.product.requests.createProduct["x-suluk-source"]).toBeUndefined(); // internal-layout disclosure scrubbed
+      expect(anon.paths.product.requests.createProduct["x-suluk-cost"]).toBeDefined();     // cost/access stay (not internal)
+      expect((await app.request("/source")).status).toBe(403);                              // the reverse index is maintainer-only
+    });
+
+    test("VISIBLE to the maintainer (admin): /openapi.json + /source + the /reference ↗ src affordance", async () => {
+      const admin = await (await app.request("/openapi.json", { headers: adminH() })).json() as any;
+      expect(admin.paths.product.requests.createProduct["x-suluk-source"]).toMatchObject({ file: "src/server/schema.ts", symbol: "product" });
+      const src = await (await app.request("/source", { headers: adminH() })).json() as any;
+      expect(src.coverage.stamped).toBe(src.coverage.total);
+      expect(Array.isArray(src.index)).toBe(true);
+      expect((await (await app.request("/reference", { headers: adminH() })).text())).toContain("schema.ts#product"); // maintainer sees source
+      expect((await (await app.request("/reference")).text())).not.toContain("schema.ts#product");                    // public does not
+    });
   });
 
   test("config health (@suluk/env): admin-only, projects the registry, never leaks values", async () => {

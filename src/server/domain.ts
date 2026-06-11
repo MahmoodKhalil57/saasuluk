@@ -81,3 +81,14 @@ export const tableByEntity: Record<string, { table: SQLiteTable; ownerCol?: stri
 
 /** every domain table — for `tableComponents` (the component schemas in the standalone openapi.json gen). */
 export const allTables = ENTITIES.map((e) => e.table);
+
+/**
+ * PROVENANCE (council whuovh6gs, L2): entity name → the authored source it was projected FROM. The symbol is
+ * REVERSE-MAPPED from the actual `schema.ts` exports by object identity — not re-derived by a naming convention —
+ * so a rename in schema.ts is reflected here (and the staleness test catches a stale pointer). Stamped onto the
+ * contract by `annotateSource`; advisory only, never an authz input.
+ */
+const tableSymbol = new Map<unknown, string>(Object.entries(s).map(([sym, tbl]) => [tbl, sym]));
+export const entitySource: Record<string, { file: string; symbol: string; kind: string }> = Object.fromEntries(
+  ENTITIES.map((e) => [e.name, { file: "src/server/schema.ts", symbol: tableSymbol.get(e.table) ?? `${e.name[0].toLowerCase()}${e.name.slice(1)}`, kind: "drizzle-table" }]),
+);

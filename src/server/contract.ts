@@ -12,6 +12,7 @@ import type { OpenAPIv4Document } from "@suluk/core";
 import { entitySchemas, costs as domainCosts } from "./domain";
 import { OPERATION_PATHS, OPERATION_COSTS } from "./operations";
 import { annotateAccess } from "./access-facet";
+import { annotateSource } from "./source-facet";
 import { hardenDocument } from "./harden-schema";
 import { auth } from "./auth";
 
@@ -34,5 +35,6 @@ export async function buildContract(): Promise<Contract> {
   } catch {
     document = mergeAuth(document, {}, { securitySchemes }); // at least the schemes, if ingest fails
   }
+  document = annotateSource(document); // stamp x-suluk-source on every op (incl. the merged auth surface) — after merge
   return { built, document: hardenDocument(document) }; // baseline-harden every input schema doc-wide (incl. path params)
 }

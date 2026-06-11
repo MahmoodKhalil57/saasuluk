@@ -6,7 +6,7 @@
  */
 import { Hono } from "hono";
 import { mount, type RouteContract } from "@suluk/hono";
-import { buildAda, matchRequest } from "@suluk/core";
+import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
@@ -67,14 +67,18 @@ export async function createApp() {
   mount(app, routes);                                                                            // contract-derived CRUD
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
   const canonHash = docHash(document);
-  app.get("/reference", () => referenceResponse(document, { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs: v4 AS v4 + L2 live view + SDK download
+  app.get("/reference", (c) => referenceResponse(isAdmin(c) ? document : scrubSource(document), { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts" })); // PRIMARY docs: v4 AS v4 + L2 live view + SDK; provenance (↗ src) for the maintainer (admin) only
   app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK, generated from the contract
-  app.get("/scalar", () => scalarResponse(document));                                            // 3.1 compatibility view (Scalar renders OpenAPI 3.x)
+  app.get("/scalar", () => scalarResponse(scrubSource(document)));                                // 3.1 compatibility view (external — no provenance)
   app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c) }));                                 // the renderer auto-selects this viewer's lens (L2)
   app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as=me|anon|user|admin → a provable-subset PROJECTION
     const viewer = requestedViewer(c, c.req.query("as"));
-    return c.json((viewer ? projectDocument(document, viewer, canonHash) : document) as unknown as Record<string, unknown>);
+    const doc = viewer ? projectDocument(document, viewer, canonHash) : document;
+    return c.json((isAdmin(c) ? doc : scrubSource(doc)) as unknown as Record<string, unknown>);   // scrub x-suluk-source from external views (council: internal-layout disclosure)
   });
+  app.get("/source", (c) => isAdmin(c)                                                            // DERIVED provenance reverse index (admin/maintainer only — never stored on the doc)
+    ? c.json({ coverage: sourceCoverage(document), index: sourceIndex(document) })
+    : c.json({ error: "forbidden" }, 403));
   app.get("/cost", (c) => {                                                                      // raw cost ledger — SCOPED to the caller (a VERIFIED superadmin sees all)
     const who = principal(c);
     const events = isAdmin(c) ? sink.events() : sink.events().filter((e) => e.principal === who);
