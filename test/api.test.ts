@@ -344,3 +344,45 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect([400, 503]).toContain((await post("/api/stripe/webhook", {})).status);
   });
 });
+
+describe("list query (@suluk/drizzle parseListQuery): pagination/sort/filter — projected to the contract, OPT-IN", () => {
+  const getJson = async (p: string) => (await app.request(p)).json() as Promise<any[]>;
+  beforeAll(async () => {
+    // a deterministic slice of the catalog to assert over (admin-write, public-read)
+    for (const [slug, price, status] of [["lq-a", 100, "published"], ["lq-b", 300, "published"], ["lq-c", 200, "published"], ["lq-d", 400, "draft"]] as const)
+      await post("/product", { name: slug, slug, priceCents: price, status }, { ...adminH(), "x-suluk-action": "add-product" });
+  });
+
+  test("the contract ADVERTISES the list params (drift-free: the handler reads exactly what the doc/SDK declare)", async () => {
+    const doc = await (await app.request("/openapi.json")).json() as any;
+    const q = doc.paths.product.requests.listProduct.parameterSchema.query;
+    for (const p of ["page", "perPage", "sort", "order", "q"]) expect(q.properties[p], `list param not projected: ${p}`).toBeDefined();
+  });
+
+  test("OPT-IN: with NO query params the FULL list returns (so fetch-then-filter-client-side consumers never silently truncate)", async () => {
+    const all = await getJson("/product");
+    expect(all.length).toBeGreaterThanOrEqual(4); // every lq-* product present, unbounded
+    expect(all.some((p) => p.slug === "lq-d")).toBe(true);
+  });
+
+  test("pagination is bounded ONLY when asked (perPage caps; page advances to fresh rows)", async () => {
+    const p1 = await getJson("/product?perPage=2");
+    expect(p1.length).toBe(2);
+    const p2 = await getJson("/product?perPage=2&page=2");
+    expect(p2.length).toBeGreaterThan(0);
+    expect(p1.map((r) => r.id).some((id) => p2.map((r) => r.id).includes(id))).toBe(false); // disjoint pages
+  });
+
+  test("sort: ?sort=priceCents&order=desc returns a monotonically non-increasing list", async () => {
+    const rows = await getJson("/product?sort=priceCents&order=desc&perPage=100");
+    for (let i = 1; i < rows.length; i++) expect(rows[i].priceCents).toBeLessThanOrEqual(rows[i - 1].priceCents);
+  });
+
+  test("filter: ?status=draft equality-filters to drafts only (an unknown column key is ignored — no injection)", async () => {
+    const drafts = await getJson("/product?status=draft&perPage=100");
+    expect(drafts.length).toBeGreaterThan(0);
+    expect(drafts.every((p) => p.status === "draft")).toBe(true);
+    // a non-column key is dropped by parseListQuery, so it cannot widen/escape the query — returns the full list
+    expect((await getJson("/product?notacolumn=x")).length).toBeGreaterThanOrEqual(4);
+  });
+});

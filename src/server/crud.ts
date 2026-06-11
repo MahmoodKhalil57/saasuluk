@@ -10,9 +10,10 @@
  *    world-writable holes (mint a discount code, delete a catalog product, PATCH an order to "paid").
  * Without an explicit access mode the default is owned (if ownerCol) or public — see access.ts.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, asc, desc, type SQL } from "drizzle-orm";
 import type { Context } from "hono";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
+import { parseListQuery } from "@suluk/drizzle";
 import { db } from "./db";
 import { principal } from "./operations";
 import { policyFor, gate, type AccessMode } from "./access";
@@ -43,8 +44,22 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: Acc
     list: (c) => {
       const g = gate(c, policy.list, principal(c));
       if (!g.ok) return denied(c, g);
-      const w = scoped(c, g.scopeOwner, false);
-      return c.json(w ? db.select().from(table).where(w).all() : db.select().from(table).all());
+      const own = scoped(c, g.scopeOwner, false);
+      // The owner-scope AND any per-column equality filters (parseListQuery only returns REAL columns, validated
+      // against the table — unknown keys are dropped, so a filter can never widen past the owner scope).
+      const lq = parseListQuery(c.req.query(), table);
+      const conds: SQL[] = [];
+      if (own) conds.push(own);
+      for (const [col, val] of Object.entries(lq.filters)) if (cols[col]) conds.push(eq(cols[col], val));
+      const where = conds.length > 1 ? and(...conds) : conds[0];
+      let qb = db.select().from(table).$dynamic();
+      if (where) qb = qb.where(where);
+      if (lq.orderBy && cols[lq.orderBy.column]) qb = qb.orderBy(lq.orderBy.dir === "desc" ? desc(cols[lq.orderBy.column]) : asc(cols[lq.orderBy.column]));
+      // Pagination is OPT-IN: bound the page only when the caller passes page/perPage — otherwise the full list,
+      // so every consumer that fetches-then-filters-client-side keeps working until it migrates to server params.
+      const raw = c.req.query();
+      if (raw.page != null || raw.perPage != null) qb = qb.limit(lq.limit).offset(lq.offset);
+      return c.json(qb.all());
     },
     get: (c) => {
       const g = gate(c, policy.get, principal(c));

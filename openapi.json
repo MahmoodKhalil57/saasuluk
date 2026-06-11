@@ -25,10 +25,14 @@
                       "maximum": 9007199254740991
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "slug": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 80,
+                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     }
                   },
                   "required": [
@@ -38,12 +42,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Category",
           "tags": [
             "Category"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -71,10 +114,14 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   }
                 },
                 "required": [
@@ -82,6 +129,14 @@
                   "slug"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -99,10 +154,14 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "slug": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               }
             },
             "required": [
@@ -147,10 +206,14 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   }
                 },
                 "required": [
@@ -163,6 +226,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Category by id",
@@ -210,10 +281,14 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   }
                 },
                 "required": [
@@ -221,6 +296,14 @@
                   "slug"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -238,10 +321,14 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "slug": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               }
             },
             "required": [
@@ -286,6 +373,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Category",
@@ -344,15 +439,21 @@
                       "maximum": 9007199254740991
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 160,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "slug": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100,
+                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     },
                     "description": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -361,8 +462,8 @@
                     },
                     "priceCents": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000000
                     },
                     "categoryId": {
                       "anyOf": [
@@ -378,13 +479,15 @@
                     },
                     "inventory": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000
                     },
                     "imageUrl": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -401,7 +504,9 @@
                     "stripePriceId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -416,12 +521,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Product",
           "tags": [
             "Product"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -449,15 +593,21 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   },
                   "description": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -466,8 +616,8 @@
                   },
                   "priceCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "categoryId": {
                     "anyOf": [
@@ -483,13 +633,15 @@
                   },
                   "inventory": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000
                   },
                   "imageUrl": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -506,7 +658,9 @@
                   "stripePriceId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -519,6 +673,14 @@
                   "slug"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -536,15 +698,21 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "slug": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
               "description": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -553,8 +721,8 @@
               },
               "priceCents": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "categoryId": {
                 "anyOf": [
@@ -570,13 +738,15 @@
               },
               "inventory": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000
               },
               "imageUrl": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -593,7 +763,9 @@
               "stripePriceId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -643,15 +815,21 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   },
                   "description": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -660,8 +838,8 @@
                   },
                   "priceCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "categoryId": {
                     "anyOf": [
@@ -677,13 +855,15 @@
                   },
                   "inventory": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000
                   },
                   "imageUrl": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -700,7 +880,9 @@
                   "stripePriceId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -718,6 +900,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Product by id",
@@ -765,15 +955,21 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   },
                   "description": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -782,8 +978,8 @@
                   },
                   "priceCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "categoryId": {
                     "anyOf": [
@@ -799,13 +995,15 @@
                   },
                   "inventory": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000
                   },
                   "imageUrl": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -822,7 +1020,9 @@
                   "stripePriceId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -835,6 +1035,14 @@
                   "slug"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -852,15 +1060,21 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "slug": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
               "description": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -869,8 +1083,8 @@
               },
               "priceCents": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "categoryId": {
                 "anyOf": [
@@ -886,13 +1100,15 @@
               },
               "inventory": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000
               },
               "imageUrl": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -909,7 +1125,9 @@
               "stripePriceId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -959,6 +1177,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Product",
@@ -1018,21 +1244,23 @@
                     },
                     "productId": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 1,
+                      "maximum": 1000000000000
                     },
                     "title": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 160,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "priceCents": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000000
                     },
                     "inventory": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000
                     }
                   },
                   "required": [
@@ -1042,12 +1270,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Variant",
           "tags": [
             "Variant"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -1076,21 +1343,23 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "priceCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "inventory": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000
                   }
                 },
                 "required": [
@@ -1098,6 +1367,14 @@
                   "title"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -1116,21 +1393,23 @@
               },
               "productId": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 1000000000000
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "priceCents": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "inventory": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000
               }
             },
             "required": [
@@ -1176,21 +1455,23 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "priceCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "inventory": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000
                   }
                 },
                 "required": [
@@ -1203,6 +1484,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Variant by id",
@@ -1251,21 +1540,23 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "priceCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "inventory": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000
                   }
                 },
                 "required": [
@@ -1273,6 +1564,14 @@
                   "title"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -1291,21 +1590,23 @@
               },
               "productId": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 1000000000000
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "priceCents": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "inventory": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000
               }
             },
             "required": [
@@ -1350,6 +1651,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Variant",
@@ -1408,7 +1717,9 @@
                       "maximum": 9007199254740991
                     },
                     "code": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 40,
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                     },
                     "discountType": {
                       "type": "string",
@@ -1419,16 +1730,16 @@
                     },
                     "discountValue": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000000
                     },
                     "isActive": {
                       "type": "boolean"
                     },
                     "currentUses": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000000
                     },
                     "maxUses": {
                       "anyOf": [
@@ -1461,12 +1772,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List DiscountCode",
           "tags": [
             "DiscountCode"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -1494,7 +1844,9 @@
                     "maximum": 9007199254740991
                   },
                   "code": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 40,
+                    "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                   },
                   "discountType": {
                     "type": "string",
@@ -1505,16 +1857,16 @@
                   },
                   "discountValue": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "isActive": {
                     "type": "boolean"
                   },
                   "currentUses": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "maxUses": {
                     "anyOf": [
@@ -1546,6 +1898,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create DiscountCode",
@@ -1562,7 +1922,9 @@
                 "maximum": 9007199254740991
               },
               "code": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
               },
               "discountType": {
                 "type": "string",
@@ -1573,16 +1935,16 @@
               },
               "discountValue": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "isActive": {
                 "type": "boolean"
               },
               "currentUses": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "maxUses": {
                 "anyOf": [
@@ -1650,7 +2012,9 @@
                     "maximum": 9007199254740991
                   },
                   "code": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 40,
+                    "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                   },
                   "discountType": {
                     "type": "string",
@@ -1661,16 +2025,16 @@
                   },
                   "discountValue": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "isActive": {
                     "type": "boolean"
                   },
                   "currentUses": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "maxUses": {
                     "anyOf": [
@@ -1706,6 +2070,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get DiscountCode by id",
@@ -1753,7 +2125,9 @@
                     "maximum": 9007199254740991
                   },
                   "code": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 40,
+                    "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                   },
                   "discountType": {
                     "type": "string",
@@ -1764,16 +2138,16 @@
                   },
                   "discountValue": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "isActive": {
                     "type": "boolean"
                   },
                   "currentUses": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "maxUses": {
                     "anyOf": [
@@ -1805,6 +2179,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update DiscountCode",
@@ -1821,7 +2203,9 @@
                 "maximum": 9007199254740991
               },
               "code": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
               },
               "discountType": {
                 "type": "string",
@@ -1832,16 +2216,16 @@
               },
               "discountValue": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "isActive": {
                 "type": "boolean"
               },
               "currentUses": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "maxUses": {
                 "anyOf": [
@@ -1909,6 +2293,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete DiscountCode",
@@ -1969,7 +2361,9 @@
                     "customerId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -1977,12 +2371,16 @@
                       ]
                     },
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000,
+                      "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                     },
                     "discountCode": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -2001,12 +2399,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Cart",
           "tags": [
             "Cart"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -2036,7 +2473,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2044,12 +2483,16 @@
                     ]
                   },
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "discountCode": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2066,6 +2509,14 @@
                   }
                 },
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -2085,7 +2536,9 @@
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2093,12 +2546,16 @@
                 ]
               },
               "items": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "discountCode": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2154,7 +2611,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2162,12 +2621,16 @@
                     ]
                   },
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "discountCode": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2189,6 +2652,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Cart by id",
@@ -2238,7 +2709,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2246,12 +2719,16 @@
                     ]
                   },
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "discountCode": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2268,6 +2745,14 @@
                   }
                 },
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -2287,7 +2772,9 @@
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2295,12 +2782,16 @@
                 ]
               },
               "items": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "discountCode": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2354,6 +2845,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Cart",
@@ -2414,7 +2913,9 @@
                     "customerId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -2422,12 +2923,14 @@
                       ]
                     },
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000,
+                      "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                     },
                     "totalCents": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 100000000000
                     },
                     "status": {
                       "type": "string",
@@ -2441,7 +2944,9 @@
                     "discountCode": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -2451,7 +2956,9 @@
                     "stripePaymentIntentId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -2474,12 +2981,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Order",
           "tags": [
             "Order"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -2509,7 +3055,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2517,12 +3065,14 @@
                     ]
                   },
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "totalCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 100000000000
                   },
                   "status": {
                     "type": "string",
@@ -2536,7 +3086,9 @@
                   "discountCode": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2546,7 +3098,9 @@
                   "stripePaymentIntentId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2568,6 +3122,14 @@
                 },
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create Order",
@@ -2586,7 +3148,9 @@
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2594,12 +3158,14 @@
                 ]
               },
               "items": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "totalCents": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 100000000000
               },
               "status": {
                 "type": "string",
@@ -2613,7 +3179,9 @@
               "discountCode": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2623,7 +3191,9 @@
               "stripePaymentIntentId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2683,7 +3253,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2691,12 +3263,14 @@
                     ]
                   },
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "totalCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 100000000000
                   },
                   "status": {
                     "type": "string",
@@ -2710,7 +3284,9 @@
                   "discountCode": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2720,7 +3296,9 @@
                   "stripePaymentIntentId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2746,6 +3324,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Order by id",
@@ -2795,7 +3381,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2803,12 +3391,14 @@
                     ]
                   },
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "totalCents": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 100000000000
                   },
                   "status": {
                     "type": "string",
@@ -2822,7 +3412,9 @@
                   "discountCode": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2832,7 +3424,9 @@
                   "stripePaymentIntentId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -2854,6 +3448,14 @@
                 },
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update Order",
@@ -2872,7 +3474,9 @@
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2880,12 +3484,14 @@
                 ]
               },
               "items": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "totalCents": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 100000000000
               },
               "status": {
                 "type": "string",
@@ -2899,7 +3505,9 @@
               "discountCode": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2909,7 +3517,9 @@
               "stripePaymentIntentId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -2967,6 +3577,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Order",
@@ -3026,13 +3644,15 @@
                     },
                     "productId": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 1,
+                      "maximum": 1000000000000
                     },
                     "customerId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -3041,16 +3661,20 @@
                     },
                     "rating": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 1,
+                      "maximum": 5
                     },
                     "title": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 160,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "body": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -3066,8 +3690,8 @@
                     },
                     "helpfulCount": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 1000000000
                     },
                     "createdAt": {
                       "anyOf": [
@@ -3089,12 +3713,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Review",
           "tags": [
             "Review"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -3123,13 +3786,15 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3138,16 +3803,20 @@
                   },
                   "rating": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 5
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "body": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3163,8 +3832,8 @@
                   },
                   "helpfulCount": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "createdAt": {
                     "anyOf": [
@@ -3185,6 +3854,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create Review",
@@ -3202,13 +3879,15 @@
               },
               "productId": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 1000000000000
               },
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -3217,16 +3896,20 @@
               },
               "rating": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 5
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "body": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -3242,8 +3925,8 @@
               },
               "helpfulCount": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "createdAt": {
                 "anyOf": [
@@ -3301,13 +3984,15 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3316,16 +4001,20 @@
                   },
                   "rating": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 5
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "body": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3341,8 +4030,8 @@
                   },
                   "helpfulCount": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "createdAt": {
                     "anyOf": [
@@ -3367,6 +4056,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Review by id",
@@ -3415,13 +4112,15 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3430,16 +4129,20 @@
                   },
                   "rating": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 5
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "body": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3455,8 +4158,8 @@
                   },
                   "helpfulCount": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "createdAt": {
                     "anyOf": [
@@ -3477,6 +4180,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update Review",
@@ -3494,13 +4205,15 @@
               },
               "productId": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 1000000000000
               },
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -3509,16 +4222,20 @@
               },
               "rating": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 5
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "body": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -3534,8 +4251,8 @@
               },
               "helpfulCount": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "createdAt": {
                 "anyOf": [
@@ -3592,6 +4309,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Review",
@@ -3652,7 +4377,9 @@
                     "customerId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -3661,8 +4388,8 @@
                     },
                     "productId": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 1,
+                      "maximum": 1000000000000
                     },
                     "variantId": {
                       "anyOf": [
@@ -3695,12 +4422,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List WishlistItem",
           "tags": [
             "WishlistItem"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -3730,7 +4496,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3739,8 +4507,8 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "variantId": {
                     "anyOf": [
@@ -3772,6 +4540,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create WishlistItem",
@@ -3790,7 +4566,9 @@
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -3799,8 +4577,8 @@
               },
               "productId": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 1000000000000
               },
               "variantId": {
                 "anyOf": [
@@ -3870,7 +4648,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3879,8 +4659,8 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "variantId": {
                     "anyOf": [
@@ -3916,6 +4696,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get WishlistItem by id",
@@ -3965,7 +4753,9 @@
                   "customerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -3974,8 +4764,8 @@
                   },
                   "productId": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 1000000000000
                   },
                   "variantId": {
                     "anyOf": [
@@ -4007,6 +4797,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update WishlistItem",
@@ -4025,7 +4823,9 @@
               "customerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4034,8 +4834,8 @@
               },
               "productId": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 1000000000000
               },
               "variantId": {
                 "anyOf": [
@@ -4103,6 +4903,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete WishlistItem",
@@ -4161,15 +4969,21 @@
                       "maximum": 9007199254740991
                     },
                     "title": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 200,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "slug": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 120,
+                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     },
                     "excerpt": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -4179,7 +4993,9 @@
                     "body": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -4208,7 +5024,9 @@
                     "authorId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -4218,7 +5036,9 @@
                     "coverImageUrl": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -4233,12 +5053,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Post",
           "tags": [
             "Post"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -4266,15 +5125,21 @@
                     "maximum": 9007199254740991
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   },
                   "excerpt": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4284,7 +5149,9 @@
                   "body": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4313,7 +5180,9 @@
                   "authorId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4323,7 +5192,9 @@
                   "coverImageUrl": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4336,6 +5207,14 @@
                   "slug"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -4353,15 +5232,21 @@
                 "maximum": 9007199254740991
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "slug": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
               "excerpt": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4371,7 +5256,9 @@
               "body": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4400,7 +5287,9 @@
               "authorId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4410,7 +5299,9 @@
               "coverImageUrl": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4460,15 +5351,21 @@
                     "maximum": 9007199254740991
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   },
                   "excerpt": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4478,7 +5375,9 @@
                   "body": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4507,7 +5406,9 @@
                   "authorId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4517,7 +5418,9 @@
                   "coverImageUrl": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4535,6 +5438,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Post by id",
@@ -4582,15 +5493,21 @@
                     "maximum": 9007199254740991
                   },
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                   },
                   "excerpt": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4600,7 +5517,9 @@
                   "body": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4629,7 +5548,9 @@
                   "authorId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4639,7 +5560,9 @@
                   "coverImageUrl": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -4652,6 +5575,14 @@
                   "slug"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -4669,15 +5600,21 @@
                 "maximum": 9007199254740991
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "slug": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
               },
               "excerpt": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4687,7 +5624,9 @@
               "body": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4716,7 +5655,9 @@
               "authorId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4726,7 +5667,9 @@
               "coverImageUrl": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -4776,6 +5719,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Post",
@@ -4834,15 +5785,19 @@
                       "maximum": 9007199254740991
                     },
                     "question": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 300,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "answer": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 2000,
+                      "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                     },
                     "sortOrder": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
+                      "minimum": 0,
+                      "maximum": 100000
                     },
                     "isActive": {
                       "type": "boolean"
@@ -4855,12 +5810,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Faq",
           "tags": [
             "Faq"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -4888,15 +5882,19 @@
                     "maximum": 9007199254740991
                   },
                   "question": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "answer": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 2000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "sortOrder": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 100000
                   },
                   "isActive": {
                     "type": "boolean"
@@ -4907,6 +5905,14 @@
                   "answer"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -4924,15 +5930,19 @@
                 "maximum": 9007199254740991
               },
               "question": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 300,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "answer": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "sortOrder": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 100000
               },
               "isActive": {
                 "type": "boolean"
@@ -4980,15 +5990,19 @@
                     "maximum": 9007199254740991
                   },
                   "question": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "answer": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 2000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "sortOrder": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 100000
                   },
                   "isActive": {
                     "type": "boolean"
@@ -5004,6 +6018,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Faq by id",
@@ -5051,15 +6073,19 @@
                     "maximum": 9007199254740991
                   },
                   "question": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "answer": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 2000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "sortOrder": {
                     "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "minimum": 0,
+                    "maximum": 100000
                   },
                   "isActive": {
                     "type": "boolean"
@@ -5070,6 +6096,14 @@
                   "answer"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
               }
             }
           },
@@ -5087,15 +6121,19 @@
                 "maximum": 9007199254740991
               },
               "question": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 300,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "answer": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "sortOrder": {
                 "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+                "minimum": 0,
+                "maximum": 100000
               },
               "isActive": {
                 "type": "boolean"
@@ -5143,6 +6181,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Faq",
@@ -5201,7 +6247,9 @@
                       "maximum": 9007199254740991
                     },
                     "email": {
-                      "type": "string"
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                     },
                     "subscribedAt": {
                       "anyOf": [
@@ -5222,12 +6270,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List NewsletterSubscriber",
           "tags": [
             "NewsletterSubscriber"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -5255,7 +6342,9 @@
                     "maximum": 9007199254740991
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "subscribedAt": {
                     "anyOf": [
@@ -5275,6 +6364,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create NewsletterSubscriber",
@@ -5291,7 +6388,9 @@
                 "maximum": 9007199254740991
               },
               "email": {
-                "type": "string"
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
               },
               "subscribedAt": {
                 "anyOf": [
@@ -5347,7 +6446,9 @@
                     "maximum": 9007199254740991
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "subscribedAt": {
                     "anyOf": [
@@ -5371,6 +6472,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get NewsletterSubscriber by id",
@@ -5418,7 +6527,9 @@
                     "maximum": 9007199254740991
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "subscribedAt": {
                     "anyOf": [
@@ -5438,6 +6549,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update NewsletterSubscriber",
@@ -5454,7 +6573,9 @@
                 "maximum": 9007199254740991
               },
               "email": {
-                "type": "string"
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
               },
               "subscribedAt": {
                 "anyOf": [
@@ -5510,6 +6631,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete NewsletterSubscriber",
@@ -5568,16 +6697,24 @@
                       "maximum": 9007199254740991
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 120,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "email": {
-                      "type": "string"
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                     },
                     "subject": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 200,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "message": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 5000,
+                      "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                     },
                     "createdAt": {
                       "anyOf": [
@@ -5601,12 +6738,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List ContactSubmission",
           "tags": [
             "ContactSubmission"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -5634,16 +6810,24 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "subject": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "message": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 5000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "createdAt": {
                     "anyOf": [
@@ -5666,6 +6850,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create ContactSubmission",
@@ -5682,16 +6874,24 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "email": {
-                "type": "string"
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
               },
               "subject": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "message": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 5000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "createdAt": {
                 "anyOf": [
@@ -5750,16 +6950,24 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "subject": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "message": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 5000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "createdAt": {
                     "anyOf": [
@@ -5786,6 +6994,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get ContactSubmission by id",
@@ -5833,16 +7049,24 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "email": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "subject": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "message": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 5000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
                   },
                   "createdAt": {
                     "anyOf": [
@@ -5865,6 +7089,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update ContactSubmission",
@@ -5881,16 +7113,24 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "email": {
-                "type": "string"
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
               },
               "subject": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "message": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 5000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
               },
               "createdAt": {
                 "anyOf": [
@@ -5949,6 +7189,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete ContactSubmission",
@@ -6007,10 +7255,13 @@
                       "maximum": 9007199254740991
                     },
                     "url": {
-                      "type": "string"
+                      "type": "string",
+                      "format": "uri"
                     },
                     "alt": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 300,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "width": {
                       "anyOf": [
@@ -6044,12 +7295,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Media",
           "tags": [
             "Media"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -6077,10 +7367,13 @@
                     "maximum": 9007199254740991
                   },
                   "url": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uri"
                   },
                   "alt": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "width": {
                     "anyOf": [
@@ -6113,6 +7406,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create Media",
@@ -6129,10 +7430,13 @@
                 "maximum": 9007199254740991
               },
               "url": {
-                "type": "string"
+                "type": "string",
+                "format": "uri"
               },
               "alt": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 300,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "width": {
                 "anyOf": [
@@ -6201,10 +7505,13 @@
                     "maximum": 9007199254740991
                   },
                   "url": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uri"
                   },
                   "alt": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "width": {
                     "anyOf": [
@@ -6241,6 +7548,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Media by id",
@@ -6288,10 +7603,13 @@
                     "maximum": 9007199254740991
                   },
                   "url": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uri"
                   },
                   "alt": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "width": {
                     "anyOf": [
@@ -6324,6 +7642,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update Media",
@@ -6340,10 +7666,13 @@
                 "maximum": 9007199254740991
               },
               "url": {
-                "type": "string"
+                "type": "string",
+                "format": "uri"
               },
               "alt": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 300,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "width": {
                 "anyOf": [
@@ -6412,6 +7741,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Media",
@@ -6472,7 +7809,9 @@
                     "userId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -6480,13 +7819,19 @@
                       ]
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 120,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "prefix": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 20,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "hashedKey": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 128,
+                      "pattern": "^[a-f0-9]+$"
                     },
                     "createdAt": {
                       "anyOf": [
@@ -6533,12 +7878,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List ApiToken",
           "tags": [
             "ApiToken"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -6568,7 +7952,9 @@
                   "userId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -6576,13 +7962,19 @@
                     ]
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "prefix": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "hashedKey": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[a-f0-9]+$"
                   },
                   "createdAt": {
                     "anyOf": [
@@ -6628,6 +8020,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create ApiToken",
@@ -6646,7 +8046,9 @@
               "userId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -6654,13 +8056,19 @@
                 ]
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "prefix": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "hashedKey": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[a-f0-9]+$"
               },
               "createdAt": {
                 "anyOf": [
@@ -6744,7 +8152,9 @@
                   "userId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -6752,13 +8162,19 @@
                     ]
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "prefix": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "hashedKey": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[a-f0-9]+$"
                   },
                   "createdAt": {
                     "anyOf": [
@@ -6808,6 +8224,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get ApiToken by id",
@@ -6857,7 +8281,9 @@
                   "userId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -6865,13 +8291,19 @@
                     ]
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "prefix": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "hashedKey": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[a-f0-9]+$"
                   },
                   "createdAt": {
                     "anyOf": [
@@ -6917,6 +8349,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update ApiToken",
@@ -6935,7 +8375,9 @@
               "userId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -6943,13 +8385,19 @@
                 ]
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "prefix": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "hashedKey": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[a-f0-9]+$"
               },
               "createdAt": {
                 "anyOf": [
@@ -7031,6 +8479,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete ApiToken",
@@ -7089,12 +8545,16 @@
                       "maximum": 9007199254740991
                     },
                     "principal": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 128,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "stripeCustomerId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -7104,7 +8564,9 @@
                     "subscriptionId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -7154,12 +8616,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List BillingAccount",
           "tags": [
             "BillingAccount"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -7187,12 +8688,16 @@
                     "maximum": 9007199254740991
                   },
                   "principal": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "stripeCustomerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7202,7 +8707,9 @@
                   "subscriptionId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7251,6 +8758,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create BillingAccount",
@@ -7267,12 +8782,16 @@
                 "maximum": 9007199254740991
               },
               "principal": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "stripeCustomerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -7282,7 +8801,9 @@
               "subscriptionId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -7367,12 +8888,16 @@
                     "maximum": 9007199254740991
                   },
                   "principal": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "stripeCustomerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7382,7 +8907,9 @@
                   "subscriptionId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7435,6 +8962,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get BillingAccount by id",
@@ -7482,12 +9017,16 @@
                     "maximum": 9007199254740991
                   },
                   "principal": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "stripeCustomerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7497,7 +9036,9 @@
                   "subscriptionId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7546,6 +9087,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update BillingAccount",
@@ -7562,12 +9111,16 @@
                 "maximum": 9007199254740991
               },
               "principal": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "stripeCustomerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -7577,7 +9130,9 @@
               "subscriptionId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -7662,6 +9217,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete BillingAccount",
@@ -7720,12 +9283,16 @@
                       "maximum": 9007199254740991
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 160,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
                     "ownerId": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                         },
                         {
                           "type": "null"
@@ -7746,12 +9313,51 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "List Project",
           "tags": [
             "Project"
           ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "x-suluk-cost": {
             "components": [
               {
@@ -7779,12 +9385,16 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "ownerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7804,6 +9414,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Create Project",
@@ -7820,12 +9438,16 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "ownerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -7881,12 +9503,16 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "ownerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7910,6 +9536,14 @@
             "404": {
               "status": 404,
               "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Get Project by id",
@@ -7957,12 +9591,16 @@
                     "maximum": 9007199254740991
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
                   "ownerId": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                       },
                       {
                         "type": "null"
@@ -7982,6 +9620,14 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Update Project",
@@ -7998,12 +9644,16 @@
                 "maximum": 9007199254740991
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
               "ownerId": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                   },
                   {
                     "type": "null"
@@ -8059,6 +9709,14 @@
             "204": {
               "status": 204,
               "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
             }
           },
           "summary": "Delete Project",
@@ -8107,7 +9765,45 @@
           ],
           "contentType": "application/json",
           "contentSchema": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "cartId": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000000000
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 200,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "productId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000000
+                    },
+                    "qty": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    },
+                    "priceCents": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000
+                    }
+                  }
+                }
+              },
+              "discountCode": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              }
+            }
           },
           "responses": {
             "ok": {
@@ -8147,7 +9843,23 @@
           ],
           "contentType": "application/json",
           "contentSchema": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              },
+              "subtotalCents": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000000000
+              }
+            },
+            "required": [
+              "code"
+            ]
           },
           "responses": {
             "ok": {
@@ -8183,9 +9895,12 @@
           "parameterSchema": {
             "query": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "q": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                 }
               }
             }
@@ -8226,12 +9941,15 @@
               "type": "object",
               "properties": {
                 "id": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                 }
               },
               "required": [
                 "id"
-              ]
+              ],
+              "additionalProperties": false
             }
           },
           "responses": {
@@ -8368,12 +10086,15 @@
               "type": "object",
               "properties": {
                 "productId": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 16,
+                  "pattern": "^[0-9]+$"
                 }
               },
               "required": [
                 "productId"
-              ]
+              ],
+              "additionalProperties": false
             }
           },
           "responses": {
@@ -8410,9 +10131,12 @@
           "contentType": "application/json",
           "contentSchema": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "email": {
-                "type": "string"
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
               }
             },
             "required": [
@@ -8458,9 +10182,12 @@
           "parameterSchema": {
             "query": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "seed": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100,
+                  "pattern": "^[\\w .@-]{0,100}$"
                 }
               }
             }
@@ -8499,9 +10226,12 @@
           "contentType": "application/json",
           "contentSchema": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               }
             },
             "required": [
@@ -8549,12 +10279,15 @@
               "type": "object",
               "properties": {
                 "id": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
                 }
               },
               "required": [
                 "id"
-              ]
+              ],
+              "additionalProperties": false
             }
           },
           "responses": {
@@ -8595,7 +10328,35 @@
           ],
           "contentType": "application/json",
           "contentSchema": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 200,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "productId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000000
+                    },
+                    "qty": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    }
+                  }
+                }
+              },
+              "discountCode": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              }
+            }
           },
           "responses": {
             "ok": {
@@ -8635,7 +10396,24 @@
           ],
           "contentType": "application/json",
           "contentSchema": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "orderId": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000000000
+              },
+              "sessionId": {
+                "type": "string",
+                "maxLength": 255,
+                "pattern": "^[A-Za-z0-9_]+$"
+              }
+            },
+            "required": [
+              "orderId",
+              "sessionId"
+            ]
           },
           "responses": {
             "ok": {
@@ -8670,7 +10448,15 @@
           ],
           "contentType": "application/json",
           "contentSchema": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
+              }
+            }
           },
           "responses": {
             "ok": {
@@ -8710,7 +10496,8 @@
           ],
           "contentType": "application/json",
           "contentSchema": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false
           },
           "responses": {
             "ok": {
@@ -8743,6 +10530,44 @@
   },
   "components": {
     "schemas": {
+      "ProblemDetails": {
+        "type": "object",
+        "title": "ProblemDetails",
+        "description": "RFC-9457 Problem Details (application/problem+json).",
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri-reference",
+            "default": "about:blank"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "error": {
+            "type": "string",
+            "deprecated": true
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status"
+        ]
+      },
       "Category": {
         "type": "object",
         "properties": {

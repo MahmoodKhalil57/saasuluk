@@ -10,10 +10,11 @@
  */
 import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { and, eq } from "drizzle-orm";
+import { and, eq, asc, desc, type SQL } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { mount, enforceAccess, type RouteContract } from "@suluk/hono";
 import { buildApp } from "@suluk/builder";
+import { parseListQuery } from "@suluk/drizzle";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
@@ -107,8 +108,21 @@ function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
   return {
     list: async (c: Context<{ Bindings: Env }>) => {
       const g = gate(c, policy.list, principal(c)); if (!g.ok) return forbidden(c, g);
-      const w = scoped(c, g.scopeOwner, false);
-      return c.json(await (w ? dz(c).select().from(table).where(w) : dz(c).select().from(table)).all());
+      const own = scoped(c, g.scopeOwner, false);
+      // Owner-scope AND per-column equality filters (real columns only — parseListQuery drops unknown keys, so a
+      // filter never widens the owner scope). Identical query-build to the dev twin (crud.ts); only `await` differs.
+      const lq = parseListQuery(c.req.query(), table);
+      const conds: SQL[] = [];
+      if (own) conds.push(own);
+      for (const [col, val] of Object.entries(lq.filters)) if (cols[col]) conds.push(eq(cols[col], val));
+      const where = conds.length > 1 ? and(...conds) : conds[0];
+      let qb = dz(c).select().from(table).$dynamic();
+      if (where) qb = qb.where(where);
+      if (lq.orderBy && cols[lq.orderBy.column]) qb = qb.orderBy(lq.orderBy.dir === "desc" ? desc(cols[lq.orderBy.column]) : asc(cols[lq.orderBy.column]));
+      // Pagination OPT-IN (page/perPage) — full list otherwise, matching the dev server so dev/prod never diverge.
+      const raw = c.req.query();
+      if (raw.page != null || raw.perPage != null) qb = qb.limit(lq.limit).offset(lq.offset);
+      return c.json(await qb.all());
     },
     get: async (c: Context<{ Bindings: Env }>) => {
       const g = gate(c, policy.get, principal(c)); if (!g.ok) return forbidden(c, g);
