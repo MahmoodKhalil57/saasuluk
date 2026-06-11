@@ -20,9 +20,11 @@ export async function hashKey(key: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The acting principal for a request: a verified API-token user (set by the auth middleware) else the
- *  `x-user` header. The ONE place owner-stamping reads, so a Bearer token attributes rows + cost identically. */
-export const principal = (c: Context): string | null => (c.get("tokenUser") as string | undefined) ?? c.req.header("x-user") ?? null;
+/** The acting principal for a request, in trust order: a verified API-token user, then a verified Better Auth
+ *  SESSION user (both set by the auth middleware), then the `x-user` header (a dev/anonymous-demo fallback only —
+ *  never authoritative for a signed-in user). Owner-scoping + cost attribution + billing all read this one place. */
+export const principal = (c: Context): string | null =>
+  (c.get("tokenUser") as string | undefined) ?? (c.get("sessionUser") as string | undefined) ?? c.req.header("x-user") ?? null;
 
 /** Read a secret/var from the Worker env (c.env) or the dev process.env — so one handler works in both runtimes. */
 const secret = (c: Context, name: string): string | undefined =>
@@ -39,13 +41,19 @@ export async function reportPrincipalUsage(
 ): Promise<{ reported: boolean; deltaMicroUsd?: number; totalMicroUsd?: number; customerId?: string; reason?: string }> {
   const acct = await dz.select().from(billingAccount).where(eq(billingAccount.principal, opts.principal)).get();
   if (!acct?.stripeCustomerId) return { reported: false, reason: "not connected" };
+  const seen = Number(acct.lastReportedMicroUsd ?? 0);
   const rows = await dz.select().from(costEvent).where(eq(costEvent.principal, opts.principal)).all();
   const total = (rows as { totalMicroUsd: number }[]).reduce((s, r) => s + Number(r.totalMicroUsd), 0);
-  const delta = total - Number(acct.lastReportedMicroUsd ?? 0);
+  const delta = total - seen;
   if (delta <= 0) return { reported: false, reason: "no new usage", totalMicroUsd: total, customerId: acct.stripeCustomerId };
-  await restStripe(opts.key).billing.meterEvents.create(meterEventParams({ eventName: opts.eventName, customerId: acct.stripeCustomerId, value: delta }));
-  await dz.update(billingAccount).set({ lastReportedMicroUsd: total, lastReportedAt: Date.now() }).where(eq(billingAccount.id, acct.id)).run();
-  return { reported: true, deltaMicroUsd: delta, totalMicroUsd: total, customerId: acct.stripeCustomerId };
+  // Idempotent under retries/races: a DETERMINISTIC identifier per (principal, new total) so Stripe dedups a
+  // duplicate submission of the same delta window, AND a compare-and-swap that advances the high-water-mark only
+  // if it is still `seen` — so the cron + the button (or two reports) can't double-bill the same usage.
+  const identifier = `${opts.principal}:${total}`;
+  await restStripe(opts.key).billing.meterEvents.create({ ...meterEventParams({ eventName: opts.eventName, customerId: acct.stripeCustomerId, value: delta }), identifier });
+  const res = (await dz.update(billingAccount).set({ lastReportedMicroUsd: total, lastReportedAt: Date.now() }).where(and(eq(billingAccount.id, acct.id), eq(billingAccount.lastReportedMicroUsd, seen))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+  const claimed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+  return { reported: claimed, deltaMicroUsd: delta, totalMicroUsd: total, customerId: acct.stripeCustomerId };
 }
 
 /** Sweep every connected billing account and report its delta — the scheduled (Cron) twin of the button. */
@@ -57,6 +65,21 @@ export async function sweepBillingUsage(dz: Dz, key: string, eventName: string):
     try { if ((await reportPrincipalUsage(dz, { key, eventName, principal: a.principal })).reported) reported++; } catch { /* skip one bad account */ }
   }
   return { swept: accts.length, reported };
+}
+
+/**
+ * Mark an order paid EXACTLY ONCE: a pending→paid transition (so a webhook re-delivery or a second confirm is a
+ * no-op), and only on that transition do we bump the discount's usage. Returns true iff this call did the work.
+ */
+export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
+  const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
+  if (!o || o.status === "paid") return false;
+  const res = (await dz.update(order).set({ status: "paid" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+  const changed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+  if (changed && o.discountCode) {
+    await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
+  }
+  return changed;
 }
 
 /** Resolve an `Authorization: Bearer sk_…` header to the owning userId via the api_token table (or null). */
@@ -282,16 +305,24 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   const payCheckout = async (c: Context) => {
     const key = secret(c, "STRIPE_SECRET_KEY");
     if (!key) return c.json({ error: "Stripe is not configured (set STRIPE_SECRET_KEY)." }, 503);
-    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string };
-    const items: LineItem[] = Array.isArray(body.items) ? body.items : [];
-    if (!items.length) return c.json({ error: "Your cart is empty." }, 422);
+    const body = (await c.req.json().catch(() => ({}))) as { items?: { productId?: number; qty?: number }[]; discountCode?: string };
+    const cart = (Array.isArray(body.items) ? body.items : []).filter((i) => i.productId != null);
+    if (!cart.length) return c.json({ error: "Your cart is empty." }, 422);
     const dz = dbFor(c);
-    const subtotal = itemsTotal(items);
+    // SERVER-AUTHORITATIVE pricing: the client supplies only productId + qty; every price comes from the product
+    // row. (A client cannot under-pay by sending a fake priceCents.) Unknown/unpublished products are dropped.
+    const ids = [...new Set(cart.map((i) => Number(i.productId)))];
+    const rows = await dz.select().from(product).where(inArray(product.id, ids)).all();
+    const byId = new Map((rows as { id: number; name: string; priceCents: number; status: string; stripePriceId?: string }[]).map((p) => [p.id, p]));
+    const lines = cart.map((i) => { const p = byId.get(Number(i.productId)); const qty = Math.max(1, Math.floor(Number(i.qty) || 1)); return p && p.status === "published" ? { productId: p.id, qty, priceCents: p.priceCents, name: p.name, stripePriceId: p.stripePriceId } : null; }).filter((x): x is NonNullable<typeof x> => x != null);
+    if (!lines.length) return c.json({ error: "No purchasable items in the cart." }, 422);
+    const subtotal = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
     const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
     if (total < 50) return c.json({ error: "Stripe's minimum charge is $0.50 — use “Place order” for free items." }, 422);
-    const codeUsed = disc.valid ? body.discountCode! : null;
-    const created = await dz.insert(order).values({ customerId: principal(c), items: JSON.stringify(items), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
+    const codeUsed = disc.valid ? body.discountCode!.toUpperCase().trim() : null;
+    // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
+    const created = await dz.insert(order).values({ customerId: principal(c), items: JSON.stringify(lines.map((l) => ({ productId: l.productId, qty: l.qty, priceCents: l.priceCents }))), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     const origin = new URL(c.req.url).origin;
     const form = new URLSearchParams();
@@ -300,18 +331,11 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     form.set("cancel_url", `${origin}/checkout`);
     form.set("client_reference_id", String(orderId));
     form.set("metadata[orderId]", String(orderId));
-    // Use the REAL Stripe catalog Prices (per item) when there's no discount AND every product has one — so the
-    // Stripe page shows the actual products. With a discount (or a missing catalog price) fall back to a single
-    // line item charging the discounted total (a one-time Price can't carry our discount per item).
-    const ids = [...new Set(items.map((i) => i.productId).filter((x): x is number => typeof x === "number"))];
-    const catalog = ids.length ? await dz.select().from(product).where(inArray(product.id, ids)).all() : [];
-    const priceOf = new Map((catalog as { id: number; stripePriceId?: string }[]).map((p) => [p.id, p.stripePriceId]));
-    const useCatalog = !disc.valid && items.length > 0 && items.every((i) => i.productId != null && priceOf.get(i.productId));
+    // no discount + every line has a catalog Price → charge the real Prices (Stripe shows the products). Otherwise
+    // a single line item at the SERVER-recomputed (discounted) total — never a client-supplied amount.
+    const useCatalog = !disc.valid && lines.every((l) => l.stripePriceId);
     if (useCatalog) {
-      items.forEach((it, idx) => {
-        form.set(`line_items[${idx}][price]`, priceOf.get(it.productId as number) as string);
-        form.set(`line_items[${idx}][quantity]`, String(Math.max(1, Number(it.qty) || 1)));
-      });
+      lines.forEach((l, idx) => { form.set(`line_items[${idx}][price]`, l.stripePriceId as string); form.set(`line_items[${idx}][quantity]`, String(l.qty)); });
     } else {
       form.set("line_items[0][quantity]", "1");
       form.set("line_items[0][price_data][currency]", "usd");
@@ -331,10 +355,13 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const orderId = Number(body.orderId);
     if (!key || !body.sessionId || !orderId) return c.json({ paid: false, reason: "missing key, session or order" }, 400);
     const dz = dbFor(c);
+    const ord = await dz.select().from(order).where(eq(order.id, orderId)).get();
+    if (!ord) return c.json({ paid: false, reason: "unknown order" }, 404);
     const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(body.sessionId)}`, { headers: { authorization: `Bearer ${key}` } });
-    const session = (await r.json().catch(() => ({}))) as { payment_status?: string; client_reference_id?: string };
-    const paid = r.ok && session.payment_status === "paid" && String(session.client_reference_id) === String(orderId);
-    if (paid) await dz.update(order).set({ status: "paid" }).where(eq(order.id, orderId)).run();
+    const session = (await r.json().catch(() => ({}))) as { payment_status?: string; client_reference_id?: string; amount_total?: number };
+    // Stripe is the source of truth: payment cleared, the session is THIS order's, AND the amount matches our total.
+    const paid = r.ok && session.payment_status === "paid" && String(session.client_reference_id) === String(orderId) && Number(session.amount_total) === Number(ord.totalCents);
+    if (paid) await markOrderPaid(dz, orderId); // pending-only transition + once-per-order discount bump (idempotent)
     const row = await dz.select().from(order).where(eq(order.id, orderId)).get();
     return c.json({ paid, order: row });
   };
@@ -356,7 +383,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // metered subs bill at period end; default_incomplete avoids an upfront charge so it works without a card (test mode)
     try { const sub = await stripe.subscriptions.create({ ...subscriptionParams({ customerId: customer.id, priceId }), payment_behavior: "default_incomplete" }); subscriptionId = (sub as { id: string }).id; } catch { /* customer still meters */ }
     if (existing) await dz.update(billingAccount).set({ stripeCustomerId: customer.id, subscriptionId }).where(eq(billingAccount.id, existing.id)).run();
-    else await dz.insert(billingAccount).values({ principal: who, stripeCustomerId: customer.id, subscriptionId, createdAt: Date.now() }).run();
+    else await dz.insert(billingAccount).values({ principal: who, stripeCustomerId: customer.id, subscriptionId, lastReportedMicroUsd: 0, createdAt: Date.now() }).run();
     return c.json({ connected: true, customerId: customer.id, subscriptionId });
   };
 

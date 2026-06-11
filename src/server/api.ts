@@ -15,7 +15,7 @@ import { auth, ensureAuthTables } from "./auth";
 import { buildContract, costs } from "./contract";
 import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
-import { mountOperations, verifyApiToken } from "./operations";
+import { mountOperations, verifyApiToken, principal } from "./operations";
 import { db } from "./db";
 
 export async function createApp() {
@@ -40,21 +40,28 @@ export async function createApp() {
 
   const app = new Hono();
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));                       // Better Auth
-  app.use("*", async (c, next) => {                                                             // API-token auth
+  app.use("*", async (c, next) => {                                                             // identity (verified)
     const h = c.req.header("authorization");
     if (h?.startsWith("Bearer sk_")) { const u = await verifyApiToken(db, h); if (u) c.set("tokenUser", u); }
+    else if (c.req.header("cookie")) {
+      try { const s = await auth.api.getSession({ headers: c.req.raw.headers }) as { user?: { id?: string } } | null; if (s?.user?.id) c.set("sessionUser", s.user.id); } catch { /* anonymous */ }
+    }
     await next();
   });
   app.use("*", costMeter({                                                                      // meter every op
     sink, costs,
     operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
-    principalOf: (c) => (c.get("tokenUser") as string | undefined) || c.req.header("x-user") || undefined,
+    principalOf: (c) => principal(c) || undefined,                                              // verified token/session, else x-user
   }));
   mount(app, routes);                                                                            // contract-derived CRUD
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
   app.get("/scalar", () => scalarResponse(document));                                            // docs (cost + auth shown)
   app.get("/openapi.json", (c) => c.json(document as unknown as Record<string, unknown>));
-  app.get("/cost", (c) => c.json(summarize(sink.events())));                                     // raw cost ledger
+  app.get("/cost", (c) => {                                                                      // raw cost ledger — SCOPED to the caller (superadmin sees all)
+    const who = principal(c);
+    const all = sink.events();
+    return c.json(summarize(c.req.header("x-role") === "superadmin" ? all : all.filter((e) => e.principal === who)));
+  });
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => c.req.header("x-role") === "superadmin" })); // /superadmin
   app.post("/api/stripe/webhook", async (c) => {                                                 // Stripe billing
     const key = process.env.STRIPE_SECRET_KEY;

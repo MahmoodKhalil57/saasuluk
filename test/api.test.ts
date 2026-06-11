@@ -36,7 +36,7 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     // an owned entity stamps the caller as customerId without the client sending it
     const order = await post("/order", { totalCents: 1999, status: "pending" }, { "x-user": "u9" });
     expect((await order.json()).customerId).toBe("u9");
-    const cost = await (await app.request("/cost")).json() as any;
+    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
     expect(cost.byPrincipal.u9).toBeGreaterThan(0);
     expect(cost.byAction["add-product"]).toBeGreaterThan(0);
   });
@@ -57,7 +57,7 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(v.valid).toBe(true); expect(v.newTotalCents).toBe(9000);
     const v2 = await post("/discount/validate", { code: "NOPE" }, {});
     expect(v2.status).toBe(422);
-    const cost = await (await app.request("/cost")).json() as any;
+    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
     expect(cost.byAction["checkout-btn"]).toBeGreaterThan(0);
   });
 
@@ -80,12 +80,24 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     // a Bearer token authenticates with NO x-user header — the row is owner-stamped to the token's user
     const made = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "via-token" }) })).json();
     expect(made.ownerId).toBe("dev-1");
-    const cost = await (await app.request("/cost")).json() as any;
+    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
     expect(cost.byPrincipal["dev-1"]).toBeGreaterThan(0);
     // revoke → the same token no longer authenticates
     await post(`/tokens/${tok.id}/revoke`, {}, {});
     const after = await (await app.request("/project", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${tok.token}` }, body: JSON.stringify({ name: "after" }) })).json();
     expect(after.ownerId).toBeNull();
+  });
+
+  test("SECURITY: owner-scoped CRUD — a user can't see, read, or delete another user's owned rows", async () => {
+    const a = await (await post("/order", { totalCents: 100, status: "pending" }, { "x-user": "alice" })).json();
+    expect(a.customerId).toBe("alice");
+    // bob's list excludes alice's order; bob can't GET or DELETE it
+    expect(((await (await app.request("/order", { headers: { "x-user": "bob" } })).json()) as { id: number }[]).some((o) => o.id === a.id)).toBe(false);
+    expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "bob" } })).status).toBe(404);
+    await app.request(`/order/${a.id}`, { method: "DELETE", headers: { "x-user": "bob" } });
+    expect((await app.request(`/order/${a.id}`, { headers: { "x-user": "alice" } })).status).toBe(200); // bob's delete was a no-op
+    // an UNidentified caller sees nothing (no cross-tenant dump)
+    expect(((await (await app.request("/billingAccount")).json()) as unknown[]).length).toBe(0);
   });
 
   test("Scalar renders the docs", async () => {
@@ -96,8 +108,8 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     const created = await post("/project", { name: "Acme" }, { "x-user": "u1", "x-suluk-action": "new-project-button" });
     expect(created.status).toBe(201);
     expect((await created.json()).name).toBe("Acme");
-    expect(((await (await app.request("/project")).json()) as unknown[]).length).toBeGreaterThan(0);
-    const cost = await (await app.request("/cost")).json() as any;
+    expect(((await (await app.request("/project", { headers: { "x-user": "u1" } })).json()) as unknown[]).length).toBeGreaterThan(0);
+    const cost = await (await app.request("/cost", { headers: { "x-role": "superadmin" } })).json() as any;
     expect(cost.byPrincipal.u1).toBeGreaterThan(0);
     expect(cost.byAction["new-project-button"]).toBeGreaterThan(0);
     expect(cost.bySource.compute).toBeGreaterThan(0);

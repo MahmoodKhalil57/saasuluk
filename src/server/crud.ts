@@ -1,20 +1,22 @@
 /**
  * Generic Drizzle CRUD — written ONCE, bound to every entity's contract-generated routes. The dev server
- * (bun:sqlite, synchronous) uses these; the Worker has the async/D1 twin in `worker.ts`. A handler stamps the
- * owner column (e.g. `customerId`) from the caller's `x-user` header on create, so a user-owned row is attributed
- * without the client having to send it. This is the one place CRUD logic lives — projecting it across the whole
- * domain is what `tableByEntity` in `domain.ts` drives.
+ * (bun:sqlite, synchronous) uses these; the Worker has the async/D1 twin in `worker.ts`.
+ *
+ * OWNERSHIP: when an entity has an owner column (`ownerCol`, e.g. Order→customerId, BillingAccount→principal,
+ * ApiToken→userId), create STAMPS the caller's principal, and list/get/update/delete are SCOPED to it — a caller
+ * only ever sees or mutates rows they own. Without that scope the whole domain would be a cross-tenant CRUD
+ * (anyone could dump every Stripe customer id or mark any order paid). Public entities (no ownerCol — products,
+ * posts, faqs) stay open. The principal is server-derived (token/session, then the x-user fallback).
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Context } from "hono";
-import type { SQLiteTable } from "drizzle-orm/sqlite-core";
+import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { db } from "./db";
 import { principal } from "./operations";
 
 type AnyRow = Record<string, unknown>;
 const numId = (c: Context) => Number(c.req.param("id"));
-// the primary key column (every domain table is keyed by `id`)
-const pk = (table: SQLiteTable) => (table as unknown as { id: Parameters<typeof eq>[0] }).id;
+const pk = (table: SQLiteTable) => (table as unknown as { id: SQLiteColumn }).id;
 
 export interface CrudHandlers {
   list: (c: Context) => Response | Promise<Response>;
@@ -24,13 +26,14 @@ export interface CrudHandlers {
   delete: (c: Context) => Response | Promise<Response>;
 }
 
-/** Build the 5 CRUD handlers for one table (bun:sqlite / synchronous). `ownerCol` is stamped from `x-user`. */
 export function crudHandlers(table: SQLiteTable, ownerCol?: string): CrudHandlers {
-  const t = table as unknown as AnyRow;
+  const cols = table as unknown as Record<string, SQLiteColumn>;
+  const ownerEq = (c: Context) => (ownerCol ? eq(cols[ownerCol], principal(c)) : undefined);
+  const byId = (c: Context) => { const o = ownerEq(c); return o ? and(eq(pk(table), numId(c)), o) : eq(pk(table), numId(c)); };
   return {
-    list: (c) => c.json(db.select().from(table).all()),
+    list: (c) => { const o = ownerEq(c); return c.json(o ? db.select().from(table).where(o).all() : db.select().from(table).all()); },
     get: (c) => {
-      const r = db.select().from(table).where(eq(pk(table), numId(c))).get();
+      const r = db.select().from(table).where(byId(c)).get();
       return r ? c.json(r) : c.json({ error: "not found" }, 404);
     },
     create: async (c) => {
@@ -41,16 +44,14 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string): CrudHandler
     },
     update: async (c) => {
       const body = (await c.req.json().catch(() => ({}))) as AnyRow;
-      // never let the client move a row's id; owner stays as-is (only create stamps it)
-      delete body.id;
-      db.update(table).set(body as never).where(eq(pk(table), numId(c))).run();
-      const r = db.select().from(table).where(eq(pk(table), numId(c))).get();
+      delete body.id; if (ownerCol) delete body[ownerCol]; // never let the client move a row's id or its owner
+      db.update(table).set(body as never).where(byId(c)).run();
+      const r = db.select().from(table).where(byId(c)).get();
       return r ? c.json(r) : c.json({ error: "not found" }, 404);
     },
     delete: (c) => {
-      db.delete(table).where(eq(pk(table), numId(c))).run();
+      db.delete(table).where(byId(c)).run();
       return c.body(null, 204);
     },
   };
-  void t;
 }
