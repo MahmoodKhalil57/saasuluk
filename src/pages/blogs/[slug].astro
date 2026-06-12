@@ -11,6 +11,7 @@ const { post } = Astro.props;
 <Layout title={`${post.title} — saasuluk blog`} description={post.excerpt}>
   <p style="margin:6px 0 14px"><a href="/blogs" class="pill">← Blog</a></p>
   <article style="max-width:680px; margin:0 auto">
+    <img src={`/img/blog/${post.slug}.jpg`} alt="" style="width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:16px; border:1px solid var(--line); margin-bottom:6px" />
     <h1>{post.title}</h1>
     <p class="tag" style="font-size:19px; margin-top:8px">{post.excerpt}</p>
     <div class="prose" set:html={md(post.body)}></div>

@@ -67,13 +67,13 @@ export const SEED_SQL = [
   "INSERT OR REPLACE INTO category (id, name, slug) VALUES\n  " +
     SEED_CATEGORIES.map((c) => `(${c.id}, ${q(c.name)}, ${q(c.slug)})`).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO product (id, name, slug, description, price_cents, category_id, inventory, image_url, status) VALUES\n  " +
-    SEED_PRODUCTS.map((p) => `(${p.id}, ${q(p.name)}, ${q(p.slug)}, ${q(p.description)}, ${p.priceCents}, ${p.categoryId}, ${p.inventory}, NULL, ${q(p.status)})`).join(",\n  ") + ";",
+    SEED_PRODUCTS.map((p) => `(${p.id}, ${q(p.name)}, ${q(p.slug)}, ${q(p.description)}, ${p.priceCents}, ${p.categoryId}, ${p.inventory}, ${q(`/img/products/${p.slug}.jpg`)}, ${q(p.status)})`).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO discount_code (id, code, discount_type, discount_value, is_active, current_uses, max_uses, expires_at) VALUES\n  " +
     SEED_DISCOUNTS.map((d) => `(${d.id}, ${q(d.code)}, ${q(d.discountType)}, ${d.discountValue}, 1, 0, ${nq(d.maxUses)}, NULL)`).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO review (id, product_id, customer_id, rating, title, body, status, helpful_count, created_at) VALUES\n  " +
     SEED_REVIEWS.map((r) => `(${r.id}, ${r.productId}, ${q(r.customerId)}, ${r.rating}, ${q(r.title)}, ${q(r.body)}, 'published', ${r.helpfulCount}, ${T})`).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO post (id, title, slug, excerpt, body, status, published_at, author_id, cover_image_url) VALUES\n  " +
-    SEED_POSTS.map((p) => `(${p.id}, ${q(p.title)}, ${q(p.slug)}, ${q(p.excerpt)}, ${q(p.body)}, 'published', ${T}, ${q(p.author)}, NULL)`).join(",\n  ") + ";",
+    SEED_POSTS.map((p) => `(${p.id}, ${q(p.title)}, ${q(p.slug)}, ${q(p.excerpt)}, ${q(p.body)}, 'published', ${T}, ${q(p.author)}, ${q(`/img/blog/${p.slug}.jpg`)})`).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO faq (id, question, answer, sort_order, is_active) VALUES\n  " +
     SEED_FAQS.map((f, i) => `(${f.id}, ${q(f.question)}, ${q(f.answer)}, ${i}, 1)`).join(",\n  ") + ";",
 ].join("\n\n");

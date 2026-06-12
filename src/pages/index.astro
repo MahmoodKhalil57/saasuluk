@@ -26,7 +26,7 @@ const features = [
 ];
 ---
 <Layout>
-  <section class="hero">
+  <section class="hero hero--photo">
     <span class="pill accent">OpenAPI v4 · Moonwalk candidate</span>
     <h1 style="margin-top:18px">The SaaS starter that<br /><span class="gradient">sells itself.</span></h1>
     <p class="tag center">Auth, payments, eCommerce, an admin cockpit, a typed API + docs — every layer projected from <b>one contract</b>. This very store is the demo: it sells the code that renders it.</p>
@@ -97,4 +97,16 @@ const features = [
     <p class="tag center" style="margin:8px auto 0">Declare it once — the API, the docs, the client, the UI, the admin, and the billing follow.</p>
     <div class="cta"><a class="btn" href="/products">Open the store →</a><a class="btn ghost" href="/scalar">Read the API</a></div>
   </section>
+
+  <style is:global>
+    /* Photographic hero band — a dark stock background with an overlay so the white text stays readable in every
+       theme. Uses .hero.hero--photo (two classes) to outrank the layout's single-class .hero::before glow. */
+    .hero.hero--photo { position: relative; isolation: isolate; border-radius: 28px; overflow: hidden; padding: 96px 28px 84px; margin-top: 10px; }
+    .hero.hero--photo::before { content: ""; position: absolute; inset: 0; height: auto; background: #0a0e1a url("/img/site/hero.jpg") center / cover no-repeat; z-index: -2; }
+    .hero.hero--photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 10, 22, 0.72), rgba(6, 10, 22, 0.9)); z-index: -1; }
+    .hero.hero--photo h1, .hero.hero--photo .tag { color: #fff; }
+    .hero.hero--photo .tag { color: rgba(255, 255, 255, 0.85); }
+    .hero.hero--photo .pill { background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.24); }
+    .hero.hero--photo .btn.ghost { color: #fff; border-color: rgba(255, 255, 255, 0.32); background: rgba(255, 255, 255, 0.04); }
+  </style>
 </Layout>

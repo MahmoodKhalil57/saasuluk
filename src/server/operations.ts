@@ -17,6 +17,14 @@ import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
 import { v } from "./validations";
 
+/** Demo personas (testimonials + seed reviewers) get a REAL stock headshot; everyone else gets a generated
+ *  identicon. Keyed by the avatar seed (handle / customerId), lower-cased. Real signed-up users are never in this
+ *  map — putting a stranger's stock face on a real account would misrepresent them. Photos live in public/img/people/. */
+const PERSONA_PHOTOS: Record<string, string> = {
+  maya: "/img/people/maya.jpg", daniel: "/img/people/daniel.jpg", sara: "/img/people/sara.jpg",
+  ada: "/img/people/ada.jpg", lin: "/img/people/lin.jpg", rob: "/img/people/rob.jpg", mei: "/img/people/mei.jpg",
+};
+
 /** SHA-256 of an API key (Web Crypto — Worker-safe). We store only the hash; the plaintext is shown once. */
 export async function hashKey(key: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
@@ -471,6 +479,8 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
   const generateAvatar = (c: Context) => {
     const seed = c.req.query("seed") ?? "anon";
+    const photo = PERSONA_PHOTOS[seed.toLowerCase()]; // demo personas → real headshot; everyone else → identicon
+    if (photo) return c.redirect(photo, 302);
     let h = 2166136261;
     for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
     const hue = h % 360;

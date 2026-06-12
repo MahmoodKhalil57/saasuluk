@@ -5,6 +5,7 @@ import Layout from "../layouts/Layout.astro";
 <Layout title="About — saasuluk">
   <h1>About saasuluk</h1>
   <p class="tag">saasuluk is a SaaS starter built bottom-up on <b>Astro + Hono</b>, where every layer — the database, the API, the docs, the typed client, the UI, the admin panel, and the cost ledger — is a <b>projection of one typed contract</b>. It is a homage to <code>saastarter</code>, reimplemented so nothing can drift, because everything is the same source.</p>
+  <img src="/img/site/about.jpg" alt="A modern developer workspace" style="width:100%; aspect-ratio:21/9; object-fit:cover; border-radius:18px; border:1px solid var(--line); margin:20px 0 8px" />
   <h2>The idea</h2>
   <p>Most SaaS starters glue together a dozen tools that each hold their own copy of the truth: the ORM schema, the API types, the validation, the docs, the admin config. They drift. Suluk inverts that: you declare your entities once (Drizzle) and your verbs once (Hono + Zod), and the OpenAPI v4 document is <em>derived</em>. Then the Scalar docs, the Nano-Stores client, the shadcn UI, the <code>/superadmin</code> cockpit, the cost meter, and the Cloudflare deploy plan all read from that one document.</p>
   <h2>What's inside</h2>

@@ -15,8 +15,8 @@ const productLd = jsonLd("Product", { name: product.name, description: product.d
 <Layout title={`${product.name} — saasuluk`} description={product.description} jsonLd={productLd}>
   <p style="margin:6px 0 14px"><a href="/products" class="pill">← Store</a></p>
   <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start">
-    <div style="width:300px; max-width:100%; aspect-ratio:1; border-radius:18px; background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,var(--panel)),var(--panel)); display:grid; place-items:center; border:1px solid var(--line)">
-      <img src={`/avatar?seed=${product.slug}`} alt={product.name} width="120" height="120" style="border-radius:24px" />
+    <div style="width:300px; max-width:100%; aspect-ratio:1; border-radius:18px; overflow:hidden; border:1px solid var(--line)">
+      <img src={`/img/products/${product.slug}.jpg`} alt={product.name} style="width:100%; height:100%; object-fit:cover; display:block" />
     </div>
     <div style="flex:1; min-width:280px">
       <span class="pill accent">{product.priceCents === 0 ? "Open source" : "One-time · lifetime"}</span>
@@ -56,7 +56,7 @@ const productLd = jsonLd("Product", { name: product.name, description: product.d
     });
     async function loadReviews() {
       const rs = (await (await fetch("/review")).json()).filter((r) => r.productId === product.id && r.status === "published");
-      document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
+      document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
       document.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" }); loadReviews(); }));
     }
     document.getElementById("review").addEventListener("submit", async (e) => {

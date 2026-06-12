@@ -8,7 +8,8 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { deployWith, type AssetFile } from "@suluk/cloudflare";
+import { deployWith, CloudflareClient, queryD1, type AssetFile } from "@suluk/cloudflare";
+import { SEED_SQL } from "../src/server/seed";
 
 const token = process.env.CLOUDFLARE_API_TOKEN;
 if (!token) {
@@ -80,6 +81,18 @@ const res = await deployWith(
   },
   (m) => console.log("  " + m),
 );
+
+// Re-seed the demo content (idempotent INSERT OR REPLACE — same SQL the dev DB runs on boot), so the live
+// products/posts carry their image URLs. Surgical to the seed rows; runs after the schema migrations are applied.
+if (res.d1?.id) {
+  try {
+    const cf = new CloudflareClient({ apiToken: token, accountId: res.accountId });
+    await queryD1(cf, res.d1.id, SEED_SQL);
+    console.log("  seed: demo content applied (products/posts now carry /img URLs)");
+  } catch (e) {
+    console.warn("  seed: skipped —", (e as Error).message);
+  }
+}
 
 console.log(`\n✓ Deployed "${res.scriptName}" to account ${res.accountId}`);
 console.log(`  D1: ${res.d1?.id ?? "—"} · assets: ${res.assetsUploaded} · secrets: ${res.secretsSet.join(", ") || "none"} · crons: ${res.crons.join(" ") || "none"}`);
