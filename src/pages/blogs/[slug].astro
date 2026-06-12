@@ -2,7 +2,7 @@
 export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
 import { SEED_POSTS } from "../../server/seed";
-import { md } from "../../lib/md";
+import { mdToHtml } from "@suluk/docs";
 export function getStaticPaths() {
   return SEED_POSTS.map((p) => ({ params: { slug: p.slug }, props: { post: p } }));
 }
@@ -14,7 +14,7 @@ const { post } = Astro.props;
     <img src={`/img/blog/${post.slug}.jpg`} alt="" style="width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:16px; border:1px solid var(--line); margin-bottom:6px" />
     <h1>{post.title}</h1>
     <p class="tag" style="font-size:19px; margin-top:8px">{post.excerpt}</p>
-    <div class="prose" set:html={md(post.body)}></div>
+    <div class="prose" set:html={mdToHtml(post.body)}></div>
     <div style="margin-top:34px; padding-top:18px; border-top:1px solid var(--line); display:flex; gap:12px; align-items:center">
       <img src={`/avatar?seed=${post.author}`} width="40" height="40" style="border-radius:50%" alt="" />
       <div><b style="font-family:inherit">The saasuluk team</b><p style="color:var(--muted); font-size:13px; margin:0">Building the SaaS that ships itself.</p></div>

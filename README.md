@@ -77,9 +77,9 @@ The stack is Cloudflare-native: Hono → Workers, Drizzle(sqlite-core) → D1, t
 
 ## Notes
 
-- **`@suluk/*` resolution:** this template references the Suluk monorepo's package sources via `tsconfig.json`
-  `paths` (the repo is expected as a sibling at `../sig-moonwalk`). Once Suluk is published, swap these for
-  normal dependencies.
+- **`@suluk/*` resolution:** this template installs the **published** `@suluk/*` packages from npm as normal
+  dependencies — nothing local. Run `bun install` and you have the whole framework. (There are no `tsconfig.json`
+  `paths` aliases to a sibling monorepo anymore.)
 - **Run with Bun:** the data layer uses `bun:sqlite`, so run the built server with `bun dist/server/entry.mjs`
   (the `start` script), not `node`.
 - **Live auth/payments need config** (a real `BETTER_AUTH_SECRET` + `better-auth migrate`, and Stripe keys) —
