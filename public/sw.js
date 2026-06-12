@@ -1,6 +1,6 @@
 /* saasuluk service worker — a minimal offline shell. Cache-first for static assets, network-first for
    navigations (so pages stay fresh), with a cached fallback when offline. Bump CACHE to invalidate. */
-const CACHE = "saasuluk-v2"; // bump on every shell-affecting deploy → forces reinstall + purges the stale cached "/"
+const CACHE = "saasuluk-v3"; // bump on every shell-affecting deploy → forces reinstall + purges the stale cached "/"
 const SHELL = ["/", "/products", "/blogs", "/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

@@ -255,10 +255,13 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       ::view-transition-old(root), ::view-transition-new(root) { animation:none; mix-blend-mode:normal; }
 
       /* ── color-scheme popover (swatches derived from @suluk/theme) ─────────────────────────── */
-      .popback { position:fixed; inset:0; z-index:50; background:rgba(8,8,20,.42); backdrop-filter:blur(2px); opacity:0; transition:opacity .18s ease; }
-      .popback.open { opacity:1; }
-      .schemepop { position:fixed; top:64px; inset-inline-end:14px; z-index:51; width:min(390px,calc(100vw - 24px)); max-height:min(72vh,580px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:0 26px 70px rgba(16,16,40,.34); overflow:hidden; opacity:0; transform:translateY(-8px) scale(.98); transform-origin:top right; transition:opacity .18s ease, transform .18s ease; }
-      .schemepop.open { opacity:1; transform:translateY(0) scale(1); }
+      .popback { position:fixed; inset:0; z-index:50; background:rgba(8,8,20,.5); backdrop-filter:blur(3px); opacity:0; transition:opacity .18s ease; }
+      .popback.open { opacity:1; } .popback:not(.open) { pointer-events:none; } .popback[hidden] { display:none; }
+      /* centered modal. NB: [hidden] must beat the class's display, and it's pointer-events:none unless fully open —
+         otherwise the invisible (opacity:0) panel stays clickable after close. */
+      .schemepop { position:fixed; top:50%; left:50%; z-index:51; width:min(440px,calc(100vw - 32px)); max-height:min(74vh,600px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:0 30px 80px rgba(16,16,40,.42); overflow:hidden; opacity:0; transform:translate(-50%,-50%) scale(.96); transition:opacity .18s ease, transform .18s ease; pointer-events:none; }
+      .schemepop.open { opacity:1; transform:translate(-50%,-50%) scale(1); pointer-events:auto; }
+      .schemepop[hidden] { display:none; }
       .schemepop-head { padding:14px 14px 11px; display:flex; flex-direction:column; gap:9px; border-bottom:1px solid var(--line); }
       .schemepop-head strong { font-size:13px; font-family:inherit; }
       #scheme-search { font:inherit; font-size:13.5px; background:var(--bg-soft); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:8px 11px; }
@@ -277,7 +280,6 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         .navtoggle { display:inline-grid; }
         .chrome #palette-open, .chrome #lang, .chrome #scheme-btn { display:none; }
         #authlink span { display:none; }
-        .schemepop { inset-inline:8px; width:auto; top:60px; transform-origin:top center; }
       }
       .mobilenav .mnav-actions { margin-top:auto; padding-top:18px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
       .mobilenav .mnav-row { display:flex; gap:8px; flex-wrap:wrap; }
