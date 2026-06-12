@@ -19,6 +19,7 @@ const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number; key: 
 };
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
+import { swaggerResponse } from "@suluk/swagger";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
@@ -31,6 +32,7 @@ import { tableByEntity } from "./domain";
 import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal } from "./operations";
 import { isAdmin, superadminEmails } from "./access";
+import { renderCockpitPage } from "./cockpit-view";
 import { accessIndex } from "./access-facet";
 import { configHealth, renderConfigHealth, loadConfig } from "./env";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "./project";
@@ -96,6 +98,8 @@ export async function createApp() {
   app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK, generated from the contract
   app.get("/conformance.test.ts", (c) => new Response(generateTests(isAdmin(c) ? document : scrubSource(document), { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk.conformance.test.ts"' } })); // a runnable suite asserting the SERVER ENFORCES the contract (access on the wire, status, schema, cost)
   app.get("/scalar", () => scalarResponse(scrubSource(document)));                                // 3.1 compatibility view (external — no provenance)
+  app.get("/swagger", () => swaggerResponse(scrubSource(document)));                              // Swagger UI — a second contract-rendered docs lens (@suluk/swagger)
+  app.get("/cockpit", (c) => isAdmin(c) ? c.html(renderCockpitPage(document)) : c.json({ error: "forbidden" }, 403)); // admin: ship gates + convergence + diagrams (@suluk/cockpit + visual)
   app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c) }));                                 // the renderer auto-selects this viewer's lens (L2)
   app.get("/openapi.json", (c) => {                                                              // canonical (full, auth-free); ?as=me|anon|user|admin → a provable-subset PROJECTION
     const viewer = requestedViewer(c, c.req.query("as"));
