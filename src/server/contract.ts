@@ -6,10 +6,11 @@
  * other surface renders. Add an entity in `domain.ts` and it appears here — and everywhere downstream — for free.
  */
 import { buildApp, type BuiltApp } from "@suluk/builder";
+import { tableComponents } from "@suluk/drizzle";
 import { annotateCosts } from "@suluk/cost";
 import { authSecuritySchemes, ingestAuthOpenAPI, mergeAuth } from "@suluk/better-auth";
 import type { OpenAPIv4Document } from "@suluk/core";
-import { entitySchemas, costs as domainCosts } from "./domain";
+import { entitySchemas, costs as domainCosts, allTables } from "./domain";
 import { OPERATION_PATHS, OPERATION_COSTS } from "./operations";
 import { annotateAccess } from "./access-facet";
 import { annotateSource } from "./source-facet";
@@ -25,6 +26,13 @@ export interface Contract { built: BuiltApp; document: OpenAPIv4Document }
 export async function buildContract(): Promise<Contract> {
   const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API", version: "0.1.0" } });
   built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
+  // Stamp every entity's schema into components.schemas (as gen-openapi.ts does) so the WHOLE domain is in the
+  // RUNTIME document — the data-admin, SDK, and conformance all project from this; without it the admin can't see
+  // (or manage) any domain entity. (buildApp leaves entity schemas inline in the routes; this names them.)
+  built.backend.document.components = {
+    ...(built.backend.document.components ?? {}),
+    schemas: { ...(built.backend.document.components?.schemas ?? {}), ...tableComponents(allTables) },
+  };
   let document = annotateAccess(annotateCosts(built.backend.document, costs)); // cost + access as contract facets
 
   const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });

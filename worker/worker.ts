@@ -14,7 +14,7 @@ import { and, eq, asc, desc, type SQL } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { mount, enforceAccess, type RouteContract } from "@suluk/hono";
 import { buildApp } from "@suluk/builder";
-import { parseListQuery } from "@suluk/drizzle";
+import { parseListQuery, tableComponents } from "@suluk/drizzle";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
@@ -24,7 +24,7 @@ import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
 import { getAuth } from "./auth-d1";
-import { entitySchemas, costs as domainCosts, tableByEntity } from "../src/server/domain";
+import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
@@ -36,6 +36,9 @@ import { projectDocument, requestedViewer, viewerOf, docHash } from "../src/serv
 const costs = { ...domainCosts, ...OPERATION_COSTS };
 const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API (Cloudflare)", version: "0.1.0" } });
 built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
+// name every entity schema into components.schemas so the WHOLE domain is in the runtime doc (the data-admin,
+// SDK + conformance project from it) — without this the prod /superadmin can't see or manage any domain entity.
+built.backend.document.components = { ...(built.backend.document.components ?? {}), schemas: { ...(built.backend.document.components?.schemas ?? {}), ...tableComponents(allTables) } };
 const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
 const document = hardenDocument(annotateSource(annotateAccess(mergeAuth(annotateCosts(built.backend.document, costs), {}, { securitySchemes })))); // cost + access + source (provenance) facets + baseline hardening
 const CANON_HASH = docHash(document); // canonical hash — the L2 projection's integrity pointer (council wcavrm7zk)
