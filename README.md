@@ -1,6 +1,6 @@
 # saasuluk
 
-A **SaaS starter on Astro + Hono, powered end-to-end by [Suluk](https://github.com/MahmoodKhalil57/sig-moonwalk)** —
+A **SaaS starter on Astro + Hono, powered end-to-end by [Suluk](https://github.com/MahmoodKhalil57/suluk)** —
 the OpenAPI v4 "Moonwalk" candidate framework. A homage to `saastarter`, reimplemented from the bottom up so
 that **every layer is derived from one typed contract**: declare your data (Drizzle) and routes (Hono + Zod)
 once, and the OpenAPI v4 document, Scalar docs, the typed client, the shadcn UI, request validation, the admin
