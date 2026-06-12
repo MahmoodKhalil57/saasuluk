@@ -354,6 +354,19 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect(body.status).toBe(429);
     expect(body.error).toBe("rate_limited"); // the shared RFC-9457 problem envelope
   });
+
+  test("GDPR erasure cascade (@suluk/better-auth beforeDeleteCascade): erases every row a user owns", async () => {
+    const { buildErasureSteps } = await import("../src/server/erasure-steps");
+    const { db } = await import("../src/server/db");
+    const s = await import("../src/server/schema");
+    const { eq } = await import("drizzle-orm");
+    db.insert(s.order).values({ customerId: "erase-me", totalCents: 100, status: "pending", createdAt: Date.now() }).run();
+    db.insert(s.wishlistItem).values({ customerId: "erase-me", productId: 1 }).run();
+    expect(db.select().from(s.order).where(eq(s.order.customerId, "erase-me")).all().length).toBe(1);
+    for (const step of buildErasureSteps(db)) await step.run({ id: "erase-me" }); // the beforeDelete hook
+    expect(db.select().from(s.order).where(eq(s.order.customerId, "erase-me")).all().length).toBe(0);
+    expect(db.select().from(s.wishlistItem).where(eq(s.wishlistItem.customerId, "erase-me")).all().length).toBe(0);
+  });
 });
 
 describe("list query (@suluk/drizzle parseListQuery): pagination/sort/filter — projected to the contract, OPT-IN", () => {

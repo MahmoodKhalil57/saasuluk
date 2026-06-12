@@ -19,6 +19,31 @@ import Layout from "../layouts/Layout.astro";
   <form id="tok" style="display:flex; gap:8px; margin-bottom:8px"><input name="name" placeholder="Token name" aria-label="API token name" required /><button class="btn" type="submit">+ Create</button></form>
   <p id="newtok"></p>
   <table><thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th></th></tr></thead><tbody id="tokens"></tbody></table>
+
+  <div id="authed" style="display:none">
+    <h2>Profile</h2>
+    <form id="profile" style="display:flex; gap:8px; max-width:460px; align-items:center; flex-wrap:wrap">
+      <input name="name" placeholder="Display name" aria-label="Display name" style="flex:1; min-width:180px" />
+      <button class="btn" type="submit">Save</button>
+      <span id="profmsg" style="color:var(--muted); font-size:13px"></span>
+    </form>
+
+    <h2>Active sessions</h2>
+    <div id="sessions"></div>
+    <button class="btn ghost sm" id="signout-all" style="margin-top:8px">Sign out of all other devices</button>
+
+    <h2 style="color:#e5484d; margin-top:34px">Danger zone</h2>
+    <div class="card" style="border-color:color-mix(in srgb,#e5484d 28%,var(--line))">
+      <p style="margin:0 0 12px">Permanently delete your account and all your data — orders, wishlist, API tokens, billing. This cannot be undone.</p>
+      <button class="btn" id="del-start" style="background:#e5484d">Delete my account</button>
+      <div id="del-confirm" style="display:none; margin-top:12px; gap:8px; flex-wrap:wrap; align-items:center">
+        <input id="del-pass" type="password" placeholder="Confirm your password" aria-label="Confirm password" style="max-width:240px" />
+        <button class="btn" id="del-go" style="background:#e5484d">Yes, delete everything</button>
+        <button class="btn ghost" id="del-cancel">Cancel</button>
+        <span id="del-msg" style="color:#e5484d; font-size:13px; width:100%"></span>
+      </div>
+    </div>
+  </div>
   <script is:inline>
     let USER = "demo-user";
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
@@ -32,6 +57,7 @@ import Layout from "../layouts/Layout.astro";
           document.getElementById("sub").innerHTML = `Signed in as <b>${s.user.name || s.user.email}</b> · ${s.user.email}`;
           const so = document.getElementById("signout"); so.style.display = "inline-flex";
           so.addEventListener("click", async (e) => { e.preventDefault(); await fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" }); location.href = "/"; });
+          setupAuthed(s.user); // profile / sessions / delete-account (signed-in only)
           return;
         }
       } catch (e) {}
@@ -62,6 +88,39 @@ import Layout from "../layouts/Layout.astro";
       });
       e.target.reset(); loadTokens();
     });
+    // ---- profile / sessions / delete (signed-in only) ----
+    function setupAuthed(user) {
+      document.getElementById("authed").style.display = "block";
+      const pf = document.getElementById("profile");
+      if (pf) { pf.elements["name"].value = user.name || ""; pf.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const r = await fetch("/api/auth/update-user", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ name: pf.elements["name"].value }) });
+        document.getElementById("profmsg").textContent = r.ok ? "Saved ✓" : "Could not save.";
+      }); }
+      loadSessions();
+      document.getElementById("signout-all")?.addEventListener("click", async () => {
+        await fetch("/api/auth/revoke-other-sessions", { method: "POST", credentials: "same-origin" }); loadSessions();
+        if (window.toast) window.toast("Signed out other devices.", { type: "success" });
+      });
+      const ds = document.getElementById("del-start"), dc = document.getElementById("del-confirm");
+      ds?.addEventListener("click", () => { ds.style.display = "none"; dc.style.display = "flex"; });
+      document.getElementById("del-cancel")?.addEventListener("click", () => { dc.style.display = "none"; ds.style.display = "inline-flex"; });
+      document.getElementById("del-go")?.addEventListener("click", async () => {
+        const password = document.getElementById("del-pass").value;
+        const r = await fetch("/api/auth/delete-user", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify(password ? { password } : {}) });
+        if (r.ok) { if (window.toast) window.toast("Account deleted.", { type: "success" }); location.href = "/"; }
+        else { const d = await r.json().catch(() => ({})); document.getElementById("del-msg").textContent = d.message || d.error?.message || "Could not delete — check your password and try again."; }
+      });
+    }
+    async function loadSessions() {
+      try {
+        const raw = await (await fetch("/api/auth/list-sessions", { credentials: "same-origin" })).json();
+        const arr = Array.isArray(raw) ? raw : (raw.sessions || []);
+        document.getElementById("sessions").innerHTML = arr.length
+          ? arr.map((s) => `<div class="card" style="margin-bottom:6px; font-size:13.5px">${(s.userAgent || "Unknown device").slice(0, 70)} <span class="muted">· ${when(s.createdAt ? new Date(s.createdAt).getTime() : 0)}</span></div>`).join("")
+          : '<p class="muted">No active sessions.</p>';
+      } catch (e) { document.getElementById("sessions").innerHTML = ""; }
+    }
     resolveSession().then(load);
   </script>
 </Layout>

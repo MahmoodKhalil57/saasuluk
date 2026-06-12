@@ -3,10 +3,12 @@
  *  Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_*, RESEND_API_KEY) come from the Worker env (wrangler secrets). */
 import { betterAuth } from "better-auth";
 import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
-import { emailVerificationConfig } from "@suluk/better-auth";
+import { emailVerificationConfig, beforeDeleteCascade } from "@suluk/better-auth";
 import { D1Dialect } from "kysely-d1";
+import { drizzle } from "drizzle-orm/d1";
 import { sendEmailAsync, brandedEmail } from "../src/server/email";
 import { superadminEmails } from "../src/server/access";
+import { buildErasureSteps } from "../src/server/erasure-steps";
 
 export interface AuthEnv {
   DB: D1Database;
@@ -31,6 +33,8 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
         sendEmailAsync({ to: user.email, subject: "Verify your saasuluk email", html: brandedEmail("Verify your email", `<p>Confirm your address to activate your account.</p><p><a href="${url}" style="color:#6366f1">Verify email</a></p>`) });
       },
     }),
+    // GDPR account deletion — erase the user's owned rows (D1) before the user row (@suluk/better-auth cascade).
+    user: { deleteUser: { enabled: true, beforeDelete: beforeDeleteCascade(buildErasureSteps(drizzle(env.DB))) } },
     secret: env.BETTER_AUTH_SECRET ?? "saasuluk-dev-secret-change-me-32chars!",
     baseURL: "https://saasuluk.saastemly.com",
     trustedOrigins: ["https://saasuluk.saastemly.com"],

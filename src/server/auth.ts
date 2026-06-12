@@ -7,8 +7,9 @@
  */
 import { betterAuth } from "better-auth";
 import { bearer, admin, openAPI, magicLink } from "better-auth/plugins";
-import { emailVerificationConfig } from "@suluk/better-auth";
-import { sqlite } from "./db";
+import { emailVerificationConfig, beforeDeleteCascade } from "@suluk/better-auth";
+import { sqlite, db } from "./db";
+import { buildErasureSteps } from "./erasure-steps";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { superadminEmails } from "./access";
 
@@ -22,6 +23,9 @@ export const auth = betterAuth({
       sendEmailAsync({ to: user.email, subject: "Verify your saasuluk email", html: brandedEmail("Verify your email", `<p>Confirm your address to activate your account.</p><p><a href="${url}" style="color:#f5a97f">Verify email</a></p>`) });
     },
   }),
+  // GDPR account deletion (@suluk/better-auth beforeDeleteCascade): erase every row the user owns before the user
+  // row goes — no orphaned orders/tokens/billing. Fail-closed (a failed cleanup aborts the delete).
+  user: { deleteUser: { enabled: true, beforeDelete: beforeDeleteCascade(buildErasureSteps(db)) } },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me-in-prod",
   baseURL: process.env.BASE_URL ?? "http://localhost:3000",
   // a SUPERADMIN_EMAILS address is promoted to role:"admin" at sign-up — so the verified session that the access
