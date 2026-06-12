@@ -15,7 +15,13 @@ import { superadminEmails } from "./access";
 
 export const auth = betterAuth({
   database: sqlite,
-  emailAndPassword: { enabled: true },
+  emailAndPassword: {
+    enabled: true,
+    // password reset (the /login "Forgot password?" flow): email a branded link to /reset-password?token=…
+    sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
+      sendEmailAsync({ to: user.email, subject: "Reset your saasuluk password", html: brandedEmail("Reset your password", `<p>Click to choose a new password — this link expires shortly. If you didn't request it, ignore this email.</p><p><a href="${url}" style="color:#f5a97f">Reset password</a></p>`) });
+    },
+  },
   // frictionless activation (@suluk/better-auth): verify-on-sign-up + auto-sign-in after the user clicks the link.
   // Not REQUIRED (sign-up still works immediately), so this adds a verified email without blocking the flow.
   emailVerification: emailVerificationConfig({

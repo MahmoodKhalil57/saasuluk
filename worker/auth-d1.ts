@@ -26,7 +26,12 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
   if (existing) return existing;
   const auth = betterAuth({
     database: { dialect: new D1Dialect({ database: env.DB }), type: "sqlite" },
-    emailAndPassword: { enabled: true },
+    emailAndPassword: {
+      enabled: true,
+      sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
+        sendEmailAsync({ to: user.email, subject: "Reset your saasuluk password", html: brandedEmail("Reset your password", `<p>Click to choose a new password — this link expires shortly. If you didn't request it, ignore this email.</p><p><a href="${url}" style="color:#6366f1">Reset password</a></p>`) });
+      },
+    },
     // frictionless activation (@suluk/better-auth) — verify-on-sign-up + auto-sign-in after; not required.
     emailVerification: emailVerificationConfig({
       sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {

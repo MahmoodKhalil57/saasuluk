@@ -23,13 +23,15 @@ import Layout from "../layouts/Layout.astro";
         <button class="btn" type="submit" style="justify-content:center; margin-top:4px">Sign in</button>
       </form>
       <p id="msg" style="margin:14px 0 0; font-size:14px"></p>
+      <p id="forgotrow" style="text-align:center; margin-top:12px"><a href="#" id="forgotlink" style="font-size:13px">Forgot your password?</a></p>
+      <p id="backrow" style="text-align:center; margin-top:12px; display:none"><a href="#" id="backlink" style="font-size:13px">← Back to sign in</a></p>
     </div>
     <p class="center" style="color:var(--muted); font-size:13px; margin-top:14px">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
   </section>
   <script is:inline>
     let mode = "signin";
     const $ = (id) => document.getElementById(id);
-    const submitText = { signin: "Sign in", signup: "Create account", magic: "Email me a link" };
+    const submitText = { signin: "Sign in", signup: "Create account", magic: "Email me a link", forgot: "Send reset link" };
     function setMode(m) {
       mode = m;
       document.querySelectorAll(".tab").forEach((t) => {
@@ -37,12 +39,16 @@ import Layout from "../layouts/Layout.astro";
         t.classList.toggle("on", on); t.style.background = on ? "var(--panel)" : "transparent"; t.style.color = on ? "var(--fg)" : "var(--muted)";
       });
       $("name").style.display = m === "signup" ? "block" : "none";
-      $("password").style.display = m === "magic" ? "none" : "block";
-      $("password").required = m !== "magic";
+      $("password").style.display = (m === "magic" || m === "forgot") ? "none" : "block";
+      $("password").required = m !== "magic" && m !== "forgot";
       $("form").querySelector("button").textContent = submitText[m];
+      $("forgotrow").style.display = m === "signin" ? "block" : "none";
+      $("backrow").style.display = m === "forgot" ? "block" : "none";
       $("msg").textContent = "";
     }
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.tab)));
+    $("forgotlink").addEventListener("click", (e) => { e.preventDefault(); setMode("forgot"); });
+    $("backlink").addEventListener("click", (e) => { e.preventDefault(); setMode("signin"); });
     // preserve where the user came from (?redirectTo=…), open-redirect-guarded (same-origin relative only).
     const redirectTo = (function () { try { const p = new URLSearchParams(location.search).get("redirectTo"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/account"; } catch (e) { return "/account"; } })();
     // field-error feedback (mirrors @suluk/nano-stores markInvalid + clearInvalidOnInput): the base CSS rings
@@ -66,6 +72,9 @@ import Layout from "../layouts/Layout.astro";
         if (mode === "magic") {
           const r = await fetch("/api/auth/sign-in/magic-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, callbackURL: redirectTo }) });
           if (r.ok) ok("Check your email for a sign-in link. (In dev it logs to the server console.)"); else { err("Could not send the link."); invalid($("email")); }
+        } else if (mode === "forgot") {
+          const r = await fetch("/api/auth/request-password-reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, redirectTo: "/reset-password" }) });
+          if (r.ok) ok("Check your email for a password-reset link."); else { err("Could not send the reset link."); invalid($("email")); }
         } else {
           const path = mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
           const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(mode === "signup" ? { email, password, name: name || email.split("@")[0] } : { email, password }) });
