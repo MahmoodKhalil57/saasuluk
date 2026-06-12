@@ -2,6 +2,7 @@
 export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
 import { SEED_POSTS } from "../../server/seed";
+import { md } from "../../lib/md";
 export function getStaticPaths() {
   return SEED_POSTS.map((p) => ({ params: { slug: p.slug }, props: { post: p } }));
 }
@@ -12,11 +13,23 @@ const { post } = Astro.props;
   <article style="max-width:680px; margin:0 auto">
     <h1>{post.title}</h1>
     <p class="tag" style="font-size:19px; margin-top:8px">{post.excerpt}</p>
-    <div style="margin-top:22px; font-size:17px; line-height:1.85; color:var(--fg)">{post.body}</div>
+    <div class="prose" set:html={md(post.body)}></div>
     <div style="margin-top:34px; padding-top:18px; border-top:1px solid var(--line); display:flex; gap:12px; align-items:center">
       <img src={`/avatar?seed=${post.author}`} width="40" height="40" style="border-radius:50%" alt="" />
       <div><b style="font-family:inherit">The saasuluk team</b><p style="color:var(--muted); font-size:13px; margin:0">Building the SaaS that ships itself.</p></div>
     </div>
     <div style="margin-top:24px"><a class="btn" href="/products">Browse the store →</a> <a class="btn ghost" href="/blogs">More posts</a></div>
   </article>
+  <style>
+    .prose { margin-top:22px; font-size:17px; line-height:1.85; color:var(--fg); }
+    .prose h2 { font-size:24px; font-weight:700; letter-spacing:-.01em; text-transform:none; color:var(--fg); margin:34px 0 10px; }
+    .prose h3 { font-size:19px; font-weight:700; margin:26px 0 8px; }
+    .prose p { margin:0 0 16px; }
+    .prose ul { margin:0 0 16px; padding-inline-start:22px; } .prose li { margin:4px 0; }
+    .prose a { color:var(--link); text-decoration:underline; }
+    .prose code { font-family:ui-monospace,"SFMono-Regular",monospace; font-size:.86em; background:var(--bg-soft); border:1px solid var(--line); border-radius:6px; padding:1px 5px; }
+    .prose pre { background:var(--bg-soft); border:1px solid var(--line); border-radius:10px; padding:14px 16px; overflow-x:auto; margin:0 0 18px; }
+    .prose pre code { background:none; border:0; padding:0; font-size:13.5px; line-height:1.6; }
+    .prose blockquote { margin:0 0 16px; padding:6px 16px; border-inline-start:3px solid var(--accent); color:var(--muted); font-style:italic; }
+  </style>
 </Layout>
