@@ -26,6 +26,15 @@ export function prettyLabel(name: string): string {
   return name.split(/[-_]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
+/** A 3-color preview (background · primary · accent) for light + dark — derived straight from the parsed tweakcn
+ *  tokens, so the picker's swatches can never drift from the actual scheme (saastarter hand-maintains these). */
+export function parseSwatch(name: string, css: string): { light: [string, string, string]; dark: [string, string, string] } | null {
+  const t = parseShadcnCss(css, name);
+  if (!t) return null;
+  const k = formatOklch;
+  return { light: [k(t.light.background), k(t.light.primary), k(t.light.accent)], dark: [k(t.dark.background), k(t.dark.primary), k(t.dark.accent)] };
+}
+
 /** The `[data-scheme]` light + dark blocks for one tweakcn scheme CSS. Returns "" if the CSS isn't a theme. */
 export function projectScheme(name: string, css: string): string {
   const t = parseShadcnCss(css, name);

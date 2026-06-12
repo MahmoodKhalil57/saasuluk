@@ -1,6 +1,6 @@
 ---
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
-import { altSchemesCss, ALT_SCHEMES } from "../theme";
+import { altSchemesCss, SCHEME_SWATCHES } from "../theme";
 import { seoMeta, jsonLd } from "@suluk/builder";
 import { renderBaseCss } from "@suluk/theme";
 const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
@@ -235,24 +235,83 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     </style>
     <style is:global set:html={schemeCss}></style>
     <style is:global set:html={baseCss}></style>
+    <style is:global>
+      /* ── upgraded header: glass + scroll-aware, animated nav, crisp SVG controls ───────────── */
+      header.site { transition: background .25s ease, border-color .25s ease, box-shadow .25s ease; }
+      header.site.scrolled { background: color-mix(in srgb, var(--bg) 70%, transparent); box-shadow: 0 8px 30px -16px rgba(16,16,40,.55); border-bottom-color: color-mix(in srgb, var(--line) 70%, var(--accent) 30%); }
+      header.site .wrap { position: relative; }
+      .scrollprog { position:absolute; left:0; bottom:-1px; height:2px; width:0; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:0 2px 2px 0; pointer-events:none; }
+      nav.main a { position:relative; } nav.main a:hover { background:transparent; color:var(--fg); }
+      nav.main a::after { content:""; position:absolute; left:11px; right:11px; bottom:2px; height:2px; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); transform:scaleX(0); transform-origin:left; transition:transform .25s cubic-bezier(.4,0,.2,1); }
+      nav.main a:hover::after, nav.main a.on::after { transform:scaleX(1); }
+      .iconbtn { display:inline-grid; place-items:center; width:36px; height:36px; padding:0; transition:background .15s ease, color .15s ease, transform .15s ease; }
+      .iconbtn:hover { color:var(--fg); transform:translateY(-1px); }
+      .iconbtn svg { width:17px; height:17px; display:block; }
+      .theme-btn svg { transition:transform .45s cubic-bezier(.4,0,.2,1); } .theme-btn:hover svg { transform:rotate(35deg); }
+      .cartbtn.bump { animation:cartbump .45s cubic-bezier(.3,1.5,.5,1); }
+      @keyframes cartbump { 0%{transform:scale(1)} 35%{transform:scale(1.25)} 100%{transform:scale(1)} }
+      .navtoggle { display:none; }
+      /* only the clip-path circle plays on a theme switch (suppress the default root cross-fade) */
+      ::view-transition-old(root), ::view-transition-new(root) { animation:none; mix-blend-mode:normal; }
+
+      /* ── color-scheme popover (swatches derived from @suluk/theme) ─────────────────────────── */
+      .popback { position:fixed; inset:0; z-index:50; background:rgba(8,8,20,.42); backdrop-filter:blur(2px); opacity:0; transition:opacity .18s ease; }
+      .popback.open { opacity:1; }
+      .schemepop { position:fixed; top:64px; inset-inline-end:14px; z-index:51; width:min(390px,calc(100vw - 24px)); max-height:min(72vh,580px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:0 26px 70px rgba(16,16,40,.34); overflow:hidden; opacity:0; transform:translateY(-8px) scale(.98); transform-origin:top right; transition:opacity .18s ease, transform .18s ease; }
+      .schemepop.open { opacity:1; transform:translateY(0) scale(1); }
+      .schemepop-head { padding:14px 14px 11px; display:flex; flex-direction:column; gap:9px; border-bottom:1px solid var(--line); }
+      .schemepop-head strong { font-size:13px; font-family:inherit; }
+      #scheme-search { font:inherit; font-size:13.5px; background:var(--bg-soft); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:8px 11px; }
+      .scheme-grid { padding:10px; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+      .scheme-card { display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:10px; border:1px solid transparent; background:transparent; cursor:pointer; text-align:left; font:inherit; color:var(--fg); width:100%; }
+      .scheme-card:hover { background:var(--bg-soft); }
+      .scheme-card.on { border-color:color-mix(in srgb,var(--accent) 55%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
+      .scheme-sw { display:inline-flex; flex-shrink:0; border-radius:6px; overflow:hidden; border:1px solid var(--line); box-shadow:0 1px 2px rgba(16,16,40,.14); }
+      .scheme-sw i { width:12px; height:24px; display:block; }
+      .scheme-name { font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
+      .scheme-card.on .scheme-name { font-weight:700; }
+      .scheme-empty { grid-column:1/-1; color:var(--muted); font-size:13px; text-align:center; padding:18px; }
+
+      /* ── responsivity: fold secondary controls into the mobile drawer ─────────────────────── */
+      @media (max-width:760px){
+        .navtoggle { display:inline-grid; }
+        .chrome #palette-open, .chrome #lang, .chrome #scheme-btn { display:none; }
+        #authlink span { display:none; }
+        .schemepop { inset-inline:8px; width:auto; top:60px; transform-origin:top center; }
+      }
+      .mobilenav .mnav-actions { margin-top:auto; padding-top:18px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
+      .mobilenav .mnav-row { display:flex; gap:8px; flex-wrap:wrap; }
+      .mobilenav .mnav-row .btn.ghost { flex:1; justify-content:center; }
+    </style>
   </head>
   <body>
     <a class="skip-link" href="#main-content" data-i18n="skipToContent">Skip to content</a>
-    <header class="site">
+    <header class="site" id="site-header">
       <div class="wrap">
         <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
-        <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
+        <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}><span>{t("en", key)}</span></a>)}</nav>
         <div class="chrome">
-          <button id="navtoggle" class="iconbtn navtoggle" aria-label="Menu" aria-expanded="false" aria-controls="mobilenav" aria-haspopup="dialog">☰</button>
-          <button id="palette-open" class="iconbtn palette-btn" aria-label="Search" title="Search (⌘K)" aria-haspopup="dialog" aria-controls="palette">🔍</button>
+          <button id="palette-open" class="iconbtn palette-btn" aria-label="Search" title="Search (⌘K)" aria-haspopup="dialog" aria-controls="palette"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></button>
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
-          <select id="scheme" aria-label="Color scheme" title="Color scheme"><option value="">Indigo</option>{ALT_SCHEMES.map((s) => <option value={s.name}>{s.label}</option>)}</select>
-          <button id="theme" class="iconbtn" aria-label="Toggle theme">◐</button>
-          <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer">🛒<span id="cartcount" class="cartcount" hidden>0</span></button>
+          <button id="scheme-btn" class="iconbtn" aria-label="Color scheme" title="Color scheme" aria-haspopup="dialog" aria-controls="schemepop" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 5.624 17.461 2 12 2Z"/></svg></button>
+          <button id="theme" class="iconbtn theme-btn" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
+          <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span id="cartcount" class="cartcount" hidden>0</span></button>
           <a id="authlink" class="btn sm" href="/login">Sign in</a>
+          <button id="navtoggle" class="iconbtn navtoggle" aria-label="Menu" aria-expanded="false" aria-controls="mobilenav" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
         </div>
       </div>
+      <span class="scrollprog" id="scrollprog" aria-hidden="true"></span>
     </header>
+
+    <!-- color-scheme picker — a previews popover; swatches are DERIVED from @suluk/theme (never hand-maintained) -->
+    <div id="schemeback" class="popback" hidden></div>
+    <div id="schemepop" class="schemepop" role="dialog" aria-modal="true" aria-label="Color scheme" aria-hidden="true" hidden>
+      <div class="schemepop-head">
+        <strong data-i18n="colorScheme">Color scheme</strong>
+        <input id="scheme-search" type="search" placeholder="Search 43 schemes…" aria-label="Search schemes" autocomplete="off" />
+      </div>
+      <div id="scheme-grid" class="scheme-grid" role="listbox" aria-label="Schemes"></div>
+    </div>
     <main id="main-content"><div class="wrap"><slot /></div></main>
     <footer class="site">
       <div class="wrap">
@@ -284,6 +343,16 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <aside id="mobilenav" class="mobilenav" role="dialog" aria-modal="true" aria-label="Navigation" aria-hidden="true" hidden>
       <div class="mobilenav-head"><a class="brand" href="/"><span class="dot">s</span> saasuluk</a><button id="navclose" class="iconbtn" aria-label="Close menu">✕</button></div>
       <nav>{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
+      <div class="mnav-actions">
+        <div class="mnav-row">
+          <button class="btn ghost sm" type="button" data-act="search">Search</button>
+          <button class="btn ghost sm" type="button" data-act="scheme">Color scheme</button>
+        </div>
+        <div class="mnav-row">
+          <button class="btn ghost sm" type="button" data-act="theme">Theme · <span id="m-theme-label">system</span></button>
+          <select id="m-lang" aria-label="Language" style="font:inherit;font-size:13px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:7px 9px;flex:1">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
+        </div>
+      </div>
     </aside>
     <div id="cartback" class="cartback" hidden></div>
     <aside id="cartdrawer" class="cartdrawer" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-hidden="true" hidden>
@@ -303,32 +372,94 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <script>import "../client/toast";</script>
     <script>import "../client/ux";</script>
     <script>import "../client/palette";</script>
+    <script is:inline set:html={`window.__schemes=${JSON.stringify(SCHEME_SWATCHES)}`}></script>
     <script is:inline>
       if (window.__applyLang) window.__applyLang(window.__lang0);
       (function () {
-        var THEMES = ["light", "dark", "system"], ICON = { light: "◐", dark: "●", system: "◑" };
-        var mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
-        function setTheme(pref) {
-          document.documentElement.dataset.theme = pref === "system" ? (mq && mq.matches ? "dark" : "light") : pref;
-          document.documentElement.dataset.themePref = pref;
+        var root = document.documentElement, mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+        var ICONS = {
+          light: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+          dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.36 6.36 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+          system: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'
+        };
+        var THEMES = ["light", "dark", "system"], tbtn = document.getElementById("theme"), mLabel = document.getElementById("m-theme-label");
+        function applyTheme(pref) {
+          root.dataset.theme = pref === "system" ? (mq && mq.matches ? "dark" : "light") : pref;
+          root.dataset.themePref = pref;
           try { localStorage.setItem("theme", pref); } catch (e) {}
-          var b = document.getElementById("theme"); if (b) { b.textContent = ICON[pref]; b.setAttribute("aria-label", "Theme: " + pref + " (click to change)"); }
+          if (tbtn) { tbtn.innerHTML = ICONS[pref]; tbtn.setAttribute("aria-label", "Theme: " + pref + " — click to change"); }
+          if (mLabel) mLabel.textContent = pref;
+          if (popOpen) renderGrid(search ? search.value : ""); // swatches preview the active light/dark mode
         }
-        var tbtn = document.getElementById("theme");
-        if (tbtn) {
-          setTheme(document.documentElement.dataset.themePref || "system"); // sync the icon to the resolved pref
-          tbtn.addEventListener("click", function () { var cur = document.documentElement.dataset.themePref || "system"; setTheme(THEMES[(THEMES.indexOf(cur) + 1) % 3]); });
+        function cycleTheme(e) {
+          var cur = root.dataset.themePref || "system", next = THEMES[(THEMES.indexOf(cur) + 1) % 3];
+          var btn = (e && e.currentTarget && e.currentTarget.getBoundingClientRect) ? e.currentTarget : tbtn;
+          if (!document.startViewTransition || !btn) { applyTheme(next); return; }
+          document.startViewTransition(function () { applyTheme(next); }).ready.then(function () {
+            var r = btn.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+            var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+            root.animate({ clipPath: ["circle(0px at " + x + "px " + y + "px)", "circle(" + rad + "px at " + x + "px " + y + "px)"] },
+              { duration: 480, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" });
+          }).catch(function () {});
         }
-        if (mq) mq.addEventListener("change", function () { if ((document.documentElement.dataset.themePref || "system") === "system") setTheme("system"); });
-        var ssel = document.getElementById("scheme");
-        if (ssel) {
-          ssel.value = document.documentElement.dataset.scheme || "";
-          ssel.addEventListener("change", function (e) {
-            var v = e.target.value;
-            if (v) { document.documentElement.dataset.scheme = v; try { localStorage.setItem("scheme", v); } catch (x) {} }
-            else { delete document.documentElement.dataset.scheme; try { localStorage.removeItem("scheme"); } catch (x) {} }
+        if (tbtn) { applyTheme(root.dataset.themePref || "system"); tbtn.addEventListener("click", cycleTheme); }
+        if (mq) mq.addEventListener("change", function () { if ((root.dataset.themePref || "system") === "system") applyTheme("system"); });
+
+        // ── color-scheme popover (swatches DERIVED from @suluk/theme — never hand-maintained) ──
+        var pop = document.getElementById("schemepop"), back = document.getElementById("schemeback"), grid = document.getElementById("scheme-grid"),
+            sbtn = document.getElementById("scheme-btn"), search = document.getElementById("scheme-search"), swatches = window.__schemes || [], popOpen = false;
+        function cur() { return root.dataset.scheme || ""; }
+        function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+        function card(s) {
+          var cols = (root.dataset.theme === "dark" ? s.dark : s.light) || [];
+          var sw = cols.map(function (c) { return '<i style="background:' + esc(c) + '"></i>'; }).join("");
+          var on = s.name === cur() ? " on" : "";
+          return '<button class="scheme-card' + on + '" role="option" aria-selected="' + (on ? "true" : "false") + '" data-scheme="' + esc(s.name) + '"><span class="scheme-sw">' + sw + '</span><span class="scheme-name">' + esc(s.label) + '</span></button>';
+        }
+        function renderGrid(q) {
+          if (!grid) return; q = (q || "").toLowerCase();
+          var list = swatches.filter(function (s) { return !q || s.label.toLowerCase().indexOf(q) >= 0; });
+          grid.innerHTML = list.length ? list.map(card).join("") : '<p class="scheme-empty">No schemes match.</p>';
+        }
+        function setScheme(name) {
+          if (name) { root.dataset.scheme = name; try { localStorage.setItem("scheme", name); } catch (e) {} }
+          else { delete root.dataset.scheme; try { localStorage.removeItem("scheme"); } catch (e) {} }
+          renderGrid(search ? search.value : "");
+        }
+        function openPop() { if (!pop) return; renderGrid(""); pop.hidden = false; if (back) back.hidden = false; requestAnimationFrame(function () { pop.classList.add("open"); if (back) back.classList.add("open"); }); pop.setAttribute("aria-hidden", "false"); if (sbtn) sbtn.setAttribute("aria-expanded", "true"); popOpen = true; setTimeout(function () { if (search) search.focus(); }, 40); }
+        function closePop() { if (!pop) return; pop.classList.remove("open"); if (back) back.classList.remove("open"); pop.setAttribute("aria-hidden", "true"); if (sbtn) sbtn.setAttribute("aria-expanded", "false"); popOpen = false; setTimeout(function () { pop.hidden = true; if (back) back.hidden = true; }, 180); }
+        if (sbtn) sbtn.addEventListener("click", function () { popOpen ? closePop() : openPop(); });
+        if (back) back.addEventListener("click", closePop);
+        if (search) search.addEventListener("input", function () { renderGrid(search.value); });
+        if (grid) grid.addEventListener("click", function (e) { var c = e.target.closest && e.target.closest("[data-scheme]"); if (c) setScheme(c.getAttribute("data-scheme")); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && popOpen) closePop(); });
+
+        // ── glassy scroll state + scroll-progress hairline ──
+        var hdr = document.getElementById("site-header"), prog = document.getElementById("scrollprog");
+        function onScroll() {
+          var y = window.scrollY || 0;
+          if (hdr) hdr.classList.toggle("scrolled", y > 6);
+          if (prog) { var h = document.documentElement.scrollHeight - innerHeight; prog.style.width = (h > 0 ? (y / h) * 100 : 0) + "%"; }
+        }
+        addEventListener("scroll", onScroll, { passive: true }); onScroll();
+
+        // ── cart bump on change ──
+        var cbtn = document.getElementById("cartbtn");
+        addEventListener("cart-changed", function () { if (cbtn) { cbtn.classList.remove("bump"); void cbtn.offsetWidth; cbtn.classList.add("bump"); } });
+
+        // ── mobile drawer actions delegate to the header controls ──
+        document.querySelectorAll("[data-act]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            var act = b.getAttribute("data-act"), nc = document.getElementById("navclose"); if (nc) nc.click();
+            setTimeout(function () {
+              if (act === "search") { var p = document.getElementById("palette-open"); if (p) p.click(); }
+              else if (act === "scheme") openPop();
+              else if (act === "theme") cycleTheme();
+            }, 60);
           });
-        }
+        });
+        var mlang = document.getElementById("m-lang");
+        if (mlang) { mlang.value = (window.__lang0 || "en"); mlang.addEventListener("change", function (e) { var L = document.getElementById("lang"); if (L) { L.value = e.target.value; L.dispatchEvent(new Event("change")); } }); }
       })();
       document.getElementById("lang").addEventListener("change", function (e) {
         try { localStorage.setItem("lang", e.target.value); } catch (x) {}
