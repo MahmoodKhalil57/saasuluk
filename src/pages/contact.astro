@@ -19,6 +19,31 @@ import Layout from "../layouts/Layout.astro";
     <button class="btn ghost" type="submit">Subscribe</button>
   </form>
   <p id="nmsg" style="color:var(--muted);font-size:13px;margin-top:6px"></p>
+
+  <h2>Find us</h2>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; align-items:start; margin-top:8px">
+    <div id="map" style="height:300px; border-radius:14px; border:1px solid var(--line); overflow:hidden; background:var(--bg-soft)" role="img" aria-label="Map of our location"></div>
+    <div>
+      <p style="margin:0 0 12px"><b style="font-family:inherit">saasuluk HQ</b><br /><span style="color:var(--muted)">Remote-first — and on the edge, literally (Cloudflare Workers in 300+ cities).</span></p>
+      <p style="margin:0 0 12px"><b style="font-family:inherit">Hours</b><br /><span style="color:var(--muted)">Always on. The Worker never sleeps.</span></p>
+      <p style="margin:0"><b style="font-family:inherit">Email</b><br /><a href="mailto:hello@saasuluk.dev">hello@saasuluk.dev</a></p>
+    </div>
+  </div>
+  <script is:inline>
+    (function () {
+      var el = document.getElementById("map"); if (!el) return;
+      var COORD = [37.7749, -122.4194]; // demo location (a template owner sets their own)
+      function init() {
+        if (!window.L) return;
+        var map = L.map("map", { scrollWheelZoom: false }).setView(COORD, 11);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 18 }).addTo(map);
+        L.marker(COORD).addTo(map).bindPopup("saasuluk — on the edge");
+        setTimeout(function () { map.invalidateSize(); }, 250);
+      }
+      var css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
+      var js = document.createElement("script"); js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.crossOrigin = ""; js.onload = init; document.head.appendChild(js);
+    })();
+  </script>
   <script is:inline>
     document.getElementById("contact").addEventListener("submit", async (e) => {
       e.preventDefault();
