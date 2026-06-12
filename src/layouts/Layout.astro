@@ -198,6 +198,20 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .mobilenav nav a { color:var(--fg); padding:11px 14px; border-radius:9px; font-weight:500; font-size:15px; }
       .mobilenav nav a:hover, .mobilenav nav a.on { background:var(--bg-soft); text-decoration:none; }
       .mobilenav nav a.on { color:var(--accent); }
+      /* ⌘K command palette (centered modal) */
+      .palette-btn { font-size:14px; }
+      .paletteback { position:fixed; inset:0; z-index:50; background:rgba(8,8,20,.42); backdrop-filter:blur(2px); opacity:0; transition:opacity .18s ease; }
+      .paletteback.open { opacity:1; }
+      .palette { position:fixed; top:13vh; left:50%; transform:translateX(-50%) translateY(-8px); z-index:51; width:min(560px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 24px 70px rgba(16,16,40,.3); overflow:hidden; opacity:0; transition:opacity .18s ease, transform .18s ease; }
+      .palette.open { opacity:1; transform:translateX(-50%) translateY(0); }
+      .palette input { width:100%; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:15px 18px; font-size:16px; background:transparent; }
+      .palette input:focus-visible { outline:none; box-shadow:none; }
+      .palette-results { list-style:none; margin:0; padding:6px; max-height:52vh; overflow-y:auto; }
+      .palette-item { display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:9px; cursor:pointer; font-size:14.5px; }
+      .palette-item.on, .palette-item:hover { background:var(--bg-soft); }
+      .palette-type { font-size:11px; font-weight:600; color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); padding:2px 7px; border-radius:999px; white-space:nowrap; }
+      .palette-empty { padding:16px 14px; color:var(--muted); font-size:14px; }
+      .palette-foot { border-top:1px solid var(--line); padding:8px 14px; color:var(--muted); font-size:12px; background:var(--bg-soft); }
       @media (max-width:560px){ #scheme{display:none} } /* keep the chrome uncrowded on small phones */
       /* toasts (bottom-inline-end stack; logical props → flips for RTL) */
       .toasts { position:fixed; bottom:20px; inset-inline-end:20px; z-index:60; display:flex; flex-direction:column; gap:10px; max-width:min(360px,calc(100vw - 40px)); pointer-events:none; }
@@ -225,6 +239,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
         <div class="chrome">
           <button id="navtoggle" class="iconbtn navtoggle" aria-label="Menu" aria-expanded="false" aria-controls="mobilenav" aria-haspopup="dialog">☰</button>
+          <button id="palette-open" class="iconbtn palette-btn" aria-label="Search" title="Search (⌘K)" aria-haspopup="dialog" aria-controls="palette">🔍</button>
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
           <select id="scheme" aria-label="Color scheme" title="Color scheme"><option value="">Indigo</option>{ALT_SCHEMES.map((s) => <option value={s.name}>{s.label}</option>)}</select>
           <button id="theme" class="iconbtn" aria-label="Toggle theme">◐</button>
@@ -252,6 +267,13 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       </div>
     </footer>
     <!-- cart drawer (populated by the bundled @suluk/nano-stores module below) -->
+    <!-- ⌘K command palette (global search-and-jump over /search) -->
+    <div id="paletteback" class="paletteback" hidden></div>
+    <div id="palette" class="palette" role="dialog" aria-modal="true" aria-label="Search" aria-hidden="true" hidden>
+      <input id="palette-input" type="search" placeholder="Search products & posts…" aria-label="Search" autocomplete="off" />
+      <ul id="palette-results" class="palette-results" role="listbox"></ul>
+      <div class="palette-foot">↑↓ navigate · ↵ open · esc close</div>
+    </div>
     <!-- mobile navigation drawer (the desktop nav is hidden < 760px; @suluk/nano-stores createDrawer drives it) -->
     <div id="navback" class="cartback" hidden></div>
     <aside id="mobilenav" class="mobilenav" role="dialog" aria-modal="true" aria-label="Navigation" aria-hidden="true" hidden>
@@ -275,6 +297,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <script>import "../client/cart";</script>
     <script>import "../client/toast";</script>
     <script>import "../client/ux";</script>
+    <script>import "../client/palette";</script>
     <script is:inline>
       if (window.__applyLang) window.__applyLang(window.__lang0);
       (function () {
