@@ -45,12 +45,12 @@ function collectAssets(dir: string): AssetFile[] {
 }
 
 const migrationsDir = join(root, "migrations");
-const migrationsSql = existsSync(migrationsDir)
-  ? readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort().map((f) => readFileSync(join(migrationsDir, f), "utf8"))
+const migrations = existsSync(migrationsDir)
+  ? readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort().map((f) => ({ name: f, sql: readFileSync(join(migrationsDir, f), "utf8") }))
   : [];
 
 const assets = collectAssets(assetsDir);
-console.log(`Deploying saasuluk — ${assets.length} assets, ${migrationsSql.length} migration(s)…`);
+console.log(`Deploying saasuluk — ${assets.length} assets, ${migrations.length} migration(s)…`);
 
 const res = await deployWith(
   { apiToken: token, accountId: process.env.CLOUDFLARE_ACCOUNT_ID },
@@ -59,7 +59,7 @@ const res = await deployWith(
     module: readFileSync(workerPath, "utf8"),
     compatibilityDate: "2026-06-01",
     compatibilityFlags: ["nodejs_compat"],
-    d1: { binding: "DB", databaseName: "saasuluk-db", migrationsSql },
+    d1: { binding: "DB", databaseName: "saasuluk-db", migrations },
     assets,
     assetsConfig: { html_handling: "auto-trailing-slash" },
     vars: {
