@@ -212,6 +212,11 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .palette-type { font-size:11px; font-weight:600; color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); padding:2px 7px; border-radius:999px; white-space:nowrap; }
       .palette-empty { padding:16px 14px; color:var(--muted); font-size:14px; }
       .palette-foot { border-top:1px solid var(--line); padding:8px 14px; color:var(--muted); font-size:12px; background:var(--bg-soft); }
+      /* stat bento (landing) */
+      .statbento { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; }
+      .stat { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 18px; text-align:center; box-shadow:var(--shadow); }
+      .stat b { display:block; font-size:34px; font-weight:800; letter-spacing:-.03em; background:linear-gradient(115deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+      .stat span { color:var(--muted); font-size:13px; }
       @media (max-width:560px){ #scheme{display:none} } /* keep the chrome uncrowded on small phones */
       /* toasts (bottom-inline-end stack; logical props → flips for RTL) */
       .toasts { position:fixed; bottom:20px; inset-inline-end:20px; z-index:60; display:flex; flex-direction:column; gap:10px; max-width:min(360px,calc(100vw - 40px)); pointer-events:none; }
