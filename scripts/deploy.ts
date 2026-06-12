@@ -1,0 +1,86 @@
+/**
+ * saasuluk → Cloudflare, the @suluk/cloudflare way (no wrangler): reads the built worker + static assets + D1
+ * migrations from disk and runs one API-driven deploy() that provisions D1, uploads assets, deploys the worker with
+ * its bindings/vars, and pushes secrets from the environment. Run: `bun run deploy:cf` (it builds first).
+ *
+ * Needs CLOUDFLARE_API_TOKEN in .env — an Account-scoped token with: Workers Scripts (Edit), D1 (Edit), and Account
+ * Settings (Read). Optional: CLOUDFLARE_ACCOUNT_ID (else the token's first account is used).
+ */
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { join, relative, sep } from "node:path";
+import { deployWith, type AssetFile } from "@suluk/cloudflare";
+
+const token = process.env.CLOUDFLARE_API_TOKEN;
+if (!token) {
+  console.error("✗ Set CLOUDFLARE_API_TOKEN in saasuluk/.env (Account: Workers Scripts Edit, D1 Edit, Account Settings Read).");
+  process.exit(1);
+}
+
+const root = new URL("..", import.meta.url).pathname;
+const workerPath = join(root, "worker/dist/worker.js");
+const assetsDir = join(root, "dist/client");
+if (!existsSync(workerPath) || !existsSync(assetsDir)) {
+  console.error("✗ Build first: `bun run build && bun run build:worker` (or use `bun run deploy:cf`).");
+  process.exit(1);
+}
+
+const CONTENT_TYPE: Record<string, string> = {
+  ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json",
+  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
+  ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".txt": "text/plain", ".xml": "application/xml",
+  ".webmanifest": "application/manifest+json", ".map": "application/json", ".wasm": "application/wasm",
+};
+const ctype = (p: string): string => CONTENT_TYPE[p.slice(p.lastIndexOf(".")).toLowerCase()] ?? "application/octet-stream";
+
+function collectAssets(dir: string): AssetFile[] {
+  const out: AssetFile[] = [];
+  (function walk(d: string) {
+    for (const name of readdirSync(d)) {
+      const full = join(d, name);
+      if (statSync(full).isDirectory()) walk(full);
+      else out.push({ path: "/" + relative(dir, full).split(sep).join("/"), bytes: new Uint8Array(readFileSync(full)), contentType: ctype(full) });
+    }
+  })(dir);
+  return out;
+}
+
+const migrationsDir = join(root, "migrations");
+const migrationsSql = existsSync(migrationsDir)
+  ? readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort().map((f) => readFileSync(join(migrationsDir, f), "utf8"))
+  : [];
+
+const assets = collectAssets(assetsDir);
+console.log(`Deploying saasuluk — ${assets.length} assets, ${migrationsSql.length} migration(s)…`);
+
+const res = await deployWith(
+  { apiToken: token, accountId: process.env.CLOUDFLARE_ACCOUNT_ID },
+  {
+    scriptName: "saasuluk",
+    module: readFileSync(workerPath, "utf8"),
+    compatibilityDate: "2026-06-01",
+    compatibilityFlags: ["nodejs_compat"],
+    d1: { binding: "DB", databaseName: "saasuluk-db", migrationsSql },
+    assets,
+    assetsConfig: { html_handling: "auto-trailing-slash" },
+    vars: {
+      STRIPE_METER_EVENT_NAME: process.env.STRIPE_METER_EVENT_NAME ?? "saasuluk_cost",
+      STRIPE_METERED_PRICE_ID: process.env.STRIPE_METERED_PRICE_ID ?? "",
+    },
+    secrets: {
+      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+      RESEND_API_KEY: process.env.RESEND_API_KEY,
+      EMAIL_FROM: process.env.EMAIL_FROM,
+    },
+    crons: ["0 * * * *"],
+    observability: true,
+  },
+  (m) => console.log("  " + m),
+);
+
+console.log(`\n✓ Deployed "${res.scriptName}" to account ${res.accountId}`);
+console.log(`  D1: ${res.d1?.id ?? "—"} · assets: ${res.assetsUploaded} · secrets: ${res.secretsSet.join(", ") || "none"} · crons: ${res.crons.join(" ") || "none"}`);
+console.log("  Live at your configured route (e.g. https://saasuluk.saastemly.com).");
