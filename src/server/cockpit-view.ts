@@ -8,7 +8,7 @@
  */
 import type { OpenAPIv4Document } from "@suluk/core";
 import { convergeContract, contractGates, shipSummary, contractToD2, diagramViews } from "@suluk/cockpit";
-import { knownWidgets, renderPrimitiveHtml, primitiveCss } from "@suluk/visual";
+import { knownWidgets, renderPrimitiveHtml } from "@suluk/visual";
 
 const esc = (s: string): string => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const DOT: Record<string, string> = { ok: "#16a34a", warn: "#d97706", error: "#dc2626", todo: "#d97706", info: "#64748b" };
@@ -27,7 +27,9 @@ export function renderCockpitPage(document: OpenAPIv4Document): string {
     ? conv.findings.map((f) => `<li><span class="tag tag-${f.severity}">${esc(f.severity)}</span> ${esc(f.message)}${f.where ? ` <code>${esc(f.where)}</code>` : ""}</li>`).join("")
     : `<li class="ok">✓ The contract is self-consistent — no dangling refs, undeclared schemes, orphan scopes or empty paths.</li>`;
   const diagramCards = diagrams.map((d) => `<figure><figcaption><b>${esc(d.title)}</b><span class="muted"> — ${esc(d.description)}</span></figcaption><pre class="d2" data-kroki>${esc(d.d2)}</pre></figure>`).join("");
-  const primitiveCards = widgets.map((w) => `<div class="prim"><span class="muted">${esc(w)}</span>${renderPrimitiveHtml({ widget: w })}</div>`).join("");
+  // renderPrimitiveHtml returns a FULL html doc (its own white-theme <style>) — isolate each in an iframe so its
+  // body{color} reset can't leak into this dark page; the iframe provides the intended white preview surface.
+  const primitiveCards = widgets.map((w) => `<div class="prim"><span class="muted">${esc(w)}</span><iframe loading="lazy" sandbox="" title="${esc(w)} primitive" srcdoc="${esc(renderPrimitiveHtml({ widget: w }))}"></iframe></div>`).join("");
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Cockpit — saasuluk</title>
@@ -50,7 +52,7 @@ export function renderCockpitPage(document: OpenAPIv4Document): string {
   pre.d2 { margin:10px 0 0; padding:12px 14px; background:#0a0e17; border:1px solid var(--line); border-radius:10px; overflow-x:auto; font-family:ui-monospace,SFMono-Regular,monospace; font-size:12.5px; color:#cbd5e1; }
   .svgwrap { margin-top:10px; background:#fff; border-radius:10px; padding:10px; } .svgwrap svg { max-width:100%; height:auto; display:block; }
   .prims { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; } .prim { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; } .prim .muted { font-size:12px; display:block; margin-bottom:8px; }
-  ${primitiveCss()}
+  .prim iframe { width:100%; height:72px; border:1px solid var(--line); border-radius:8px; background:#fff; display:block; }
 </style></head>
 <body><div class="wrap">
   <div class="nav"><a href="/superadmin">← Admin</a><a href="/reference">Reference</a><a href="/scalar">Scalar</a><a href="/swagger">Swagger</a><a href="/openapi.json">openapi.json</a></div>
