@@ -33,6 +33,7 @@ import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal } from "./operations";
 import { isAdmin, superadminEmails } from "./access";
 import { renderCockpitPage } from "./cockpit-view";
+import { themeHeadHtml } from "../themes/head";
 import { accessIndex } from "./access-facet";
 import { configHealth, renderConfigHealth, loadConfig } from "./env";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "./project";
@@ -116,7 +117,7 @@ export async function createApp() {
     for (const e of events) { const o = (opStats[e.operation] ??= { count: 0, totalMicroUsd: 0 }); o.count++; o.totalMicroUsd += e.totalMicroUsd; }
     return c.json({ ...summarize(events), opStats });
   });
-  app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c) })); // /superadmin (verified session, not a header)
+  app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // /superadmin (verified session, not a header)
   app.get("/config", (c) => {                                                                   // config health (@suluk/env) — one registry, projected
     if (!isAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const h = configHealth(process.env as Record<string, string | undefined>);

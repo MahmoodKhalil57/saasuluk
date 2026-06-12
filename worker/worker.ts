@@ -21,6 +21,7 @@ import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from
 import { scalarResponse } from "@suluk/scalar";
 import { swaggerResponse } from "@suluk/swagger";
 import { renderCockpitPage } from "../src/server/cockpit-view";
+import { themeHeadHtml } from "../src/themes/head";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
@@ -196,7 +197,7 @@ app.get("/cost", async (c) => {
 
 // the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker. Gated on a VERIFIED
 // superadmin session (SUPERADMIN_EMAILS), not a spoofable header — it surfaces the whole store's cost ledger.
-app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => isAdmin(c as unknown as Context) }));
+app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml() }));
 
 // config health (@suluk/env) — one declared registry (src/server/env.ts) projected into the admin surface. The
 // browser gets the premium HTML panel; an API client gets JSON. Values are NEVER returned — presence only.
