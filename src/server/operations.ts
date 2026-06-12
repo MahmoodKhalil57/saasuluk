@@ -11,7 +11,7 @@ import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
 import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
-import { customerParams, subscriptionParams, meterEventParams, computeDiscountAmount, type Discount } from "@suluk/stripe";
+import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, type Discount } from "@suluk/stripe";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
@@ -85,6 +85,18 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
   return changed;
 }
 
+/** Get-or-create the signed-in principal's Stripe customer, recorded on their billing_account row. ONE customer
+ *  per user underpins both card-saving at checkout (the saved card attaches here) and the billing portal (which
+ *  lists that customer's cards + invoices). Usage billing's connect flow tops up a subscription on the SAME row. */
+export async function ensureStripeCustomer(dz: Dz, key: string, who: string, email?: string): Promise<string> {
+  const existing = await dz.select().from(billingAccount).where(eq(billingAccount.principal, who)).get();
+  if (existing?.stripeCustomerId) return existing.stripeCustomerId;
+  const customer = await restStripe(key).customers.create(customerParams({ email, metadata: { principal: who } }));
+  if (existing) await dz.update(billingAccount).set({ stripeCustomerId: customer.id }).where(eq(billingAccount.id, existing.id)).run();
+  else await dz.insert(billingAccount).values({ principal: who, stripeCustomerId: customer.id, subscriptionId: null, lastReportedMicroUsd: 0, createdAt: Date.now() }).run();
+  return customer.id;
+}
+
 /** Resolve an `Authorization: Bearer sk_…` header to the owning userId via the api_token table (or null). */
 export async function verifyApiToken(dz: { select: (...a: unknown[]) => any }, authHeader: string | undefined): Promise<string | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const m = /^Bearer\s+(sk_[A-Za-z0-9_]+)$/.exec(authHeader ?? "");
@@ -130,7 +142,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30),
-  connectBilling: write(60), reportUsage: write(40),
+  connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40),
 };
 
 // typed input bodies for the custom ops with REAL bounds (validations.ts) — a bare {type:"object"} is a free-form bag.
@@ -157,6 +169,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: obj({ orderId: v.int(1, ID), sessionId: v.line(255, "^[A-Za-z0-9_]+$") }, ["orderId", "sessionId"]) }) } },
   "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: v.email() }) }) } },
   "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object", additionalProperties: false } }) } },
+  "billing/portal": { requests: { openBillingPortal: jsonOp("post", "Open the Stripe customer billing portal (manage saved cards + invoices)", { body: { type: "object", additionalProperties: false } }) } },
 };
 
 // HARDEN the custom-op inputs (the answer to @suluk/harden's findings): bound strings/numbers/arrays + close objects.
@@ -360,6 +373,17 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     form.set("cancel_url", `${origin}/checkout`);
     form.set("client_reference_id", String(orderId));
     form.set("metadata[orderId]", String(orderId));
+    // CARD-SAVING: for a signed-in shopper, attach their Stripe customer + save the payment method for future
+    // on-session reuse, so the card they pay with shows up in the billing portal. Defensive — a customer hiccup
+    // (e.g. Stripe blip) must never block the sale, so we fall back to an anonymous Checkout Session.
+    const who = principal(c);
+    if (who) {
+      try {
+        const customerId = await ensureStripeCustomer(dz, key, who);
+        form.set("customer", customerId);
+        form.set("payment_intent_data[setup_future_usage]", "on_session");
+      } catch { /* anonymous checkout — the sale still completes, just without a saved card */ }
+    }
     // no discount + every line has a catalog Price → charge the real Prices (Stripe shows the products). Otherwise
     // a single line item at the SERVER-recomputed (discounted) total — never a client-supplied amount.
     const useCatalog = !disc.valid && lines.every((l) => l.stripePriceId);
@@ -403,17 +427,16 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const who = principal(c);
     if (!who) return c.json({ error: "Sign in first." }, 401);
     const dz = dbFor(c);
-    const existing = await dz.select().from(billingAccount).where(eq(billingAccount.principal, who)).get();
-    if (existing?.stripeCustomerId) return c.json({ connected: true, already: true, customerId: existing.stripeCustomerId, subscriptionId: existing.subscriptionId });
     const body = (await c.req.json().catch(() => ({}))) as { email?: string };
-    const stripe = restStripe(key);
-    const customer = await stripe.customers.create(customerParams({ email: body.email, metadata: { principal: who } }));
+    // ONE Stripe customer per user (shared with checkout card-saving + the portal); connect just adds the metered sub.
+    const customerId = await ensureStripeCustomer(dz, key, who, body.email);
+    const acct = await dz.select().from(billingAccount).where(eq(billingAccount.principal, who)).get();
+    if (acct?.subscriptionId) return c.json({ connected: true, already: true, customerId, subscriptionId: acct.subscriptionId });
     let subscriptionId: string | null = null;
     // metered subs bill at period end; default_incomplete avoids an upfront charge so it works without a card (test mode)
-    try { const sub = await stripe.subscriptions.create({ ...subscriptionParams({ customerId: customer.id, priceId }), payment_behavior: "default_incomplete" }); subscriptionId = (sub as { id: string }).id; } catch { /* customer still meters */ }
-    if (existing) await dz.update(billingAccount).set({ stripeCustomerId: customer.id, subscriptionId }).where(eq(billingAccount.id, existing.id)).run();
-    else await dz.insert(billingAccount).values({ principal: who, stripeCustomerId: customer.id, subscriptionId, lastReportedMicroUsd: 0, createdAt: Date.now() }).run();
-    return c.json({ connected: true, customerId: customer.id, subscriptionId });
+    try { const sub = await restStripe(key).subscriptions.create({ ...subscriptionParams({ customerId, priceId }), payment_behavior: "default_incomplete" }); subscriptionId = (sub as { id: string }).id; } catch { /* customer still meters */ }
+    await dz.update(billingAccount).set({ subscriptionId }).where(eq(billingAccount.principal, who)).run();
+    return c.json({ connected: true, customerId, subscriptionId });
   };
 
   const reportUsage = async (c: Context) => {
@@ -425,6 +448,24 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const r = await reportPrincipalUsage(dbFor(c), { key, eventName, principal: who });
     if (r.reason === "not connected") return c.json({ error: "Connect usage billing first.", connected: false }, 409);
     return c.json({ ...r, valueMicroUsd: r.deltaMicroUsd, eventName }); // delta = only the NEW usage since last report
+  };
+
+  // Open the Stripe-hosted billing portal: the customer manages saved cards + sees invoices, no PCI surface of ours.
+  const openBillingPortal = async (c: Context) => {
+    const key = secret(c, "STRIPE_SECRET_KEY");
+    if (!key) return c.json({ error: "Stripe is not configured (set STRIPE_SECRET_KEY)." }, 503);
+    const who = principal(c);
+    if (!who) return c.json({ error: "Sign in first." }, 401);
+    const dz = dbFor(c);
+    const customerId = await ensureStripeCustomer(dz, key, who); // one customer per user — created on first portal/checkout
+    const returnUrl = `${new URL(c.req.url).origin}/account`;
+    try {
+      const session = await restStripe(key).billingPortal!.sessions.create(billingPortalSessionParams({ customerId, returnUrl }));
+      return c.json({ url: session.url });
+    } catch (e) {
+      // the portal needs a one-time activation in the Stripe dashboard (Settings → Billing → Customer portal).
+      return c.json({ error: (e as Error).message || "Could not open the billing portal.", needsPortalConfig: true }, 502);
+    }
   };
 
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
@@ -459,4 +500,5 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.post("/checkout/confirm", confirmCheckout);
   app.post("/billing/connect", connectBilling);
   app.post("/billing/report", reportUsage);
+  app.post("/billing/portal", openBillingPortal);
 }

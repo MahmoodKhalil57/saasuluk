@@ -32,6 +32,13 @@ import Layout from "../layouts/Layout.astro";
     <div id="sessions"></div>
     <button class="btn ghost sm" id="signout-all" style="margin-top:8px">Sign out of all other devices</button>
 
+    <h2>Billing &amp; payment methods</h2>
+    <div class="card">
+      <p style="margin:0 0 12px">Manage your saved cards, view invoices and update billing details on Stripe's secure, hosted portal — no card data ever touches saasuluk.</p>
+      <button class="btn" id="billing-portal">Manage billing &amp; cards →</button>
+      <span id="billmsg" style="color:var(--muted); font-size:13px; margin-inline-start:10px"></span>
+    </div>
+
     <h2 style="color:#e5484d; margin-top:34px">Danger zone</h2>
     <div class="card" style="border-color:color-mix(in srgb,#e5484d 28%,var(--line))">
       <p style="margin:0 0 12px">Permanently delete your account and all your data — orders, wishlist, API tokens, billing. This cannot be undone.</p>
@@ -101,6 +108,18 @@ import Layout from "../layouts/Layout.astro";
       document.getElementById("signout-all")?.addEventListener("click", async () => {
         await fetch("/api/auth/revoke-other-sessions", { method: "POST", credentials: "same-origin" }); loadSessions();
         if (window.toast) window.toast("Signed out other devices.", { type: "success" });
+      });
+      // Billing portal — the session cookie (credentials) identifies the principal; redirect to Stripe's hosted page.
+      document.getElementById("billing-portal")?.addEventListener("click", async (e) => {
+        const btn = e.currentTarget, msg = document.getElementById("billmsg");
+        btn.disabled = true; msg.textContent = "Opening Stripe…";
+        try {
+          const r = await fetch("/billing/portal", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: "{}" });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.url) { location.href = d.url; return; }
+          msg.textContent = d.needsPortalConfig ? "Billing portal isn't activated yet — enable it in the Stripe dashboard." : (d.error || "Could not open billing.");
+        } catch (err) { msg.textContent = "Could not open billing — please try again."; }
+        finally { btn.disabled = false; }
       });
       const ds = document.getElementById("del-start"), dc = document.getElementById("del-confirm");
       ds?.addEventListener("click", () => { ds.style.display = "none"; dc.style.display = "flex"; });

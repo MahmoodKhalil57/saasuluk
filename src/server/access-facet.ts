@@ -26,6 +26,7 @@ const OP_ACCESS: Record<string, AccessFacet> = {
   markReviewHelpful: { requires: "authenticated" },
   createToken: { requires: "authenticated" }, revokeToken: { requires: "authenticated", scope: "owner" },
   connectBilling: { requires: "authenticated" }, reportUsage: { requires: "authenticated", scope: "owner" },
+  openBillingPortal: { requires: "authenticated" },
 };
 
 /** Annotate every operation with x-suluk-access, derived from the same registry that drives enforcement. In place. */

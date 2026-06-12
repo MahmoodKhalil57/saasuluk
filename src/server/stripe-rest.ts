@@ -45,6 +45,7 @@ export function restStripe(key: string): StripeLike {
       meters: { create: (p) => post("billing/meters", p) },
       meterEvents: { create: (p) => post("billing/meter_events", p) },
     },
+    billingPortal: { sessions: { create: (p) => post("billing_portal/sessions", p) } },
     // verifyWebhook isn't used on the Worker (it has its own Web-Crypto HMAC check) — stub to satisfy the type.
     webhooks: { constructEvent: () => { throw new Error("constructEvent not supported by the REST adapter"); } },
   } as StripeLike;
