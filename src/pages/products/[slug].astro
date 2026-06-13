@@ -1,48 +1,102 @@
 ---
 export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
-import { SEED_PRODUCTS, SEED_REVIEWS } from "../../server/seed";
+import { SEED_PRODUCTS, SEED_VARIANTS, SEED_REVIEWS, type SeedImage } from "../../server/seed";
 import { product as productSchema, breadcrumb } from "@suluk/seo";
 export function getStaticPaths() {
-  return SEED_PRODUCTS.map((p) => ({ params: { slug: p.slug }, props: { product: p } }));
+  return SEED_PRODUCTS.map((p) => ({ params: { slug: p.slug }, props: { product: p, variants: SEED_VARIANTS.filter((v) => v.productId === p.id) } }));
 }
-const { product } = Astro.props;
+const { product, variants } = Astro.props;
 const money = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
-// Product + breadcrumb structured data → rich results (price · availability · rating). Prerendered from the seed,
-// so it matches what's rendered; @suluk/seo nodes compose into the Layout's single schema.org @graph.
-// NB: keep every `/` division on its OWN line — Astro's frontmatter tokenizer mis-reads `a / b` as a regex start
-// when a slash-bearing template literal (`${base}/...`) follows on the SAME line, which desyncs the compiler.
+const moneyOrFree = (c: number) => (c === 0 ? "Free" : money(c));
+// gallery: the product's images (or the slug-derived single image as a fallback).
+const images: SeedImage[] = (product.images && product.images.length) ? product.images : [{ url: `/img/products/${product.slug}.jpg`, alt: product.name }];
+const hasVariants = variants.length > 0;
+// option DIMENSIONS (e.g. "Color" → [Black, White], "Tier" → [Personal, Team, Enterprise]) — preserve first-seen order.
+const dimMap = new Map<string, string[]>();
+for (const v of variants) for (const o of v.options) { const arr = dimMap.get(o.label) ?? []; if (!arr.includes(o.value)) arr.push(o.value); dimMap.set(o.label, arr); }
+const dimList = [...dimMap.entries()].map(([label, values]) => ({ label, values }));
+const variantPrices = variants.filter((v) => v.priceCentsEnabled).map((v) => v.priceCents);
+const minPrice = variantPrices.length ? Math.min(...variantPrices) : product.priceCents;
+const maxPrice = variantPrices.length ? Math.max(...variantPrices) : product.priceCents;
+// a range when the variants span prices ("Free – $299.00"), a single price when they don't, else the base price.
+const priceLabel = hasVariants && variantPrices.length
+  ? (minPrice === maxPrice ? moneyOrFree(minPrice) : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`)
+  : moneyOrFree(product.priceCents);
+// SEO/structured data — see the slash-on-its-own-line note below; keep `${base}/...` off shared lines.
 const base = Astro.site ? Astro.site.href.replace(/\/$/, "") : "";
 const url = `${base}/products/${product.slug}`;
-const img = `${base}/img/products/${product.slug}.jpg`;
+const img = `${base}${images[0].url}`;
 const reviews = SEED_REVIEWS.filter((r) => r.productId === product.id);
 const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
 const rating = reviews.length ? { ratingValue: Number(avg.toFixed(1)), reviewCount: reviews.length } : undefined;
-const priceUsd = product.priceCents / 100;
+const offerPrice = (variantPrices.length ? minPrice : product.priceCents) / 100;
 const productNodes = [
   productSchema({ name: product.name, description: product.description, image: img, sku: `SAAS-${product.id}`, url,
-    offers: { price: priceUsd, currency: "USD", availability: product.inventory > 0 ? "InStock" : "OutOfStock", url }, rating }),
+    offers: { price: offerPrice, currency: "USD", availability: product.inventory > 0 || hasVariants ? "InStock" : "OutOfStock", url }, rating }),
   breadcrumb([{ name: "Store", url: `${base}/products` }, { name: product.name, url }]),
 ];
 ---
 <Layout title={`${product.name} — saasuluk`} description={product.description} image={img} ogType="product" jsonLd={productNodes}>
+  <!-- is:global so the rules also apply to thumbnails the gallery REBUILDS via innerHTML at runtime (a scoped
+       style only matches build-time elements; runtime-injected ones lack the scope attribute → would be unstyled). -->
+  <style is:global>
+    .gthumb { width:60px; height:60px; border-radius:10px; overflow:hidden; border:2px solid var(--line); padding:0; cursor:pointer; background:none; flex:none; }
+    .gthumb.on { border-color:var(--accent); }
+    .gthumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .vopt { border:1px solid var(--line); background:var(--bg-soft); color:var(--fg); border-radius:9px; padding:8px 14px; font:inherit; font-size:14px; cursor:pointer; }
+    .vopt:hover { border-color:color-mix(in srgb,var(--accent) 40%,var(--line)); }
+    .vopt.on { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); font-weight:600; }
+    .vdim-label { font-size:13px; font-weight:600; color:var(--muted); margin-bottom:7px; }
+  </style>
   <p style="margin:6px 0 14px"><a href="/products" class="pill">← Store</a></p>
-  <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start">
-    <div style="width:300px; max-width:100%; aspect-ratio:1; border-radius:18px; overflow:hidden; border:1px solid var(--line)">
-      <img src={`/img/products/${product.slug}.jpg`} alt={product.name} style="width:100%; height:100%; object-fit:cover; display:block" />
+  <div style="display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start">
+    <div style="width:400px; max-width:100%">
+      <div style="aspect-ratio:1; border-radius:18px; overflow:hidden; border:1px solid var(--line)">
+        <img id="gmain-img" src={images[0].url} alt={product.name} style="width:100%; height:100%; object-fit:cover; display:block" />
+      </div>
+      {images.length > 1 && (
+        <div id="gthumbs" style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+          {images.map((im, i) => (
+            <button class:list={["gthumb", { on: i === 0 }]} data-i={i} aria-label={`View image ${i + 1}`}>
+              <img src={im.url} alt={im.alt ?? ""} loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
     <div style="flex:1; min-width:280px">
-      <span class="pill accent">{product.priceCents === 0 ? "Open source" : "One-time · lifetime"}</span>
+      <span class="pill accent">{product.priceCents === 0 && !hasVariants ? "Open source" : hasVariants ? "Choose your options" : "One-time · lifetime"}</span>
       <h1 style="margin:12px 0 8px">{product.name}</h1>
       <p class="tag" style="font-size:17px">{product.description}</p>
-      <p style="font-size:36px; font-weight:800; letter-spacing:-.03em; margin:16px 0 6px">{money(product.priceCents)}</p>
+      <p id="price" style="font-size:36px; font-weight:800; letter-spacing:-.03em; margin:16px 0 6px">{priceLabel}</p>
+      {hasVariants && (
+        <div id="variant-selector" style="margin:18px 0">
+          {dimList.map((d) => (
+            <div style="margin-bottom:12px">
+              <div class="vdim-label">{d.label}</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap">
+                {d.values.map((val) => <button class="vopt" data-label={d.label} data-value={val} type="button">{val}</button>)}
+              </div>
+            </div>
+          ))}
+          <p id="variant-stock" style="font-size:13px; color:var(--muted); margin-top:4px"></p>
+        </div>
+      )}
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px">
-        <button class="btn" id="add">Add to cart</button>
+        <button class="btn" id="add">{hasVariants ? "Select options" : "Add to cart"}</button>
         <a class="btn ghost" href="/checkout">Go to checkout →</a>
       </div>
       <p id="cartmsg" style="color:var(--accent); font-size:14px; margin-top:10px"></p>
     </div>
   </div>
+
+  {product.longDescription && (
+    <section style="margin-top:34px; max-width:760px">
+      <h2>Details</h2>
+      <p class="tag" style="font-size:16px; white-space:pre-line" set:html={product.longDescription.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")} />
+    </section>
+  )}
 
   <h2>Reviews</h2>
   <div id="reviews"><p style="color:var(--muted)">Loading reviews…</p></div>
@@ -55,40 +109,108 @@ const productNodes = [
   <h2>You might also like</h2>
   <div class="grid" id="related"></div>
 
-  <script is:inline define:vars={{ product }}>
+  <script is:inline define:vars={{ product, variants, baseImages: images }}>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
+    const moneyOrFree = (c) => (Number(c) === 0 ? "Free" : money(c));
     const esc = (s) => String(s || "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
+    const dims = [...new Set(variants.flatMap((v) => v.options.map((o) => o.label)))];
+    const variantPrices = variants.filter((v) => v.priceCentsEnabled).map((v) => v.priceCents);
+    const minPrice = variantPrices.length ? Math.min(...variantPrices) : product.priceCents;
+    const maxPrice = variantPrices.length ? Math.max(...variantPrices) : product.priceCents;
+    const rangeLabel = () => (variantPrices.length ? (minPrice === maxPrice ? moneyOrFree(minPrice) : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`) : moneyOrFree(product.priceCents));
+    const sel = {};
+    let curImgs = baseImages;
+
+    const priceOf = (v) => (v && v.priceCentsEnabled ? v.priceCents : product.priceCents);
+    const matchVariant = () => {
+      if (!variants.length) return null;
+      if (dims.some((d) => !sel[d])) return null; // not every dimension chosen yet
+      return variants.find((v) => v.options.every((o) => sel[o.label] === o.value)) || null;
+    };
+
+    const gmain = () => document.getElementById("gmain-img");
+    function setGallery(imgs) {
+      const next = (imgs && imgs.length) ? imgs : baseImages;
+      // only rebuild the thumb strip when the image SET actually changed (a variant with its own gallery) — this
+      // avoids churning the server-rendered thumbs on the initial render + on same-image variant picks.
+      const sameSet = next.length === curImgs.length && next.every((im, i) => im.url === curImgs[i].url);
+      curImgs = next;
+      if (gmain() && curImgs[0]) gmain().src = curImgs[0].url;
+      const tb = document.getElementById("gthumbs");
+      if (tb && !sameSet) {
+        tb.innerHTML = curImgs.map((im, i) => `<button class="gthumb${i === 0 ? " on" : ""}" data-i="${i}" aria-label="View image ${i + 1}"><img src="${esc(im.url)}" alt="${esc(im.alt || "")}" loading="lazy" /></button>`).join("");
+        bindThumbs();
+      }
+    }
+    function bindThumbs() {
+      document.querySelectorAll(".gthumb").forEach((b) => b.addEventListener("click", () => {
+        const i = Number(b.dataset.i);
+        if (gmain() && curImgs[i]) gmain().src = curImgs[i].url;
+        document.querySelectorAll(".gthumb").forEach((x) => x.classList.toggle("on", x === b));
+      }));
+    }
+
+    function update() {
+      const v = matchVariant();
+      const priceEl = document.getElementById("price");
+      if (variants.length) {
+        if (v) priceEl.textContent = moneyOrFree(priceOf(v));
+        else priceEl.textContent = rangeLabel();
+        setGallery(v && v.images && v.images.length ? v.images : baseImages);
+        const addBtn = document.getElementById("add"), stockEl = document.getElementById("variant-stock");
+        if (!v) { addBtn.disabled = true; addBtn.textContent = "Select options"; if (stockEl) stockEl.textContent = ""; }
+        else if (Number(v.inventory) <= 0) { addBtn.disabled = true; addBtn.textContent = "Sold out"; if (stockEl) stockEl.textContent = "Out of stock"; }
+        else { addBtn.disabled = false; addBtn.textContent = "Add to cart"; if (stockEl) stockEl.textContent = Number(v.inventory) < 10 ? `Only ${v.inventory} left` : "In stock"; }
+      }
+    }
+
+    document.querySelectorAll(".vopt").forEach((b) => b.addEventListener("click", () => {
+      const { label, value } = b.dataset;
+      sel[label] = sel[label] === value ? undefined : value; // toggle
+      document.querySelectorAll(`.vopt[data-label="${CSS.escape(label)}"]`).forEach((x) => x.classList.toggle("on", x.dataset.value === sel[label]));
+      update();
+    }));
+    bindThumbs();
+
     document.getElementById("add").addEventListener("click", () => {
+      const v = matchVariant();
+      if (variants.length && !v) return; // button is disabled in this state, defensive
+      const price = priceOf(v);
+      const imgs = (v && v.images && v.images.length) ? v.images : baseImages;
+      const image = imgs[0] && imgs[0].url;
+      const line = { productId: product.id, qty: 1, priceCents: price, name: product.name, image };
+      if (v) { line.variantId = v.id; line.variantLabel = v.title; }
       const c = JSON.parse(localStorage.getItem("cart") || "[]");
-      const ex = c.find((i) => i.productId === product.id && i.variantId == null);
-      const img = (product.images && product.images[0] && product.images[0].url) || ("/img/products/" + product.slug + ".jpg");
-      if (ex) ex.qty++; else c.push({ productId: product.id, qty: 1, priceCents: product.priceCents, name: product.name, image: img });
+      const ex = c.find((i) => i.productId === product.id && (i.variantId ?? null) === (line.variantId ?? null));
+      if (ex) ex.qty++; else c.push(line);
       localStorage.setItem("cart", JSON.stringify(c));
       window.dispatchEvent(new Event("cart-changed"));
-      if (window.toast) window.toast(product.name + " added to cart", { type: "success" });
+      if (window.toast) window.toast(product.name + (v ? ` (${v.title})` : "") + " added to cart", { type: "success" });
       document.getElementById("cartmsg").textContent = "Added to cart ✓ — go to checkout when ready.";
     });
+
     async function loadReviews() {
       const rs = (await (await fetch("/review")).json()).filter((r) => r.productId === product.id && r.status === "published");
-      document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
+      document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}${r.verifiedPurchase ? ' <span class="pill" style="font-size:11px">✓ Verified</span>' : ""}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
       document.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" }); loadReviews(); }));
     }
     document.getElementById("review").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true; // prevent a duplicate review
+      const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
       try {
-        const r = await fetch("/review", { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user" }, body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value, status: "published" }) });
+        const r = await fetch("/review", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value }) });
         if (!r.ok) throw new Error("Could not submit your review.");
         e.target.reset(); loadReviews();
-        if (window.toast) window.toast("Review submitted ✓", { type: "success" });
+        if (window.toast) window.toast("Review submitted ✓ — pending moderation.", { type: "success" });
       } catch (err) {
         if (window.toast) window.toast(err.message || "Could not submit your review.", { type: "error" });
       } finally { btn.disabled = false; }
     });
     (async () => {
       const rel = await (await fetch(`/recommendations/${product.id}`)).json();
-      document.getElementById("related").innerHTML = (rel.related || []).map((p) => `<div class="card"><a href="/products/${p.slug}"><b style="font-family:inherit">${esc(p.name)}</b></a><p>${money(p.priceCents)}</p></div>`).join("") || `<p style="color:var(--muted)">—</p>`;
+      document.getElementById("related").innerHTML = (rel.related || []).map((p) => `<a href="/products/${p.slug}" class="card" style="display:block"><b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`).join("") || `<p style="color:var(--muted)">—</p>`;
     })();
+    update();
     loadReviews();
   </script>
 </Layout>
