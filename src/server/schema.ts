@@ -23,10 +23,13 @@ export const product = sqliteTable("product", {
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   description: text("description"),
+  longDescription: text("long_description"), // rich body shown in the product-detail "Details" section
   priceCents: integer("price_cents").notNull().default(0),
   categoryId: integer("category_id"),
   inventory: integer("inventory").notNull().default(0),
-  imageUrl: text("image_url"),
+  imageUrl: text("image_url"), // the PRIMARY image (kept as images[0] mirror for thin consumers)
+  images: text("images"), // JSON gallery: [{ url, alt?, sortOrder? }] — the multi-image capability
+  featured: integer("featured", { mode: "boolean" }).notNull().default(false),
   status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
   stripePriceId: text("stripe_price_id"), // set by scripts/sync-catalog.ts — the real Stripe Price for checkout
 });
@@ -35,18 +38,27 @@ export const variant = sqliteTable("variant", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull(),
   title: text("title").notNull(),
+  options: text("options"), // JSON [{ label, value }] — the variant's option dimensions (e.g. Size:L, Color:Black)
+  images: text("images"), // JSON gallery override for this variant (swaps the product gallery when selected)
   priceCents: integer("price_cents").notNull().default(0),
+  priceCentsEnabled: integer("price_cents_enabled", { mode: "boolean" }).notNull().default(false), // false → inherit product price
   inventory: integer("inventory").notNull().default(0),
 });
 
 export const discountCode = sqliteTable("discount_code", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull(),
+  description: text("description"),
   discountType: text("discount_type", { enum: ["percent", "fixed"] }).notNull().default("percent"),
   discountValue: integer("discount_value").notNull().default(0),
+  minSubtotalCents: integer("min_subtotal_cents"), // code only valid when cart subtotal ≥ this
+  maxDiscountCents: integer("max_discount_cents"), // cap on a percentage discount (saastarter's maxDiscountAmount)
+  maxUses: integer("max_uses"),
+  maxUsesPerCustomer: integer("max_uses_per_customer"),
+  appliesToProductIds: text("applies_to_product_ids"), // JSON number[] — scope the code to specific products
+  startsAt: integer("starts_at"), // validFrom
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   currentUses: integer("current_uses").notNull().default(0),
-  maxUses: integer("max_uses"),
   expiresAt: integer("expires_at"),
 });
 
@@ -62,7 +74,11 @@ export const cart = sqliteTable("cart", {
 export const order = sqliteTable("order", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   customerId: text("customer_id"),
+  customerEmail: text("customer_email"), // snapshot of the buyer's email at purchase (guest or member)
+  // items snapshot each line as { productId, variantId?, qty, priceCents, name, image?, variantLabel? } so a later
+  // rename/reprice/delete never mis-renders a historical order.
   items: text("items").notNull().default("[]"),
+  shippingAddress: text("shipping_address"), // JSON snapshot of the address at purchase time
   totalCents: integer("total_cents").notNull().default(0),
   status: text("status", { enum: ["pending", "paid", "shipped", "cancelled"] }).notNull().default("pending"),
   discountCode: text("discount_code"),
@@ -77,9 +93,31 @@ export const review = sqliteTable("review", {
   rating: integer("rating").notNull().default(5),
   title: text("title").notNull(),
   body: text("body"),
+  verifiedPurchase: integer("verified_purchase", { mode: "boolean" }).notNull().default(false),
   status: text("status", { enum: ["pending", "published"] }).notNull().default("pending"),
   helpfulCount: integer("helpful_count").notNull().default(0),
   createdAt: integer("created_at"),
+});
+
+// one row per (review, principal) so a "helpful" vote is idempotent + can be un-voted (replaces the bare counter race).
+export const reviewHelpfulVote = sqliteTable("review_helpful_vote", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  reviewId: integer("review_id").notNull(),
+  principal: text("principal").notNull(),
+});
+
+// a customer's saved shipping/billing addresses — the address book the checkout form reads + writes.
+export const address = sqliteTable("address", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  customerId: text("customer_id"),
+  name: text("name"),
+  line1: text("line1").notNull(),
+  line2: text("line2"),
+  city: text("city").notNull(),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  country: text("country").notNull().default("US"),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
 });
 
 export const wishlistItem = sqliteTable("wishlist_item", {
@@ -183,12 +221,14 @@ export const project = sqliteTable("project", {
  */
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS category (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
-CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, price_cents INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, max_uses INTEGER, expires_at INTEGER);
+CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, long_description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, images TEXT, featured INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
+CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, options TEXT, images TEXT, price_cents INTEGER NOT NULL DEFAULT 0, price_cents_enabled INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, description TEXT, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, min_subtotal_cents INTEGER, max_discount_cents INTEGER, max_uses INTEGER, max_uses_per_customer INTEGER, applies_to_product_ids TEXT, starts_at INTEGER, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER);
 CREATE TABLE IF NOT EXISTS cart (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', discount_code TEXT, status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, created_at INTEGER);
-CREATE TABLE IF NOT EXISTS review (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, customer_id TEXT, rating INTEGER NOT NULL DEFAULT 5, title TEXT NOT NULL, body TEXT, status TEXT NOT NULL DEFAULT 'pending', helpful_count INTEGER NOT NULL DEFAULT 0, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, customer_email TEXT, items TEXT NOT NULL DEFAULT '[]', shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS review (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, customer_id TEXT, rating INTEGER NOT NULL DEFAULT 5, title TEXT NOT NULL, body TEXT, verified_purchase INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', helpful_count INTEGER NOT NULL DEFAULT 0, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS review_helpful_vote (id INTEGER PRIMARY KEY AUTOINCREMENT, review_id INTEGER NOT NULL, principal TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS address (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, name TEXT, line1 TEXT NOT NULL, line2 TEXT, city TEXT NOT NULL, state TEXT, postal_code TEXT, country TEXT NOT NULL DEFAULT 'US', is_default INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS wishlist_item (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, product_id INTEGER NOT NULL, variant_id INTEGER, added_at INTEGER);
 CREATE TABLE IF NOT EXISTS post (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT, body TEXT, status TEXT NOT NULL DEFAULT 'draft', published_at INTEGER, author_id TEXT, cover_image_url TEXT);
 CREATE TABLE IF NOT EXISTS faq (id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL, answer TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1);
