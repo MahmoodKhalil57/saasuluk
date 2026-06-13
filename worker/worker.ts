@@ -26,6 +26,7 @@ import { themeHeadHtml } from "../src/themes/head";
 import { BUILD_ID } from "../src/build-id";
 import { referenceInsightsResponse } from "@suluk/reference";
 import { SCALAR_FORK_HASH } from "./gen/scalar-fork";
+import { v4ShowcaseDoc } from "../src/server/v4-showcase";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
@@ -196,6 +197,9 @@ app.get("/reference/spec", (c) => c.json(enrichedV4(refProjected(c as unknown as
 // The ⚡ Insights drawer iframes this: the v4 superpower PANELS (cost explorer, reachability, ADA, hardening) — same
 // role projection as the spec, so the drawer reflects the selected "View as".
 app.get("/reference/insights", (c) => referenceInsightsResponse(refProjected(c as unknown as Context), { costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" }));
+// /reference/showcase — a self-contained v4 doc demonstrating MULTI-REQUEST-PER-METHOD (the one v4 capability 3.1
+// can't express): /checkout has two requests sharing POST, rendered by the forked Scalar as distinct operations.
+app.get("/reference/showcase", () => scalarV4Response(v4ShowcaseDoc as never, { cdn: SCALAR_FORK, pageTitle: "OpenAPI v4 — Multi-Request Showcase", brand: "v4 showcase" }));
 app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK from the contract
 app.get("/conformance.test.ts", (c) => new Response(generateTests(isAdmin(c) ? document : scrubSource(document), { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk.conformance.test.ts"' } })); // a runnable suite asserting the SERVER ENFORCES the contract (access on the wire, status, schema, cost)
 // /scalar — VANILLA Scalar: the plain v4→3.1 downgrade fed to stock Scalar (no badges, no theme, no suluk superpowers).
