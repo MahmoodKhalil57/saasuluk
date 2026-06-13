@@ -79,7 +79,7 @@ export async function createApp() {
     else if (c.req.header("cookie")) {
       try {
         const s = await auth.api.getSession({ headers: c.req.raw.headers }) as { user?: { id?: string; email?: string } } | null;
-        if (s?.user?.id) { c.set("sessionUser", s.user.id); if (s.user.email && admins.includes(s.user.email.toLowerCase())) c.set("isAdmin", true); } // verified superadmin
+        if (s?.user?.id) { c.set("sessionUser", s.user.id); if (s.user.email) { c.set("sessionEmail", s.user.email); if (admins.includes(s.user.email.toLowerCase())) c.set("isAdmin", true); } } // verified superadmin; email stashed so checkout can snapshot it onto the order + send a receipt
       } catch { /* anonymous */ }
     }
     await next();

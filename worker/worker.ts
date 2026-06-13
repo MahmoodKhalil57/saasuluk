@@ -60,7 +60,7 @@ const access = accessIndex(document); // op → x-suluk-access, for the wire enf
 type R2Object = { body: ReadableStream; httpMetadata?: { contentType?: string } };
 type MediaBucket = { put(key: string, value: ReadableStream | ArrayBuffer | string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>; get(key: string): Promise<R2Object | null> };
 type Env = { DB: D1Database; MEDIA?: MediaBucket; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string; OPENROUTER_API_KEY?: string };
-const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; isAdmin?: boolean } }>();
+const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; sessionEmail?: string; isAdmin?: boolean } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
 app.on(["GET", "POST"], "/api/auth/*", async (c) => {
@@ -81,7 +81,7 @@ app.use("*", async (c, next) => {
   else if (c.req.header("cookie")) {
     try {
       const s = await getAuth(c.env).api.getSession({ headers: c.req.raw.headers }) as { user?: { id?: string; email?: string } } | null;
-      if (s?.user?.id) { c.set("sessionUser", s.user.id); if (s.user.email && admins.includes(s.user.email.toLowerCase())) c.set("isAdmin", true); }
+      if (s?.user?.id) { c.set("sessionUser", s.user.id); if (s.user.email) { c.set("sessionEmail", s.user.email); if (admins.includes(s.user.email.toLowerCase())) c.set("isAdmin", true); } } // email stashed so checkout snapshots it onto the order + sends a receipt
     } catch { /* anonymous */ }
   }
   await next();

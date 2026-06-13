@@ -11,6 +11,7 @@ import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
 import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
+import { orderConfirmationEmail } from "@suluk/email";
 import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, type Discount } from "@suluk/stripe";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
@@ -102,6 +103,34 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
     }
   }
   return changed;
+}
+
+/** The buyer's email for the receipt — the verified session email the auth middleware stashed (null for guests). */
+const buyerEmail = (c: Context): string | null => (c.get("sessionEmail") as string | undefined) ?? null;
+
+/**
+ * Fire the order-confirmation receipt via @suluk/email's rich, locale-aware template (icon + line table + CTA) —
+ * the SINGLE receipt site, called only on the once-only pending→paid transition (so a webhook re-deliver / double
+ * confirm can't double-send). Best-effort: a render/send hiccup must NEVER break a completed sale, so it's wrapped.
+ * Reads order.customerEmail (snapshotted at checkout from the session), so guests with no email simply get no email.
+ */
+async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Promise<void> {
+  try {
+    const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
+    if (!o || o.status !== "paid" || !o.customerEmail) return;
+    let items: { name?: string; qty?: number; priceCents?: number; variantLabel?: string }[] = [];
+    try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+    const lines = items.map((l) => {
+      const qty = Math.max(1, Math.floor(Number(l.qty) || 1));
+      return { name: l.variantLabel ? `${l.name ?? "Item"} — ${l.variantLabel}` : (l.name ?? "Item"), qty, totalCents: Math.max(0, Math.round(Number(l.priceCents) || 0)) * qty };
+    });
+    const origin = new URL(c.req.url).origin;
+    const { subject, html } = orderConfirmationEmail(
+      { orderNumber: String(o.id), items: lines, totalCents: o.totalCents, currency: "usd", orderUrl: `${origin}/dashboard` },
+      { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } },
+    );
+    sendEmailAsync({ to: o.customerEmail, subject, html }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
+  } catch { /* a receipt failure must never break the sale */ }
 }
 
 /** Get-or-create the signed-in principal's Stripe customer, recorded on their billing_account row. ONE customer
@@ -308,12 +337,12 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
     const codeFinal = disc.valid ? codeUsed!.toUpperCase().trim() : null;
-    const created = await dz.insert(order).values({ customerId: who, items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeFinal, createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeFinal, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
     // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
     const free = !requiresStripe(total);
-    if (free) await markOrderPaid(dz, orderId);
+    if (free && await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId);
     const final = await dz.select().from(order).where(eq(order.id, orderId)).get();
     return c.json({ order: final, subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid, free }, 201);
   };
@@ -451,12 +480,12 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const total = applyDiscount(subtotal, disc);
     const codeUsed = disc.valid ? body.discountCode!.toUpperCase().trim() : null;
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
-    const created = await dz.insert(order).values({ customerId: who, items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
     // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.
     if (!requiresStripe(total)) {
-      await markOrderPaid(dz, orderId);
+      if (await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId);
       const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
       return c.json({ free: true, paid: true, order: o, orderId, totalCents: total });
     }
@@ -510,7 +539,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const session = (await r.json().catch(() => ({}))) as { payment_status?: string; client_reference_id?: string; amount_total?: number };
     // Stripe is the source of truth: payment cleared, the session is THIS order's, AND the amount matches our total.
     const paid = r.ok && session.payment_status === "paid" && String(session.client_reference_id) === String(orderId) && Number(session.amount_total) === Number(ord.totalCents);
-    if (paid) await markOrderPaid(dz, orderId); // pending-only transition + once-per-order discount bump (idempotent)
+    if (paid && await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId); // pending-only transition + once-per-order discount bump + receipt (all idempotent)
     const row = await dz.select().from(order).where(eq(order.id, orderId)).get();
     return c.json({ paid, order: row });
   };
