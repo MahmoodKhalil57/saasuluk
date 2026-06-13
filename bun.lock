@@ -34,7 +34,7 @@
         "@suluk/sdk": "^0.1.0",
         "@suluk/seo": "^0.1.2",
         "@suluk/shadcn": "^0.1.2",
-        "@suluk/stripe": "^0.1.2",
+        "@suluk/stripe": "^0.1.4",
         "@suluk/swagger": "^0.1.2",
         "@suluk/testgen": "^0.1.0",
         "@suluk/theme": "^0.1.1",
@@ -420,7 +420,7 @@
 
     "@suluk/shadcn": ["@suluk/shadcn@0.1.2", "", { "dependencies": { "@suluk/core": "^0.1.7", "@suluk/theme": "^0.1.0" } }, "sha512-lVfcnT4+2onfMGhOWKmT8s+Dmxp2ewfKmsVJwYCANIGpdOVHWB6l1v2jYTqU3BIV+messnba+R1Vy8rT93mHcw=="],
 
-    "@suluk/stripe": ["@suluk/stripe@0.1.2", "", { "dependencies": { "@suluk/cost": "^0.1.2" }, "peerDependencies": { "stripe": "^17.0.0 || ^18.0.0" }, "optionalPeers": ["stripe"] }, "sha512-gLRmn/608/EA97GA522WIDi2socnjzQ+6IGBpp3z61SKqC1X31fZWnRTIz/FizLjEmwWEtwv6FM20yb8AZKwdg=="],
+    "@suluk/stripe": ["@suluk/stripe@0.1.4", "", { "dependencies": { "@suluk/cost": "^0.1.2" }, "peerDependencies": { "stripe": "^17.0.0 || ^18.0.0" }, "optionalPeers": ["stripe"] }, "sha512-G4qDUsTpHnVE9tK/LS7MTcmTM3JRz+FN9Tw0GaSG1oOMnAXLLUiCd9ZwpIsqG6s4AzJFjbdh7YfusIOpGn+J8Q=="],
 
     "@suluk/swagger": ["@suluk/swagger@0.1.2", "", { "dependencies": { "@suluk/core": "^0.1.7", "@suluk/openapi-compat": "^0.1.2" } }, "sha512-9kP4AYRyR+u/S2hSBwEhWqGNk/zRwkWhFzDPBG8VNpwAhppuYxRO01iJDE2r8BsigXb+g3fqhqdb7HnH9cDBBg=="],
 

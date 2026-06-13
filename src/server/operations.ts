@@ -6,12 +6,12 @@
  * call is awaited, so it works whether the driver is synchronous (bun) or asynchronous (D1). saastarter
  * hand-writes each of these as a Next.js route + an Effect program; here they project from the same single source.
  */
-import { and, eq, gte, inArray, like, lt, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
+import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
-import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, type Discount } from "@suluk/stripe";
+import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, type Discount } from "@suluk/stripe";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
@@ -127,7 +127,9 @@ const read = (m: number): CostModel => ({ components: [{ source: "db-read", basi
 const write = (m: number): CostModel => ({ components: [{ source: "compute", basis: "per-call", microUsd: 100 }, { source: "db-write", basis: "per-call", microUsd: m }], estimateMicroUsd: 100 + m });
 
 interface LineItem { productId?: number; variantId?: number; qty?: number; priceCents?: number }
-interface ResolvedDiscount { valid: boolean; discountType?: "percent" | "fixed"; discountValue?: number; reason?: string }
+interface ResolvedDiscount { valid: boolean; discountType?: "percent" | "fixed"; discountValue?: number; reason?: string; maxDiscountCents?: number; minSubtotalCents?: number }
+/** A server-re-priced order line — the client's priceCents is NEVER trusted; every cent comes from the product/variant row. */
+interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string }
 
 const idParam = { path: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } };
 function jsonOp(
@@ -156,8 +158,8 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
 // typed input bodies for the custom ops with REAL bounds (validations.ts) — a bare {type:"object"} is a free-form bag.
 const obj = (properties: Record<string, unknown>, required?: string[]) => ({ type: "object", additionalProperties: false, properties, ...(required ? { required } : {}) });
 const ID = 1_000_000_000_000;
-const cartLine = obj({ productId: v.int(1, ID), qty: v.int(1, 1000), priceCents: v.cents() });
-const payLine = obj({ productId: v.int(1, ID), qty: v.int(1, 1000) });
+const cartLine = obj({ productId: v.int(1, ID), variantId: v.int(1, ID), qty: v.int(1, 1000), priceCents: v.cents() });
+const payLine = obj({ productId: v.int(1, ID), variantId: v.int(1, ID), qty: v.int(1, 1000) });
 
 /** The v4 path fragment for the custom operations — merged into the contract document (then hardened below). */
 export const OPERATION_PATHS: Record<string, unknown> = {
@@ -189,56 +191,118 @@ for (const pi of Object.values(OPERATION_PATHS) as { requests?: Record<string, R
   }
 }
 
-/** Validate a discount code against the table: must exist, be active, not expired, and under its usage cap. */
-async function resolveDiscount(dz: Dz, raw: string): Promise<ResolvedDiscount> {
+const fmtUsd = (cents: number) => "$" + (Math.max(0, Math.round(cents)) / 100).toFixed(2);
+
+/** Validate a discount code against the table — the FULL eligibility set (saastarter-parity): exists, active, within
+ *  its date window (startsAt..expiresAt), under its global + per-customer usage caps, above its minimum subtotal, and
+ *  in scope for the cart's products. `opts` carries the live cart context the data-dependent checks need. Returns the
+ *  cap (maxDiscountCents) + minimum so applyDiscount can clamp exactly. Reasons are human + actionable. */
+async function resolveDiscount(dz: Dz, raw: string, opts: { subtotalCents?: number; principal?: string; productIds?: number[] } = {}): Promise<ResolvedDiscount> {
   const code = String(raw ?? "").toUpperCase().trim();
-  // human, actionable reasons (saastarter-parity: discount errors tell the shopper what to do, not a code)
   if (!code) return { valid: false, reason: "Enter a discount code." };
   const d = await dz.select().from(discountCode).where(eq(discountCode.code, code)).get();
   if (!d) return { valid: false, reason: "That code isn’t recognized." };
   if (!d.isActive) return { valid: false, reason: "This code is no longer active." };
-  if (d.expiresAt && Number(d.expiresAt) < Date.now()) return { valid: false, reason: "This code has expired." };
+  const now = Date.now();
+  if (d.startsAt != null && now < Number(d.startsAt)) return { valid: false, reason: "This code isn’t active yet." };
+  if (d.expiresAt != null && Number(d.expiresAt) < now) return { valid: false, reason: "This code has expired." };
   if (d.maxUses != null && Number(d.currentUses) >= Number(d.maxUses)) return { valid: false, reason: "This code has reached its usage limit." };
-  return { valid: true, discountType: d.discountType, discountValue: Number(d.discountValue) };
+  if (d.minSubtotalCents != null && opts.subtotalCents != null && opts.subtotalCents < Number(d.minSubtotalCents)) return { valid: false, reason: `Spend at least ${fmtUsd(Number(d.minSubtotalCents))} to use this code.` };
+  // product scope — the cart must contain at least one eligible product
+  if (d.appliesToProductIds && opts.productIds?.length) {
+    let scope: number[] = [];
+    try { scope = JSON.parse(d.appliesToProductIds as string); } catch { scope = []; }
+    if (Array.isArray(scope) && scope.length && !opts.productIds.some((id) => scope.includes(id))) return { valid: false, reason: "This code doesn’t apply to the items in your cart." };
+  }
+  // per-customer cap — count this principal's prior PAID/shipped orders that used this code
+  if (d.maxUsesPerCustomer != null && opts.principal) {
+    const prior = (await dz.select({ id: order.id }).from(order)
+      .where(and(eq(order.customerId, opts.principal), eq(order.discountCode, code), or(eq(order.status, "paid"), eq(order.status, "shipped")))).all()) as unknown[];
+    if (prior.length >= Number(d.maxUsesPerCustomer)) return { valid: false, reason: "You’ve already redeemed this code." };
+  }
+  return { valid: true, discountType: d.discountType, discountValue: Number(d.discountValue), maxDiscountCents: d.maxDiscountCents != null ? Number(d.maxDiscountCents) : undefined, minSubtotalCents: d.minSubtotalCents != null ? Number(d.minSubtotalCents) : undefined };
 }
 
-/** Apply a resolved discount to a cents total via @suluk/stripe's tested money primitive: computeDiscountAmount is
- *  poison-guarded (non-finite → 0) and CLAMPED to [0, total] (a discount can never exceed the order or go negative),
- *  so the order total is `total − discount`. Replaces the hand-rolled math with one shared, conformance-tested core. */
+/** Apply a resolved discount to a cents total via @suluk/stripe's tested money primitive — poison-guarded, CLAMPED to
+ *  [0, total], and now CAPPED at maxDiscountCents (e.g. "30% off, up to $50"). One shared conformance-tested core. */
 function applyDiscount(totalCents: number, d: ResolvedDiscount): number {
   if (!d.valid || !d.discountType) return totalCents;
-  const discount: Discount = { type: d.discountType, value: d.discountValue ?? 0 };
+  const discount: Discount = { type: d.discountType, value: d.discountValue ?? 0, maxDiscountCents: d.maxDiscountCents, minSubtotalCents: d.minSubtotalCents };
   return totalCents - computeDiscountAmount(totalCents, discount);
 }
 
-const itemsTotal = (items: LineItem[]) => items.reduce((s, it) => s + (Number(it.priceCents) || 0) * (Number(it.qty) || 1), 0);
+/** The primary display image for a product (preferring a selected variant's gallery, then the product gallery). */
+function firstImage(p: { imageUrl?: string | null; images?: string | null }, v?: { images?: string | null }): string | undefined {
+  for (const src of [v?.images, p.images]) {
+    if (typeof src === "string" && src) { try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr[0]?.url) return arr[0].url as string; } catch { /* ignore */ } }
+  }
+  return p.imageUrl ?? undefined;
+}
+
+/** SERVER-AUTHORITATIVE re-pricing — the client sends only {productId, variantId?, qty}; every price comes from the
+ *  product/variant row (a variant with priceCentsEnabled charges its own price, else it inherits the product's). The
+ *  returned lines also snapshot name/image/variantLabel so the order immortalizes them. Unpublished products + variants
+ *  belonging to another product are dropped. This is the one place price is decided, for BOTH checkout paths. */
+async function repriceLines(dz: Dz, items: LineItem[]): Promise<PricedLine[]> {
+  const valid = (Array.isArray(items) ? items : []).filter((i) => i?.productId != null);
+  if (!valid.length) return [];
+  const pids = [...new Set(valid.map((i) => Number(i.productId)))];
+  const prods = (await dz.select().from(product).where(inArray(product.id, pids)).all()) as Record<string, unknown>[];
+  const byPid = new Map(prods.map((p) => [Number(p.id), p]));
+  const vids = [...new Set(valid.map((i) => (i.variantId != null ? Number(i.variantId) : null)).filter((x): x is number => x != null))];
+  const vars = vids.length ? ((await dz.select().from(variant).where(inArray(variant.id, vids)).all()) as Record<string, unknown>[]) : [];
+  const byVid = new Map(vars.map((vrow) => [Number(vrow.id), vrow]));
+  const out: PricedLine[] = [];
+  for (const i of valid) {
+    const p = byPid.get(Number(i.productId));
+    if (!p || p.status !== "published") continue;
+    const qty = Math.max(1, Math.floor(Number(i.qty) || 1));
+    const vrow = i.variantId != null ? byVid.get(Number(i.variantId)) : undefined;
+    const vmatch = vrow && Number(vrow.productId) === Number(p.id) ? vrow : undefined;
+    const priceCents = vmatch && vmatch.priceCentsEnabled ? Number(vmatch.priceCents) : Number(p.priceCents);
+    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined });
+  }
+  return out;
+}
+const linesSubtotal = (lines: PricedLine[]) => lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
+const orderItemsJson = (lines: PricedLine[]) => JSON.stringify(lines.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, priceCents: l.priceCents, name: l.name, image: l.image, variantLabel: l.variantLabel })));
 
 /** Bind the custom-operation handlers to a Drizzle instance and mount them on a Hono app. */
 export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: (...a: unknown[]) => unknown }, dbFor: DbFor): void {
   const checkout = async (c: Context) => {
     const dz = dbFor(c);
     const body = (await c.req.json().catch(() => ({}))) as { cartId?: number; items?: LineItem[]; discountCode?: string };
-    let items: LineItem[] = Array.isArray(body.items) ? body.items : [];
+    let rawItems: LineItem[] = Array.isArray(body.items) ? body.items : [];
     let codeUsed: string | null = body.discountCode ?? null;
     if (body.cartId) {
       const ct = await dz.select().from(cart).where(eq(cart.id, Number(body.cartId))).get();
-      if (ct) { try { items = JSON.parse(ct.items || "[]"); } catch { items = []; } codeUsed = codeUsed ?? ct.discountCode ?? null; }
+      if (ct) { try { rawItems = JSON.parse(ct.items || "[]"); } catch { rawItems = []; } codeUsed = codeUsed ?? ct.discountCode ?? null; }
     }
-    const subtotal = itemsTotal(items);
-    const disc = codeUsed ? await resolveDiscount(dz, codeUsed) : { valid: false } as ResolvedDiscount;
+    // SERVER-AUTHORITATIVE: re-price every line from the product/variant rows (the client's priceCents is ignored).
+    const lines = await repriceLines(dz, rawItems);
+    if (!lines.length) return c.json({ error: "Your cart is empty." }, 422);
+    const subtotal = linesSubtotal(lines);
+    const who = principal(c);
+    const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
-    if (codeUsed && !disc.valid) codeUsed = null;
-    const customerId = principal(c);
-    const created = await dz.insert(order).values({ customerId, items: JSON.stringify(items), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
-    if (codeUsed && disc.valid) await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, codeUsed.toUpperCase().trim())).run();
-    return c.json({ order: created[0], subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid }, 201);
+    const codeFinal = disc.valid ? codeUsed!.toUpperCase().trim() : null;
+    const created = await dz.insert(order).values({ customerId: who, items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeFinal, createdAt: Date.now() }).returning();
+    const orderId = created[0].id;
+    // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
+    // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
+    const free = !requiresStripe(total);
+    if (free) await markOrderPaid(dz, orderId);
+    const final = await dz.select().from(order).where(eq(order.id, orderId)).get();
+    return c.json({ order: final, subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid, free }, 201);
   };
 
   const validateDiscount = async (c: Context) => {
-    const body = (await c.req.json().catch(() => ({}))) as { code?: string; subtotalCents?: number };
-    const d = await resolveDiscount(dbFor(c), body.code ?? "");
+    const body = (await c.req.json().catch(() => ({}))) as { code?: string; subtotalCents?: number; items?: LineItem[] };
+    const productIds = Array.isArray(body.items) ? body.items.map((i) => Number(i.productId)).filter(Boolean) : undefined;
+    const d = await resolveDiscount(dbFor(c), body.code ?? "", { subtotalCents: body.subtotalCents, principal: principal(c), productIds });
     const preview = d.valid && typeof body.subtotalCents === "number" ? applyDiscount(body.subtotalCents, d) : undefined;
-    return c.json({ ...d, ...(preview !== undefined ? { newTotalCents: preview } : {}) }, d.valid ? 200 : 422);
+    // 200 even when invalid (a {valid:false, reason} is not an HTTP error — the client shows the reason inline).
+    return c.json({ ...d, ...(preview !== undefined ? { newTotalCents: preview } : {}) }, 200);
   };
 
   const search = async (c: Context) => {
@@ -353,27 +417,29 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   // hosted Checkout Session; the success page calls confirmCheckout, which retrieves the session from Stripe
   // (the source of truth) and marks the order paid — so it works WITHOUT a configured webhook endpoint.
   const payCheckout = async (c: Context) => {
-    const key = secret(c, "STRIPE_SECRET_KEY");
-    if (!key) return c.json({ error: "Stripe is not configured (set STRIPE_SECRET_KEY)." }, 503);
-    const body = (await c.req.json().catch(() => ({}))) as { items?: { productId?: number; qty?: number }[]; discountCode?: string };
-    const cart = (Array.isArray(body.items) ? body.items : []).filter((i) => i.productId != null);
-    if (!cart.length) return c.json({ error: "Your cart is empty." }, 422);
+    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string };
     const dz = dbFor(c);
-    // SERVER-AUTHORITATIVE pricing: the client supplies only productId + qty; every price comes from the product
-    // row. (A client cannot under-pay by sending a fake priceCents.) Unknown/unpublished products are dropped.
-    const ids = [...new Set(cart.map((i) => Number(i.productId)))];
-    const rows = await dz.select().from(product).where(inArray(product.id, ids)).all();
-    const byId = new Map((rows as { id: number; name: string; priceCents: number; status: string; stripePriceId?: string }[]).map((p) => [p.id, p]));
-    const lines = cart.map((i) => { const p = byId.get(Number(i.productId)); const qty = Math.max(1, Math.floor(Number(i.qty) || 1)); return p && p.status === "published" ? { productId: p.id, qty, priceCents: p.priceCents, name: p.name, stripePriceId: p.stripePriceId } : null; }).filter((x): x is NonNullable<typeof x> => x != null);
+    const who = principal(c);
+    // SERVER-AUTHORITATIVE, variant-aware re-pricing (the same path the free checkout uses) — client priceCents ignored.
+    const lines = await repriceLines(dz, Array.isArray(body.items) ? body.items : []);
     if (!lines.length) return c.json({ error: "No purchasable items in the cart." }, 422);
-    const subtotal = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
-    const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode) : { valid: false } as ResolvedDiscount;
+    const subtotal = linesSubtotal(lines);
+    const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
-    if (total < 50) return c.json({ error: "Stripe's minimum charge is $0.50 — use “Place order” for free items." }, 422);
     const codeUsed = disc.valid ? body.discountCode!.toUpperCase().trim() : null;
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
-    const created = await dz.insert(order).values({ customerId: principal(c), items: JSON.stringify(lines.map((l) => ({ productId: l.productId, qty: l.qty, priceCents: l.priceCents }))), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
+    // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
+    // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.
+    if (!requiresStripe(total)) {
+      await markOrderPaid(dz, orderId);
+      const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
+      return c.json({ free: true, paid: true, order: o, orderId, totalCents: total });
+    }
+    // a real charge is required → only NOW do we need Stripe configured.
+    const key = secret(c, "STRIPE_SECRET_KEY");
+    if (!key) return c.json({ error: "Stripe is not configured (set STRIPE_SECRET_KEY).", orderId }, 503);
     const origin = new URL(c.req.url).origin;
     const form = new URLSearchParams();
     form.set("mode", "payment");
@@ -384,7 +450,6 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // CARD-SAVING: for a signed-in shopper, attach their Stripe customer + save the payment method for future
     // on-session reuse, so the card they pay with shows up in the billing portal. Defensive — a customer hiccup
     // (e.g. Stripe blip) must never block the sale, so we fall back to an anonymous Checkout Session.
-    const who = principal(c);
     if (who) {
       try {
         const customerId = await ensureStripeCustomer(dz, key, who);
