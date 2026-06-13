@@ -4,7 +4,7 @@
  * cockpit (same brain as the vscode extension); the cost ledger; and the Stripe webhook. Same `app` deploys
  * to a Cloudflare Worker (Hono is native there).
  */
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { mount, enforceAccess, enforceRateLimit, type RouteContract } from "@suluk/hono";
 
 /** Per-operation rate budgets (saastarter-parity: abuse protection on the money + write paths). Undeclared ops fall
@@ -27,6 +27,9 @@ import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
 import { panelApp } from "@suluk/panel";
+import { mcpApp, appExec } from "@suluk/mcp";
+import { chatApp } from "@suluk/chat";
+import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "./dashboard";
 import { costMeter, MemoryCostSink, summarize } from "@suluk/cost";
 import { stripeProvider, type StripeLike } from "@suluk/stripe";
 import { auth, ensureAuthTables } from "./auth";
@@ -121,7 +124,16 @@ export async function createApp() {
     return c.json({ ...summarize(events), opStats });
   });
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // /superadmin (verified session, not a header)
-  app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // @suluk/panel — Payload-style admin
+  app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml(), homeHeading: "Superadmin", homeLabel: "Overview", groups: adminGroups, sections: adminSections, stats: () => adminStats(db as never) })); // @suluk/panel — admin dashboard (full document, grouped, KPIs + cost ledger)
+  // The user /dashboard — consolidated self-service area (replaces /account + /dashboard), role-projected.
+  const signedIn = (c: Context) => !!(c.get("sessionUser") || c.get("tokenUser"));
+  app.use("/dashboard", (c, next) => (signedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+  app.use("/dashboard/*", (c, next) => (signedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+  app.route("/", panelApp({ document: (c) => projectDocument(document, viewerOf(c), canonHash), basePath: "/dashboard", title: "saasuluk", authorize: (c) => signedIn(c), headHtml: themeHeadHtml(), homeHeading: "Your dashboard", homeLabel: "Overview", sections: dashboardSections, groups: dashboardGroups, hideEntities: dashboardHiddenEntities, home: (c) => dashboardHome({ admin: isAdmin(c) }), stats: (c) => userStats(db as never, principal(c)) }));
+  app.get("/account", (c) => c.redirect("/dashboard", 301));
+  app.get("/account/*", (c) => c.redirect("/dashboard", 301));
+  app.route("/", mcpApp({ document: (c) => projectDocument(document, viewerOf(c), canonHash), basePath: "/mcp", name: "saasuluk", include: "read", exec: appExec(app), instructions: "Browse the saasuluk store: list and read products, posts, and categories." })); // @suluk/mcp — contract → MCP server (read-only, per-role, in-process exec)
+  app.route("/", chatApp({ document: (c) => projectDocument(document, viewerOf(c), canonHash), basePath: "/chat", include: "all", exec: appExec(app), apiKey: () => process.env.OPENROUTER_API_KEY, title: "saasuluk", greeting: "Hi! I'm the saasuluk assistant — ask me to find products, compare plans, or dig through the docs.", system: "You are the assistant for saasuluk, a premium ecommerce + SaaS starter. Use tools to browse/search the catalog and to take actions the signed-in user asks for. Ground answers in tool results; prices are in cents. Confirm before any create/update/delete. Be concise." })); // @suluk/chat — in-page agent (read+act, per-role)
 
   app.get("/config", (c) => {                                                                   // config health (@suluk/env) — one registry, projected
     if (!isAdmin(c)) return c.json({ error: "forbidden" }, 403);

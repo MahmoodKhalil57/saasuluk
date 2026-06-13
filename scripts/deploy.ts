@@ -76,6 +76,7 @@ const res = await deployWith(
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
       RESEND_API_KEY: process.env.RESEND_API_KEY,
       EMAIL_FROM: process.env.EMAIL_FROM,
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY, // powers the @suluk/chat in-page agent
     },
     crons: ["0 * * * *"],
     observability: true,

@@ -27,6 +27,7 @@ export const env = defineEnv({
   GOOGLE_CLIENT_ID:        { surfaces: ["local", "cloudflare"], description: "Google OAuth client id" },
   GOOGLE_CLIENT_SECRET:    { secret: true, surfaces: ["local", "cloudflare"], description: "Google OAuth client secret" },
   SUPERADMIN_EMAILS:       { surfaces: ["local", "cloudflare"], description: 'JSON array of admin emails, e.g. ["you@example.com"]' },
+  OPENROUTER_API_KEY:      { secret: true, surfaces: ["local", "cloudflare"], description: "OpenRouter API key — powers the @suluk/chat in-page assistant (omit ⇒ /chat returns a graceful 503)" },
   // build/script-only knobs (declared so /config doesn't under-report what the code reads)
   CATALOG_BASE:            { surfaces: ["ci"], description: "Base URL the catalog-sync script fetches live prices from" },
   FORCE:                   { surfaces: ["ci"], description: "Set to 1 to force re-creating Stripe prices in sync-catalog" },

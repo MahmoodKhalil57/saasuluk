@@ -16,7 +16,7 @@ import Layout from "../../layouts/Layout.astro";
         const r = await (await fetch("/checkout/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId: Number(orderId), sessionId }) })).json();
         if (r.paid) {
           localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed"));
-          state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${orderId} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and the order is marked paid — every step metered. See it in your <a href="/account">account</a> and the live <a href="/metrics">metrics</a>.</p><div class="cta"><a class="btn" href="/account">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
+          state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${orderId} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and the order is marked paid — every step metered. See it in your <a href="/dashboard">account</a> and the live <a href="/metrics">metrics</a>.</p><div class="cta"><a class="btn" href="/dashboard">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
         } else {
           state.innerHTML = `<h1>Payment not confirmed yet</h1><p class="tag center">We couldn't confirm order #${orderId}. If you just paid, give it a moment and refresh — or <a href="/checkout">return to checkout</a>.</p>`;
         }

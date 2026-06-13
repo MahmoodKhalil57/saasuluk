@@ -1,0 +1,273 @@
+/**
+ * The signed-in user's /dashboard — the NON-CRUD half. The CRUD half (orders, wishlist, reviews, projects, cart) is
+ * projected automatically by @suluk/panel from the per-role document; this module supplies the bits a contract can't
+ * express: identity, password, sessions, Stripe billing portal, API-key minting, and the delete-account danger zone.
+ * Each section is a self-contained HTML+script body rendered inside the panel shell (so it inherits the theme + the
+ * .pf-* design system). `userStats` computes the home KPI tiles from the caller's own rows.
+ */
+import { eq, and, isNull } from "drizzle-orm";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
+import { order, wishlistItem, apiToken, product } from "./schema";
+import type { PanelSection, StatCard } from "@suluk/panel";
+
+type Rows = Promise<Record<string, unknown>[]>;
+type AnyDb = { select: (...a: unknown[]) => { from: (t: unknown) => Rows & { where: (w: unknown) => Rows } } };
+
+/** Home KPI tiles, computed from the caller's OWN rows (drizzle → works on D1 + bun:sqlite). Resilient: any failure
+ *  just drops the stats rather than breaking the dashboard. */
+export async function userStats(db: AnyDb, userId: string | null): Promise<StatCard[]> {
+  if (!userId) return [];
+  try {
+    const [orders, wl, toks] = await Promise.all([
+      db.select().from(order).where(eq(order.customerId as unknown as SQLiteColumn, userId)) as Promise<{ totalCents?: number }[]>,
+      db.select().from(wishlistItem).where(eq(wishlistItem.customerId as unknown as SQLiteColumn, userId)),
+      db.select().from(apiToken).where(and(eq(apiToken.userId as unknown as SQLiteColumn, userId), isNull(apiToken.revokedAt as unknown as SQLiteColumn))),
+    ]);
+    const spent = orders.reduce((n, o) => n + (Number(o.totalCents) || 0), 0);
+    return [
+      { label: "Orders", value: orders.length, href: "/dashboard/Order" },
+      { label: "Total spent", value: "$" + (spent / 100).toFixed(2), hint: "all time" },
+      { label: "Wishlist", value: wl.length, href: "/dashboard/WishlistItem" },
+      { label: "API keys", value: toks.length, href: "/dashboard/s/developer" },
+    ];
+  } catch { return []; }
+}
+
+/** The sidebar grouping for the user dashboard (entities + sections). */
+export const dashboardGroups = [
+  { title: "Account", sections: ["profile", "security", "sessions"] },
+  { title: "Commerce", entities: ["Order", "WishlistItem", "Review", "Cart"] },
+  { title: "Developer", entities: ["Project"], sections: ["developer"] },
+  { title: "Billing", sections: ["billing"] },
+  { title: "Danger zone", sections: ["danger"] },
+];
+
+/** Entities the custom sections replace (so the panel doesn't also auto-list them). */
+export const dashboardHiddenEntities = ["ApiToken", "BillingAccount"];
+
+const PROFILE = `
+<div class="pf-section">
+  <div style="display:flex;gap:15px;align-items:center;flex-wrap:wrap">
+    <img id="ac-avatar" alt="" width="60" height="60" style="border-radius:50%;border:1px solid var(--line)"/>
+    <div style="flex:1;min-width:200px"><div id="ac-name" style="font-weight:700;font-size:18px">Loading…</div><div id="ac-email" class="pf-muted" style="font-size:13.5px"></div></div>
+    <a id="ac-signout" class="pf-btn" href="#">Sign out</a>
+  </div>
+</div>
+<div class="pf-section">
+  <h2>Display name</h2>
+  <p class="pf-sub">How your name appears across the store.</p>
+  <form id="ac-profile" style="display:flex;gap:8px;max-width:460px;align-items:center;flex-wrap:wrap">
+    <input class="pf-input" name="name" placeholder="Display name" style="flex:1;min-width:180px"/>
+    <button class="pf-btn pf-primary" type="submit">Save</button>
+    <span id="ac-profmsg" class="pf-muted" style="font-size:13px"></span>
+  </form>
+</div>
+<script>(function(){
+  var av=document.getElementById("ac-avatar"),nm=document.getElementById("ac-name"),em=document.getElementById("ac-email"),pf=document.getElementById("ac-profile"),msg=document.getElementById("ac-profmsg");
+  fetch("/api/auth/get-session",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(s){
+    var u=s&&s.user; if(!u)return; av.src="/avatar?seed="+encodeURIComponent(u.email||u.id); nm.textContent=u.name||u.email; em.textContent=u.email||""; pf.elements["name"].value=u.name||"";
+  }).catch(function(){});
+  document.getElementById("ac-signout").addEventListener("click",function(e){e.preventDefault();fetch("/api/auth/sign-out",{method:"POST",credentials:"same-origin"}).then(function(){location.href="/";});});
+  pf.addEventListener("submit",function(e){e.preventDefault();msg.textContent="Saving…";
+    fetch("/api/auth/update-user",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({name:pf.elements["name"].value})}).then(function(r){msg.textContent=r.ok?"Saved ✓":"Could not save.";});});
+})();</script>`;
+
+const SECURITY = `
+<div class="pf-section">
+  <h2>Change password</h2>
+  <p class="pf-sub">Update the password you use to sign in. Choose at least 8 characters.</p>
+  <form id="ac-pw" style="display:grid;gap:10px;max-width:420px">
+    <input class="pf-input" type="password" name="current" placeholder="Current password" autocomplete="current-password"/>
+    <input class="pf-input" type="password" name="next" placeholder="New password" autocomplete="new-password"/>
+    <div style="display:flex;gap:10px;align-items:center"><button class="pf-btn pf-primary" type="submit">Update password</button><span id="ac-pwmsg" class="pf-muted" style="font-size:13px"></span></div>
+  </form>
+</div>
+<script>(function(){
+  var f=document.getElementById("ac-pw"),msg=document.getElementById("ac-pwmsg");
+  f.addEventListener("submit",function(e){e.preventDefault();
+    var cur=f.elements["current"].value,nx=f.elements["next"].value; if(nx.length<8){msg.textContent="New password must be at least 8 characters.";return;}
+    msg.textContent="Updating…";
+    fetch("/api/auth/change-password",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({currentPassword:cur,newPassword:nx,revokeOtherSessions:true})})
+      .then(function(r){return r.ok?{ok:true}:r.json().then(function(d){return {ok:false,d:d};});})
+      .then(function(x){ if(x.ok){msg.textContent="Password updated ✓";f.reset();} else {msg.textContent=(x.d&&(x.d.message||(x.d.error&&x.d.error.message)))||"Could not update — check your current password.";} })
+      .catch(function(){msg.textContent="Could not update.";});});
+})();</script>`;
+
+const SESSIONS = `
+<div class="pf-section">
+  <h2>Active sessions</h2>
+  <p class="pf-sub">Devices currently signed in to your account.</p>
+  <div id="ac-sessions" class="pf-muted">Loading…</div>
+  <button class="pf-btn" id="ac-signout-all" style="margin-top:14px">Sign out of all other devices</button>
+</div>
+<script>(function(){
+  var box=document.getElementById("ac-sessions");
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function when(t){return t?new Date(Number(t)).toLocaleString():"—";}
+  function load(){fetch("/api/auth/list-sessions",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(raw){
+    var arr=Array.isArray(raw)?raw:(raw.sessions||[]);
+    box.innerHTML=arr.length?arr.map(function(s){return '<div class="pf-row"><span>'+esc((s.userAgent||"Unknown device").slice(0,80))+'</span><span class="pf-muted">'+esc(when(s.createdAt?new Date(s.createdAt).getTime():0))+'</span></div>';}).join(""):'<div class="pf-empty">No active sessions.</div>';
+  }).catch(function(){box.innerHTML='<div class="pf-empty">Could not load sessions.</div>';});}
+  document.getElementById("ac-signout-all").addEventListener("click",function(){fetch("/api/auth/revoke-other-sessions",{method:"POST",credentials:"same-origin"}).then(load);});
+  load();
+})();</script>`;
+
+const BILLING = `
+<div class="pf-section">
+  <h2>Billing &amp; payment methods</h2>
+  <p class="pf-sub">Manage saved cards, invoices and billing details on Stripe's secure, hosted portal — no card data ever touches saasuluk.</p>
+  <button class="pf-btn pf-primary" id="ac-billing">Manage billing &amp; cards →</button>
+  <span id="ac-billmsg" class="pf-muted" style="margin-inline-start:10px;font-size:13px"></span>
+</div>
+<script>(function(){
+  var btn=document.getElementById("ac-billing"),msg=document.getElementById("ac-billmsg");
+  btn.addEventListener("click",function(){btn.disabled=true;msg.textContent="Opening Stripe…";
+    fetch("/billing/portal",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:"{}"})
+      .then(function(r){return r.json().catch(function(){return {};}).then(function(d){return {ok:r.ok,d:d};});})
+      .then(function(x){ if(x.ok&&x.d.url){location.href=x.d.url;return;} msg.textContent=x.d.needsPortalConfig?"Billing portal isn't activated yet — enable it in the Stripe dashboard.":(x.d.error||"Could not open billing."); btn.disabled=false; })
+      .catch(function(){msg.textContent="Could not open billing — please try again.";btn.disabled=false;});});
+})();</script>`;
+
+const DEVELOPER = `
+<div class="pf-section">
+  <h2>API keys</h2>
+  <p class="pf-sub">Create bearer tokens for programmatic access to your data. A token's secret is shown once, at creation.</p>
+  <form id="ac-tok" style="display:flex;gap:8px;margin-bottom:12px;max-width:460px"><input class="pf-input" name="name" placeholder="Token name" required style="flex:1"/><button class="pf-btn pf-primary" type="submit">+ Create</button></form>
+  <div id="ac-newtok"></div>
+  <div id="ac-tokens" class="pf-muted">Loading…</div>
+</div>
+<script>(function(){
+  var box=document.getElementById("ac-tokens"),form=document.getElementById("ac-tok"),newtok=document.getElementById("ac-newtok"),USER=null;
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function when(t){return t?new Date(Number(t)).toLocaleDateString():"—";}
+  function load(){fetch("/apiToken",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(ts){
+    ts=(ts||[]).filter(function(t){return (!USER||t.userId===USER)&&!t.revokedAt;});
+    box.innerHTML=ts.length?ts.map(function(t){return '<div class="pf-row"><span><b>'+esc(t.name)+'</b> <code class="pf-mono">'+esc(t.prefix)+'…</code></span><span class="pf-muted">'+esc(when(t.createdAt))+' <button class="pf-link-danger" data-r="'+esc(t.id)+'">revoke</button></span></div>';}).join(""):'<div class="pf-empty">No API keys yet.</div>';
+    box.querySelectorAll("[data-r]").forEach(function(b){b.addEventListener("click",function(){fetch("/tokens/"+encodeURIComponent(b.dataset.r)+"/revoke",{method:"POST",credentials:"same-origin"}).then(load);});});
+  }).catch(function(){box.innerHTML='<div class="pf-empty">Could not load keys.</div>';});}
+  fetch("/api/auth/get-session",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(s){USER=s&&s.user&&s.user.id;load();}).catch(load);
+  form.addEventListener("submit",function(e){e.preventDefault();
+    fetch("/tokens/create",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({name:form.elements["name"].value})})
+      .then(function(r){return r.json();}).then(function(d){ if(d&&d.token){ newtok.innerHTML='<div class="pf-section" style="background:color-mix(in srgb,var(--accent) 8%,var(--panel))">New key — copy it now, it won\\'t be shown again:<br/><code class="pf-mono" style="font-size:13.5px;word-break:break-all">'+esc(d.token)+'</code></div>'; } form.reset(); load(); })
+      .catch(function(){});});
+})();</script>`;
+
+const DANGER = `
+<div class="pf-section" style="border-color:color-mix(in srgb,var(--danger) 32%,var(--line))">
+  <h2 style="color:var(--danger)">Delete account</h2>
+  <p class="pf-sub">Permanently delete your account and all your data — orders, wishlist, API keys, billing. This cannot be undone.</p>
+  <button class="pf-btn pf-danger" id="ac-del-start">Delete my account</button>
+  <div id="ac-del-confirm" style="display:none;margin-top:14px;gap:8px;flex-wrap:wrap;align-items:center">
+    <input class="pf-input" id="ac-del-pass" type="password" placeholder="Confirm your password" style="max-width:260px"/>
+    <button class="pf-btn pf-danger" id="ac-del-go">Yes, delete everything</button>
+    <button class="pf-btn" id="ac-del-cancel">Cancel</button>
+    <span id="ac-del-msg" style="color:var(--danger);font-size:13px;width:100%"></span>
+  </div>
+</div>
+<script>(function(){
+  var start=document.getElementById("ac-del-start"),conf=document.getElementById("ac-del-confirm"),msg=document.getElementById("ac-del-msg");
+  start.addEventListener("click",function(){start.style.display="none";conf.style.display="flex";});
+  document.getElementById("ac-del-cancel").addEventListener("click",function(){conf.style.display="none";start.style.display="inline-flex";});
+  document.getElementById("ac-del-go").addEventListener("click",function(){
+    var p=document.getElementById("ac-del-pass").value; msg.textContent="Deleting…";
+    fetch("/api/auth/delete-user",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(p?{password:p}:{})})
+      .then(function(r){return r.ok?{ok:true}:r.json().then(function(d){return {ok:false,d:d};});})
+      .then(function(x){ if(x.ok){location.href="/";} else {msg.textContent=(x.d&&(x.d.message||(x.d.error&&x.d.error.message)))||"Could not delete — check your password and try again.";} })
+      .catch(function(){msg.textContent="Could not delete.";});});
+})();</script>`;
+
+/** The BESPOKE product-dashboard home (vs /superadmin's everything-grid): a personalized overview — welcome, quick
+ *  actions, recent orders, recommendations — that adapts to WHO is logged in (admins also get a Superadmin shortcut).
+ *  Server-rendered skeleton + an inline script that fills the per-user bits from the owner-scoped REST endpoints. */
+export function dashboardHome(opts: { admin: boolean }): string {
+  const adminTile = opts.admin ? '<a class="dh-qa dh-qa-admin" href="/superadmin"><span>🛡️</span> Superadmin</a>' : "";
+  return `
+<style>
+  .dh-hero{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:linear-gradient(120deg,color-mix(in oklab,var(--accent) 12%,var(--panel)),var(--panel));border:1px solid var(--line);border-radius:18px;padding:20px 22px;box-shadow:var(--shadow);margin-bottom:20px}
+  .dh-hero img{width:64px;height:64px;border-radius:50%;border:1px solid var(--line)}
+  .dh-hero h2{margin:0;font-size:21px;letter-spacing:-.01em}.dh-hero p{margin:3px 0 0;color:var(--muted);font-size:13.5px}
+  .dh-quick{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
+  .dh-qa{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 14px;font-weight:600;font-size:13.5px;color:var(--fg);box-shadow:var(--shadow)}
+  .dh-qa:hover{border-color:color-mix(in oklab,var(--accent) 50%,var(--line));text-decoration:none}.dh-qa span{font-size:15px}
+  .dh-qa-admin{background:color-mix(in oklab,var(--accent) 12%,var(--panel));color:var(--accent)}
+  .dh-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}@media(max-width:760px){.dh-grid{grid-template-columns:1fr}}
+  .dh-recs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .dh-rec{display:block;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+  .dh-rec img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:var(--bg-soft)}
+  .dh-rec .dh-rb{padding:9px 11px}.dh-rec b{font-size:13.5px}.dh-rec p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+</style>
+<div class="dh-hero">
+  <img id="dh-avatar" alt=""/>
+  <div style="flex:1;min-width:180px"><h2 id="dh-hi">Welcome back</h2><p id="dh-sub">Loading your dashboard…</p></div>
+</div>
+<div class="dh-quick">
+  <a class="dh-qa" href="/products"><span>🛍️</span> Browse products</a>
+  <a class="dh-qa" href="/dashboard/Order"><span>📦</span> Your orders</a>
+  <a class="dh-qa" href="/dashboard/WishlistItem"><span>❤️</span> Wishlist</a>
+  <a class="dh-qa" href="/dashboard/s/billing"><span>💳</span> Billing</a>
+  <a class="dh-qa" href="/dashboard/s/developer"><span>🔑</span> API keys</a>
+  ${adminTile}
+</div>
+<div class="dh-grid">
+  <div class="pf-section"><h2>Recent orders</h2><p class="pf-sub">Your latest purchases.</p><div id="dh-orders" class="pf-muted">Loading…</div></div>
+  <div class="pf-section"><h2>Recommended for you</h2><p class="pf-sub">Fresh from the catalog.</p><div id="dh-recs" class="dh-recs"></div></div>
+</div>
+<script>(function(){
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function money(c){return window.fmtMoney?window.fmtMoney(c):"$"+(Number(c||0)/100).toFixed(2);}
+  function when(t){return t?(window.fmtDate?window.fmtDate(Number(t)):new Date(Number(t)).toLocaleDateString()):"—";}
+  fetch("/api/auth/get-session",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(s){
+    var u=s&&s.user; var av=document.getElementById("dh-avatar");
+    if(u){ av.src="/avatar?seed="+encodeURIComponent(u.email||u.id); document.getElementById("dh-hi").textContent="Welcome back, "+(u.name||u.email.split("@")[0]); document.getElementById("dh-sub").textContent="Signed in as "+u.email; }
+    else { av.src="/avatar?seed=you"; document.getElementById("dh-sub").textContent="Here's your dashboard."; }
+  }).catch(function(){});
+  fetch("/order",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(os){
+    os=(os||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).slice(0,4);
+    var box=document.getElementById("dh-orders");
+    box.innerHTML=os.length?os.map(function(o){return '<div class="pf-row"><span>#'+esc(o.id)+' <span class="pf-pill">'+esc(o.status)+'</span></span><span class="pf-muted">'+esc(money(o.totalCents))+' · '+esc(when(o.createdAt))+'</span></div>';}).join(""):'<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';
+  }).catch(function(){document.getElementById("dh-orders").innerHTML='<div class="pf-empty">Could not load orders.</div>';});
+  fetch("/product",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(ps){
+    ps=(ps||[]).filter(function(p){return p.status==="published";}).slice(0,4);
+    document.getElementById("dh-recs").innerHTML=ps.map(function(p){return '<a class="dh-rec" href="/products/'+encodeURIComponent(p.slug)+'">'+(p.imageUrl?'<img src="'+esc(p.imageUrl)+'" alt="" loading="lazy"/>':'')+'<div class="dh-rb"><b>'+esc(p.name)+'</b><p>'+esc(money(p.priceCents))+'</p></div></a>';}).join("");
+  }).catch(function(){});
+})();</script>`;
+}
+
+export const dashboardSections: PanelSection[] = [
+  { id: "profile", label: "Profile", summary: "Your name, email and avatar", render: () => PROFILE },
+  { id: "security", label: "Security", summary: "Change your password", render: () => SECURITY },
+  { id: "sessions", label: "Sessions", summary: "Devices signed in", render: () => SESSIONS },
+  { id: "billing", label: "Billing", summary: "Cards, invoices & plan", render: () => BILLING },
+  { id: "developer", label: "API keys", summary: "Tokens for the API", render: () => DEVELOPER },
+  { id: "danger", label: "Danger zone", summary: "Delete your account", render: () => DANGER },
+];
+
+// ----- ADMIN side (the /superadmin panel: full document, grouped, with KPIs + the global cost ledger) -----
+
+export async function adminStats(db: AnyDb): Promise<StatCard[]> {
+  try {
+    const [prods, orders] = await Promise.all([
+      db.select().from(product),
+      db.select().from(order) as Promise<{ totalCents?: number }[]>,
+    ]);
+    const revenue = orders.reduce((n, o) => n + (Number(o.totalCents) || 0), 0);
+    return [
+      { label: "Products", value: prods.length, href: "/panel/Product" },
+      { label: "Orders", value: orders.length, href: "/panel/Order" },
+      { label: "Revenue", value: "$" + (revenue / 100).toFixed(2), hint: "all orders" },
+      { label: "Cost ledger", value: "View →", href: "/panel/s/cost" },
+    ];
+  } catch { return []; }
+}
+
+export const adminGroups = [
+  { title: "Catalog", entities: ["Product", "Category", "Variant", "DiscountCode"] },
+  { title: "Commerce", entities: ["Order", "Cart", "WishlistItem", "Review"] },
+  { title: "Content", entities: ["Post", "Faq"] },
+  { title: "Accounts", entities: ["Project", "ApiToken", "BillingAccount"] },
+  { title: "Ops", sections: ["cost"] },
+];
+
+export const adminSections: PanelSection[] = [
+  { id: "cost", label: "Cost ledger", summary: "Per-request spend, metered", render: () => '<div class="pf-section" style="padding:0;overflow:hidden;border-radius:16px"><iframe src="/cost" title="Cost ledger" style="width:100%;height:72vh;border:0;display:block"></iframe></div>' },
+];

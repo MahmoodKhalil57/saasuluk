@@ -61,7 +61,7 @@ import Layout from "../layouts/Layout.astro";
         if (!r.order) throw new Error(r.error || "Order failed.");
         localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; if (window.discount) window.discount.clear(); render(); // clear ONLY on success
         if (window.toast) window.toast("Order #" + r.order.id + " placed — total " + money(r.totalCents), { type: "success" });
-        document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/account">View in your account →</a></span>`;
+        document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/dashboard">View in your account →</a></span>`;
       } catch (err) {
         if (window.toast) window.toast(err.message || "Could not place the order.", { type: "error" }); // cart preserved
       } finally { payBtn.disabled = false; payBtn.textContent = label; }

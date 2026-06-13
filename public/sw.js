@@ -1,6 +1,6 @@
 /* saasuluk service worker — a minimal offline shell. Cache-first for static assets, network-first for
    navigations (so pages stay fresh), with a cached fallback when offline. Bump CACHE to invalidate. */
-const CACHE = "saasuluk-v3"; // bump on every shell-affecting deploy → forces reinstall + purges the stale cached "/"
+const CACHE = "saasuluk-v8"; // bump on every shell-affecting deploy → forces reinstall + purges the stale cached "/"
 const SHELL = ["/", "/products", "/blogs", "/favicon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -16,8 +16,9 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return; // never cache the API's writes
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  // API/JSON paths: always go to the network (the contract is live).
-  if (/^\/(api|cost|scalar|openapi|product|order|cart|review|post|faq|analytics|search|checkout|discount|recommendations|newsletter|tokens|avatar)/.test(url.pathname)) return;
+  // API/JSON paths: always go to the network (the contract is live). Includes the @suluk/chat (/chat — the agent's
+  // SSE stream is POST so it already bypasses, but its GET /chat/info boot probe must stay live) and @suluk/mcp (/mcp).
+  if (/^\/(api|cost|scalar|openapi|chat|mcp|product|order|cart|review|post|faq|analytics|search|checkout|discount|recommendations|newsletter|tokens|avatar)/.test(url.pathname)) return;
   if (req.mode === "navigate") {
     e.respondWith(fetch(req).catch(() => caches.match(req).then((r) => r || caches.match("/"))));
     return;

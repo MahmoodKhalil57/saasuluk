@@ -50,7 +50,7 @@ import Layout from "../layouts/Layout.astro";
     $("forgotlink").addEventListener("click", (e) => { e.preventDefault(); setMode("forgot"); });
     $("backlink").addEventListener("click", (e) => { e.preventDefault(); setMode("signin"); });
     // preserve where the user came from (?redirectTo=…), open-redirect-guarded (same-origin relative only).
-    const redirectTo = (function () { try { const p = new URLSearchParams(location.search).get("redirectTo"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/account"; } catch (e) { return "/account"; } })();
+    const redirectTo = (function () { try { const p = new URLSearchParams(location.search).get("redirectTo"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/dashboard"; } catch (e) { return "/dashboard"; } })();
     // field-error feedback (mirrors @suluk/nano-stores markInvalid + clearInvalidOnInput): the base CSS rings
     // [aria-invalid] red + .shake animates; editing a field clears it.
     const invalid = (el) => { if (!el) return; el.setAttribute("aria-invalid", "true"); el.classList.add("shake"); setTimeout(() => el.classList.remove("shake"), 450); };

@@ -23,6 +23,9 @@ export const GET: APIRoute = ({ site }) => {
         { title: "Typed SDK", url: `${base}/sdk.ts`, description: "A generated ofetch SDK" },
         { title: "Cost ledger", url: `${base}/cost`, description: "Real per-request cost, metered" },
       ] },
+      { title: "MCP (agent tools)", links: [
+        { title: "MCP server", url: `${base}/mcp`, description: "Model Context Protocol endpoint (Streamable-HTTP, POST JSON-RPC). The same OpenAPI v4 contract projected into read-only tools — list/get products, posts, and categories. Call `initialize` then `tools/list`." },
+      ] },
       { title: "Pages", links: [
         { title: "Pricing", url: `${base}/pricing` }, { title: "About", url: `${base}/about` },
         { title: "FAQ", url: `${base}/faqs` }, { title: "Contact", url: `${base}/contact` },

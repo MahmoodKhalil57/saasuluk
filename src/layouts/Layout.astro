@@ -2,6 +2,7 @@
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
 import { altSchemesCss, SCHEME_SWATCHES } from "../theme";
 import { seoTags, renderTags, organization, website, graph, deploymentMeta, skewGuardScript } from "@suluk/seo";
+import { chatWidget } from "@suluk/chat";
 import { renderBaseCss } from "@suluk/theme";
 import { BUILD_ID } from "../build-id";
 const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
@@ -36,7 +37,7 @@ const footerCols: { head: string; links: [string, Key | string][] }[] = [
   { head: "Product", links: [["/products", "products"], ["/pricing", "pricing"], ["/metrics", "metrics"], ["/dashboard", "dashboard"]] },
   { head: "Resources", links: [["/blogs", "blog"], ["/faqs", "faq"], ["/about", "about"], ["/contact", "contact"]] },
   { head: "Developers", links: [["/reference", "API reference (v4)"], ["/scalar", "Scalar · 3.1 view"], ["/swagger", "Swagger UI"], ["/openapi.json", "OpenAPI v4 doc"], ["/panel", "Admin panel"], ["/superadmin", "Superadmin"], ["/cockpit", "Cockpit"], ["/cost", "Cost ledger"]] },
-  { head: "Robots & AI", links: [["/sitemap.xml", "Sitemap"], ["/robots.txt", "robots.txt"], ["/llms.txt", "llms.txt"], ["/og.svg?title=saasuluk", "OG image"], ["/manifest.webmanifest", "Web manifest"]] },
+  { head: "Robots & AI", links: [["/sitemap.xml", "Sitemap"], ["/robots.txt", "robots.txt"], ["/llms.txt", "llms.txt"], ["/mcp", "MCP server"], ["/og.svg?title=saasuluk", "OG image"], ["/manifest.webmanifest", "Web manifest"]] },
   { head: "Legal", links: [["/terms", "terms"], ["/privacy", "privacy"], ["/license", "license"]] },
 ];
 const path = Astro.url.pathname;
@@ -471,11 +472,56 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         fetch("/api/auth/get-session", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
           var u = s && s.user; if (!u) return;
           var name = u.name || (u.email || "").split("@")[0];
-          link.href = "/account"; link.className = "iconbtn"; link.style.display = "inline-flex"; link.style.alignItems = "center"; link.style.gap = "6px"; link.style.padding = "4px 9px 4px 5px";
+          link.href = "/dashboard"; link.className = "iconbtn"; link.style.display = "inline-flex"; link.style.alignItems = "center"; link.style.gap = "6px"; link.style.padding = "4px 9px 4px 5px";
           link.innerHTML = '<img src="/avatar?seed=' + encodeURIComponent(u.email || name) + '" width="22" height="22" style="border-radius:50%"/> <span>' + name + '</span>';
         }).catch(function () {});
       })();
     </script>
     <script is:inline set:html={skewGuardScript()}></script>
+    <!-- Browser-executed CLIENT TOOLS the @suluk/chat agent can call: cart (works logged-out — the cart is local),
+         theme/scheme, and same-site navigation. Only DEFINITIONS go to the model; run() executes here in the page. -->
+    <script is:inline>
+      (function () {
+        function num(v) { var n = Number(v); return Number.isFinite(n) ? n : 0; }
+        function readCart() { try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch (e) { return []; } }
+        var schemes = (window.__schemes || []).map(function (s) { return s.name; });
+        window.__sulukChatContext = function () {
+          var c = readCart();
+          return { path: location.pathname, theme: localStorage.getItem("theme") || "system", scheme: document.documentElement.dataset.scheme || "default",
+            availableSchemes: schemes, cart: c, cartCount: c.reduce(function (n, l) { return n + (l.qty || 0); }, 0),
+            subtotalCents: c.reduce(function (n, l) { return n + (l.qty || 0) * (l.priceCents || 0); }, 0) };
+        };
+        window.__sulukChatTools = [
+          { name: "addToCart", description: "Add a product to the shopping cart by its numeric product id (find the id via search/listProduct first). Quantity defaults to 1. Works without signing in.",
+            parameters: { type: "object", properties: { productId: { type: "integer", description: "the product's numeric id" }, quantity: { type: "integer", description: "how many (default 1)" } }, required: ["productId"] },
+            run: function (a) { var id = num(a.productId), qty = Math.max(1, num(a.quantity) || 1);
+              return fetch("/product/" + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; }).then(function (p) { if (p && window.cart && window.cart.add) window.cart.add({ productId: id, qty: qty, priceCents: num(p.priceCents), name: String(p.name || ("#" + id)) }); }); } },
+          { name: "removeFromCart", description: "Remove a product from the cart by its numeric product id.",
+            parameters: { type: "object", properties: { productId: { type: "integer" } }, required: ["productId"] },
+            run: function (a) { if (window.cart && window.cart.remove) window.cart.remove(num(a.productId)); } },
+          { name: "setCartQuantity", description: "Set the quantity of a product already in the cart (0 removes it).",
+            parameters: { type: "object", properties: { productId: { type: "integer" }, quantity: { type: "integer" } }, required: ["productId", "quantity"] },
+            run: function (a) { if (window.cart && window.cart.setQty) window.cart.setQty(num(a.productId), Math.max(0, num(a.quantity))); } },
+          { name: "clearCart", description: "Empty the shopping cart.", parameters: { type: "object", properties: {} },
+            run: function () { if (window.cart && window.cart.clear) window.cart.clear(); } },
+          { name: "openCart", description: "Open the cart drawer so the user can review their items.", parameters: { type: "object", properties: {} },
+            run: function () { var b = document.getElementById("cartbtn"); if (b) b.click(); } },
+          { name: "goToCheckout", description: "Go to the checkout page.", parameters: { type: "object", properties: {} },
+            run: function () { location.href = "/checkout"; } },
+          { name: "setTheme", description: "Switch the site between light and dark mode, or follow the operating system.",
+            parameters: { type: "object", properties: { mode: { type: "string", enum: ["light", "dark", "system"] } }, required: ["mode"] },
+            run: function (a) { var m = a.mode === "dark" ? "dark" : a.mode === "light" ? "light" : "system"; try { localStorage.setItem("theme", m); } catch (e) {} document.documentElement.dataset.theme = m === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : m; } },
+          { name: "setColorScheme", description: "Apply a named color scheme to the whole site. Use one of the names listed in availableSchemes (browser state).",
+            parameters: { type: "object", properties: { scheme: { type: "string" } }, required: ["scheme"] },
+            run: function (a) { var n = String(a.scheme || ""); if (!schemes.length || schemes.indexOf(n) >= 0) { document.documentElement.dataset.scheme = n; try { localStorage.setItem("scheme", n); } catch (e) {} } } },
+          { name: "navigate", description: "Navigate to a page on this site. Use a same-site path such as /products, /pricing, /products/<slug>, /blogs, /faqs, or /dashboard.",
+            parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+            run: function (a) { var p = String(a.path || ""); if (p === "/" || /^\/[^\/\\]/.test(p)) location.href = p; } }
+        ];
+      })();
+    </script>
+    <!-- @suluk/chat — the floating, contract-driven assistant (browse + act). Baked into the static shell; its
+         script talks to the worker's /chat SSE endpoint. Theme-aware via the same CSS vars as the rest of the site. -->
+    <Fragment set:html={chatWidget({ title: "saasuluk assistant" })} />
   </body>
 </html>

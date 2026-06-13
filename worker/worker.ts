@@ -29,6 +29,9 @@ import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
 import { panelApp } from "@suluk/panel";
+import { mcpApp, appExec } from "@suluk/mcp";
+import { chatApp, chatWidget } from "@suluk/chat";
+import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "../src/server/dashboard";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
@@ -54,7 +57,7 @@ const access = accessIndex(document); // op → x-suluk-access, for the wire enf
 // minimal R2 surface (avoids pulling @cloudflare/workers-types) — for @suluk/panel media uploads.
 type R2Object = { body: ReadableStream; httpMetadata?: { contentType?: string } };
 type MediaBucket = { put(key: string, value: ReadableStream | ArrayBuffer | string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>; get(key: string): Promise<R2Object | null> };
-type Env = { DB: D1Database; MEDIA?: MediaBucket; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string };
+type Env = { DB: D1Database; MEDIA?: MediaBucket; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string; OPENROUTER_API_KEY?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; isAdmin?: boolean } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
@@ -201,11 +204,34 @@ app.get("/cost", async (c) => {
   return c.json({ ...summarize(events), opStats });
 });
 
+// Signed-in (verified session OR API token) — the gate for the user /dashboard.
+const isSignedIn = (c: Context): boolean => { const g = c as unknown as { get: (k: string) => unknown }; return !!(g.get("sessionUser") || g.get("tokenUser")); };
+
 // the /superadmin cockpit — the same brain as the VSCode extension, now running on a Worker. Gated on a VERIFIED
 // superadmin session (SUPERADMIN_EMAILS), not a spoofable header — it surfaces the whole store's cost ledger.
 app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml() }));
-// @suluk/panel — the Payload-style, field-type-aware admin (contract-first). Same document → a polished CRUD panel.
-app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml(), uploadPath: "/panel/upload" }));
+// /superadmin's admin panel — @suluk/panel as a full dashboard: every entity (grouped), admin KPIs, the global cost
+// ledger (moved here from the old user /dashboard). Admin-gated; full document.
+app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml(), uploadPath: "/panel/upload",
+  homeHeading: "Superadmin", homeLabel: "Overview", groups: adminGroups, sections: adminSections, stats: (c) => adminStats(drizzle(c.env.DB) as never) }));
+
+// The signed-in USER's /dashboard — the consolidated self-service area (replaces /account + /dashboard). Same panel
+// framework, but projected to the CALLER's role: they get ONLY their own entities (orders, wishlist, reviews,
+// projects, cart) plus the custom sections (profile, security, sessions, billing, API keys, danger zone). Anonymous
+// visitors are bounced to /login.
+app.use("/dashboard", (c, next) => (isSignedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+app.use("/dashboard/*", (c, next) => (isSignedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+app.route("/", panelApp({
+  document: (c) => projectDocument(document, viewerOf(c as unknown as Context), CANON_HASH),
+  basePath: "/dashboard", title: "saasuluk", authorize: (c) => isSignedIn(c), headHtml: themeHeadHtml(), uploadPath: "/panel/upload",
+  homeHeading: "Your dashboard", homeLabel: "Overview",
+  sections: dashboardSections, groups: dashboardGroups, hideEntities: dashboardHiddenEntities,
+  home: (c) => dashboardHome({ admin: isAdmin(c as unknown as Context) }), // bespoke, role-aware product overview
+  stats: (c) => userStats(drizzle(c.env.DB) as never, principal(c as unknown as Context)),
+}));
+// /account is retired — fold it into /dashboard.
+app.get("/account", (c) => c.redirect("/dashboard", 301));
+app.get("/account/*", (c) => c.redirect("/dashboard", 301));
 
 // Media uploads for @suluk/panel — admin-only, raster images only (no SVG → no inline-script vector), 5 MB cap,
 // random key (no path traversal / overwrite); stored in R2 and served back with nosniff + a locked-down CSP.
@@ -232,6 +258,42 @@ app.get("/media/:key", async (c) => {
   if (!obj) return c.notFound();
   return new Response(obj.body, { headers: { "content-type": obj.httpMetadata?.contentType ?? "application/octet-stream", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
 });
+
+// @suluk/mcp — the contract projected ONE more way: a Model Context Protocol server at /mcp. Tools = exactly what
+// the CALLER's role may READ (projectDocument per viewer, read-only), each executed as a same-origin subrequest so
+// the store's own enforceAccess gate is the real boundary on every call. Anonymous agents browse the public catalog
+// (products/posts/categories); the machine-callable companion to /llms.txt. Streamable-HTTP JSON-RPC (POST /mcp).
+app.route("/", mcpApp({
+  document: (c) => projectDocument(document, viewerOf(c as unknown as Context), CANON_HASH),
+  basePath: "/mcp",
+  name: "saasuluk",
+  version: BUILD_ID,
+  include: "read",
+  exec: appExec(app), // dispatch tool calls in-process through THIS app (no edge self-loop / 522 on Workers)
+  instructions: "Browse the saasuluk store: list and read products, posts, and categories. The tool set mirrors the caller's role — anonymous callers see the public catalog.",
+}));
+
+// @suluk/chat — the in-page floating ASSISTANT. Same contract → an agent that can BROWSE and (when the user is
+// signed in) ACT: it runs an OpenRouter tool-use loop (model chosen by @suluk/models) over the role-projected
+// operations, executed in-process through enforceAccess — so the agent is exactly as capable as the caller is.
+app.route("/", chatApp({
+  document: (c) => projectDocument(document, viewerOf(c as unknown as Context), CANON_HASH),
+  basePath: "/chat",
+  include: "all", // read + act; the per-role projection + enforceAccess decide what a given caller may actually do
+  exec: appExec(app),
+  apiKey: (c) => c.env.OPENROUTER_API_KEY,
+  referer: "https://saasuluk.saastemly.com",
+  title: "saasuluk",
+  greeting: "Hi! I'm the saasuluk assistant. I can find products, compare plans, add things to your cart (no sign-in needed), switch the theme, navigate the site, and dig through the docs. What can I do for you?",
+  system:
+    "You are the assistant for saasuluk, a premium ecommerce + SaaS starter whose products are real slices of its own codebase. " +
+    "Use the tools to browse and search the catalog (products, categories, posts, FAQs) and to take actions the signed-in user asks for (e.g. placing an order). " +
+    "You can ALSO act directly in the user's browser: add/remove items in their cart (this works even when they are NOT signed in — the cart is local), set the quantity, open the cart, go to checkout, switch light/dark theme, apply a color scheme, and navigate to pages. " +
+    "To add a product to the cart, first find its numeric id via search or listProduct, then call addToCart with that id. The user's current cart and page are given to you as read-only browser state — use it to answer 'what's in my cart' and to avoid re-adding duplicates. " +
+    "Ground every answer in tool results — never invent products, prices, or availability. Prices are stored in cents; present them as currency. " +
+    "Briefly confirm before checkout or before deleting anything. If a server tool returns an authorization error, tell them they may need to sign in. " +
+    "Be concise and friendly; use short markdown and link to pages like /products/<slug>, /pricing, or /blogs/<slug> when helpful.",
+}));
 
 // config health (@suluk/env) — one declared registry (src/server/env.ts) projected into the admin surface. The
 // browser gets the premium HTML panel; an API client gets JSON. Values are NEVER returned — presence only.
