@@ -18,11 +18,12 @@ const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number; key: 
   createReview: { windowMs: 60000, maxRequests: 20, key: "ip" },
 };
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
-import { scalarResponse } from "@suluk/scalar";
+import { scalarResponse, scalarV4Response, enrichedSpec, SCALAR_VERSION } from "@suluk/scalar";
+import { SCALAR_FORK_HASH } from "../../worker/gen/scalar-fork";
 import { swaggerResponse } from "@suluk/swagger";
 import { ogImageSvg, DEPLOYMENT_HEADER } from "@suluk/seo";
 import { BUILD_ID } from "../build-id";
-import { referenceResponse } from "@suluk/reference";
+import { referenceInsightsResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
@@ -101,10 +102,15 @@ export async function createApp() {
   mount(app, routes);                                                                            // contract-derived CRUD
   mountOperations(app, () => db);                                                                // custom ops (checkout, search, analytics, …)
   const canonHash = docHash(document);
-  app.get("/reference", (c) => referenceResponse(isAdmin(c) ? document : scrubSource(document), { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts", conformanceUrl: "/conformance.test.ts" })); // PRIMARY docs: v4 AS v4 + L2 live view + SDK + conformance suite; provenance (↗ src) for the maintainer (admin) only
+  const SCALAR_SELF = `/vendor/scalar/standalone-${SCALAR_VERSION}.js`; // upstream (vanilla /scalar)
+  const SCALAR_FORK = `/vendor/scalar/standalone-suluk.js?v=${SCALAR_FORK_HASH}`; // our fork: latest + suluk v4 patches (/reference); ?v= cache-busts on rebuild
+  const refProjected = (c: Context) => { const base = isAdmin(c) ? document : scrubSource(document); const v = requestedViewer(c, c.req.query("as")); return v ? projectDocument(base, v, canonHash) : base; };
+  app.get("/reference", (c) => scalarV4Response(isAdmin(c) ? document : scrubSource(document), { cdn: SCALAR_FORK, pageTitle: "saasuluk — OpenAPI v4 reference", brand: "saasuluk", specUrl: "/reference/spec", views: [{ label: "Anonymous", value: "anon" }, { label: "Signed-in", value: "user" }, { label: "Admin", value: "admin" }], insightsUrl: "/reference/insights" })); // the ONE v4 reference: OUR forked Scalar + superpowers + ⚡ insights drawer
+  app.get("/reference/spec", (c) => c.json(enrichedSpec(refProjected(c)).spec));
+  app.get("/reference/insights", (c) => referenceInsightsResponse(refProjected(c), { costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" })); // the v4 superpower panels for the drawer
   app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK, generated from the contract
   app.get("/conformance.test.ts", (c) => new Response(generateTests(isAdmin(c) ? document : scrubSource(document), { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk.conformance.test.ts"' } })); // a runnable suite asserting the SERVER ENFORCES the contract (access on the wire, status, schema, cost)
-  app.get("/scalar", () => scalarResponse(scrubSource(document)));                                // 3.1 compatibility view (external — no provenance)
+  app.get("/scalar", () => scalarResponse(scrubSource(document), { cdn: SCALAR_SELF, facetBadges: false, customCss: "" })); // VANILLA Scalar (plain 4→3 downgrade, no superpowers) — the baseline; the fancy view is /reference
   app.get("/swagger", () => swaggerResponse(scrubSource(document)));                              // Swagger UI — a second contract-rendered docs lens (@suluk/swagger)
   app.get("/cockpit", (c) => isAdmin(c) ? c.html(renderCockpitPage(document)) : c.json({ error: "forbidden" }, 403)); // admin: ship gates + convergence + diagrams (@suluk/cockpit + visual)
   app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c) }));                                 // the renderer auto-selects this viewer's lens (L2)

@@ -18,13 +18,14 @@ import { parseListQuery, tableComponents } from "@suluk/drizzle";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
-import { scalarResponse } from "@suluk/scalar";
+import { scalarResponse, scalarV4Response, enrichedSpec, SCALAR_VERSION } from "@suluk/scalar";
 import { swaggerResponse } from "@suluk/swagger";
 import { ogImageSvg, DEPLOYMENT_HEADER } from "@suluk/seo";
 import { renderCockpitPage } from "../src/server/cockpit-view";
 import { themeHeadHtml } from "../src/themes/head";
 import { BUILD_ID } from "../src/build-id";
-import { referenceResponse } from "@suluk/reference";
+import { referenceInsightsResponse } from "@suluk/reference";
+import { SCALAR_FORK_HASH } from "./gen/scalar-fork";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
@@ -175,10 +176,30 @@ const routes: RouteContract[] = built.backend.routes.map((r) => {
 mount(app, routes);
 mountOperations(app, (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB)); // custom ops on D1
 
-app.get("/reference", (c) => referenceResponse(isAdmin(c) ? document : scrubSource(document), { pageTitle: "Saasuluk — v4 reference", costLedgerUrl: "/cost", whoamiUrl: "/api/whoami", sdkUrl: "/sdk.ts", conformanceUrl: "/conformance.test.ts" })); // PRIMARY docs + L2 live view + SDK + conformance suite; provenance (↗ src) shown to the maintainer (admin) only
+// /reference — the ONE v4 reference: the self-hosted Scalar UI faithfully fed the v4 doc + ALL suluk superpowers
+// (cost/access badges + breakdowns) + the "View as" role projector + the v4-native panels (cost explorer,
+// reachability matrix, ADA playground, hardening) rendered INLINE in Scalar's own content (via the fork's
+// content-start slot — no second page, no bolt-on drawer). The `?v=` hash cache-busts on every fork rebuild.
+const SCALAR_SELF = `/vendor/scalar/standalone-${SCALAR_VERSION}.js`; // upstream Scalar (for /scalar, vanilla)
+const SCALAR_FORK = `/vendor/scalar/standalone-suluk.js?v=${SCALAR_FORK_HASH}`; // OUR fork: latest Scalar + suluk v4 patches (for /reference)
+const refBase = (c: Context) => (isAdmin(c) ? document : scrubSource(document));
+const refProjected = (c: Context) => { const v = requestedViewer(c, c.req.query("as")); const b = refBase(c); return v ? projectDocument(b, v, CANON_HASH) : b; };
+app.get("/reference", (c) => scalarV4Response(refBase(c as unknown as Context), {
+  cdn: SCALAR_FORK, pageTitle: "saasuluk — OpenAPI v4 reference", brand: "saasuluk", specUrl: "/reference/spec",
+  views: [{ label: "Anonymous", value: "anon" }, { label: "Signed-in", value: "user" }, { label: "Admin", value: "admin" }],
+  insightsUrl: "/reference/insights",
+}));
+// The "View as" projector fetches this: the role-projected v4 doc, downgraded + facet-enriched for Scalar. A
+// non-admin never sees provenance (scrubbed base); projection only HIDES ops a role can't reach (concealment, not authz).
+app.get("/reference/spec", (c) => c.json(enrichedSpec(refProjected(c as unknown as Context)).spec));
+// The ⚡ Insights drawer iframes this: the v4 superpower PANELS (cost explorer, reachability, ADA, hardening) — same
+// role projection as the spec, so the drawer reflects the selected "View as".
+app.get("/reference/insights", (c) => referenceInsightsResponse(refProjected(c as unknown as Context), { costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" }));
 app.get("/sdk.ts", (c) => new Response(generateSdk(document, { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk-sdk.ts"' } })); // a complete typed ofetch SDK from the contract
 app.get("/conformance.test.ts", (c) => new Response(generateTests(isAdmin(c) ? document : scrubSource(document), { baseURL: new URL(c.req.url).origin }), { headers: { "content-type": "application/typescript; charset=utf-8", "content-disposition": 'attachment; filename="saasuluk.conformance.test.ts"' } })); // a runnable suite asserting the SERVER ENFORCES the contract (access on the wire, status, schema, cost)
-app.get("/scalar", () => scalarResponse(scrubSource(document)));                                // 3.1 compatibility view (external — no provenance)
+// /scalar — VANILLA Scalar: the plain v4→3.1 downgrade fed to stock Scalar (no badges, no theme, no suluk superpowers).
+// The honest "what upstream Scalar shows" baseline; the fancy v4 view lives at /reference.
+app.get("/scalar", () => scalarResponse(scrubSource(document), { cdn: SCALAR_SELF, facetBadges: false, customCss: "" }));
 app.get("/swagger", () => swaggerResponse(scrubSource(document)));                              // Swagger UI — a second contract-rendered docs lens (@suluk/swagger)
 app.get("/cockpit", (c) => isAdmin(c) ? c.html(renderCockpitPage(document)) : c.json({ error: "forbidden" }, 403)); // admin: ship gates + convergence + diagrams (@suluk/cockpit + docs + visual)
 app.get("/api/whoami", (c) => c.json({ viewer: viewerOf(c as unknown as Context) }));           // renderer auto-selects this viewer's lens (L2)
