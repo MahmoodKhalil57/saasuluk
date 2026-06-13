@@ -26,7 +26,7 @@
         "@suluk/i18n": "^0.1.0",
         "@suluk/nano-stores": "^0.1.2",
         "@suluk/openapi-compat": "^0.1.2",
-        "@suluk/panel": "^0.1.1",
+        "@suluk/panel": "^0.1.3",
         "@suluk/reference": "^0.1.0",
         "@suluk/scalar": "^0.1.2",
         "@suluk/sdk": "^0.1.0",
@@ -400,7 +400,7 @@
 
     "@suluk/openapi-compat": ["@suluk/openapi-compat@0.1.2", "", { "dependencies": { "@suluk/core": "^0.1.7" } }, "sha512-gjoV+L1qWKkJzeaj/5vINEdByU822YghGeHChRX1Jwzy1QwG0c/JCc3WCQg4w204ASAfDbK7C+8OMKzBPpD7EA=="],
 
-    "@suluk/panel": ["@suluk/panel@0.1.1", "", { "dependencies": { "@suluk/core": "^0.1.7" }, "peerDependencies": { "hono": "*" } }, "sha512-ZPdfSsOYduiupTAkcmwAjOsBE8FZQWDD4YeLsnkkJuBREJTlIjudVjdYp5gFIFBpDcPDeFH8MXYbiicKcMpjjQ=="],
+    "@suluk/panel": ["@suluk/panel@0.1.3", "", { "dependencies": { "@suluk/core": "^0.1.7" }, "peerDependencies": { "hono": "*" } }, "sha512-2pRz3hco1lieJxqljD5/zW1QZwpXdqwoH2w9zQub+YxQffd1E2IUhYkSLb1rDJAhzO+aSqMvyCavSheqBGBpkg=="],
 
     "@suluk/reference": ["@suluk/reference@0.1.0", "", { "dependencies": { "@suluk/core": "^0.1.7", "@suluk/harden": "^0.1.0" } }, "sha512-khPAoTEka8raqtPxrVvIMhTMfzljqP90InENleqcE5np/DunbgGzOzRkNV7rscaOCW7SqOWsgR/RqXZxHWX4Bg=="],
 

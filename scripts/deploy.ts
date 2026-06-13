@@ -61,6 +61,7 @@ const res = await deployWith(
     compatibilityDate: "2026-06-01",
     compatibilityFlags: ["nodejs_compat"],
     d1: { binding: "DB", databaseName: "saasuluk-db", migrations },
+    r2: [{ binding: "MEDIA", bucketName: "saasuluk-media" }], // @suluk/panel media uploads (provisioned + bound)
     assets,
     assetsConfig: { html_handling: "auto-trailing-slash" },
     vars: {

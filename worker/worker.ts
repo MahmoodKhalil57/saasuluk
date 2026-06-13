@@ -51,7 +51,10 @@ const CANON_HASH = docHash(document); // canonical hash — the L2 projection's 
 const ada = buildAda(document);
 const access = accessIndex(document); // op → x-suluk-access, for the wire enforcer
 
-type Env = { DB: D1Database; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string };
+// minimal R2 surface (avoids pulling @cloudflare/workers-types) — for @suluk/panel media uploads.
+type R2Object = { body: ReadableStream; httpMetadata?: { contentType?: string } };
+type MediaBucket = { put(key: string, value: ReadableStream | ArrayBuffer | string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>; get(key: string): Promise<R2Object | null> };
+type Env = { DB: D1Database; MEDIA?: MediaBucket; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; isAdmin?: boolean } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
@@ -202,7 +205,33 @@ app.get("/cost", async (c) => {
 // superadmin session (SUPERADMIN_EMAILS), not a spoofable header — it surfaces the whole store's cost ledger.
 app.route("/", adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml() }));
 // @suluk/panel — the Payload-style, field-type-aware admin (contract-first). Same document → a polished CRUD panel.
-app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml() }));
+app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml(), uploadPath: "/panel/upload" }));
+
+// Media uploads for @suluk/panel — admin-only, raster images only (no SVG → no inline-script vector), 5 MB cap,
+// random key (no path traversal / overwrite); stored in R2 and served back with nosniff + a locked-down CSP.
+const UPLOAD_EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" };
+app.post("/panel/upload", async (c) => {
+  if (!isAdmin(c as unknown as Context)) return c.json({ error: "forbidden" }, 403);
+  if (!c.env.MEDIA) return c.json({ error: "media storage not configured" }, 503);
+  // Cheap fast-path: reject by declared length BEFORE formData() buffers the whole body into isolate memory.
+  // Client-supplied + absent under chunked encoding, so the post-parse file.size check below stays authoritative.
+  const declared = Number(c.req.header("content-length") ?? 0);
+  if (declared > 5 * 1024 * 1024) return c.json({ error: "file too large (max 5 MB)" }, 413);
+  const file = (await c.req.formData().catch(() => null))?.get("file");
+  if (!(file instanceof File)) return c.json({ error: "no file uploaded" }, 400);
+  if (file.size > 5 * 1024 * 1024) return c.json({ error: "file too large (max 5 MB)" }, 413);
+  const ext = UPLOAD_EXT[file.type];
+  if (!ext) return c.json({ error: "unsupported type — raster images only (png/jpg/webp/gif/avif)" }, 415);
+  const key = `${crypto.randomUUID().replace(/-/g, "")}.${ext}`;
+  await c.env.MEDIA.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
+  return c.json({ url: `/media/${key}` });
+});
+app.get("/media/:key", async (c) => {
+  if (!c.env.MEDIA) return c.notFound();
+  const obj = await c.env.MEDIA.get(c.req.param("key")); // :key is a single segment → no traversal
+  if (!obj) return c.notFound();
+  return new Response(obj.body, { headers: { "content-type": obj.httpMetadata?.contentType ?? "application/octet-stream", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
+});
 
 // config health (@suluk/env) — one declared registry (src/server/env.ts) projected into the admin surface. The
 // browser gets the premium HTML panel; an API client gets JSON. Values are NEVER returned — presence only.
