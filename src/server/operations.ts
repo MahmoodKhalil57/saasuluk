@@ -87,8 +87,19 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
   if (!o || o.status === "paid") return false;
   const res = (await dz.update(order).set({ status: "paid" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
   const changed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
-  if (changed && o.discountCode) {
-    await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
+  if (changed) {
+    if (o.discountCode) {
+      await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
+    }
+    // decrement stock for each paid line (product + variant), clamped at 0 — the SINGLE place inventory is reduced,
+    // on the once-only paid transition, so a webhook re-delivery / double-confirm can't double-decrement.
+    let items: { productId?: number; variantId?: number; qty?: number }[] = [];
+    try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+    for (const it of items) {
+      const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
+      if (it.productId != null) await dz.update(product).set({ inventory: sql`max(0, ${product.inventory} - ${qty})` }).where(eq(product.id, Number(it.productId))).run();
+      if (it.variantId != null) await dz.update(variant).set({ inventory: sql`max(0, ${variant.inventory} - ${qty})` }).where(eq(variant.id, Number(it.variantId))).run();
+    }
   }
   return changed;
 }
@@ -129,7 +140,17 @@ const write = (m: number): CostModel => ({ components: [{ source: "compute", bas
 interface LineItem { productId?: number; variantId?: number; qty?: number; priceCents?: number }
 interface ResolvedDiscount { valid: boolean; discountType?: "percent" | "fixed"; discountValue?: number; reason?: string; maxDiscountCents?: number; minSubtotalCents?: number }
 /** A server-re-priced order line — the client's priceCents is NEVER trusted; every cent comes from the product/variant row. */
-interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string }
+interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string; inventory: number }
+
+/** The first stock problem in the cart (sold-out / over-qty), or null if everything is available. */
+function stockError(lines: PricedLine[]): string | null {
+  for (const l of lines) {
+    const label = l.name + (l.variantLabel ? ` (${l.variantLabel})` : "");
+    if (l.inventory <= 0) return `${label} is sold out.`;
+    if (l.qty > l.inventory) return `Only ${l.inventory} of ${label} ${l.inventory === 1 ? "is" : "are"} left.`;
+  }
+  return null;
+}
 
 const idParam = { path: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } };
 function jsonOp(
@@ -260,7 +281,7 @@ async function repriceLines(dz: Dz, items: LineItem[]): Promise<PricedLine[]> {
     const vrow = i.variantId != null ? byVid.get(Number(i.variantId)) : undefined;
     const vmatch = vrow && Number(vrow.productId) === Number(p.id) ? vrow : undefined;
     const priceCents = vmatch && vmatch.priceCentsEnabled ? Number(vmatch.priceCents) : Number(p.priceCents);
-    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined });
+    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined, inventory: Number(vmatch ? vmatch.inventory : p.inventory) });
   }
   return out;
 }
@@ -281,6 +302,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // SERVER-AUTHORITATIVE: re-price every line from the product/variant rows (the client's priceCents is ignored).
     const lines = await repriceLines(dz, rawItems);
     if (!lines.length) return c.json({ error: "Your cart is empty." }, 422);
+    const stock = stockError(lines); if (stock) return c.json({ error: stock }, 409); // never oversell
     const subtotal = linesSubtotal(lines);
     const who = principal(c);
     const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
@@ -423,6 +445,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // SERVER-AUTHORITATIVE, variant-aware re-pricing (the same path the free checkout uses) — client priceCents ignored.
     const lines = await repriceLines(dz, Array.isArray(body.items) ? body.items : []);
     if (!lines.length) return c.json({ error: "No purchasable items in the cart." }, 422);
+    const stock = stockError(lines); if (stock) return c.json({ error: stock }, 409); // never oversell
     const subtotal = linesSubtotal(lines);
     const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);

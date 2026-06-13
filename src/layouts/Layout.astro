@@ -152,6 +152,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       .spacer { flex:1; }
       /* footer */
       footer.site { border-top:1px solid var(--line); background:var(--bg-soft); margin-top:60px; }
+      footer.site .newsletter { display:flex; gap:24px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:28px 0; border-bottom:1px solid var(--line); }
+      footer.site .newsletter-form { display:flex; gap:8px; flex-wrap:wrap; }
+      footer.site .newsletter-form input { min-width:220px; }
       footer.site .cols { display:grid; grid-template-columns:1.5fr repeat(5,1fr); gap:24px; padding:46px 0 30px; }
       @media (max-width:980px){ footer.site .cols{grid-template-columns:1fr 1fr 1fr} }
       @media (max-width:600px){ footer.site .cols{grid-template-columns:1fr 1fr} }
@@ -361,6 +364,16 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     <main id="main-content"><div class="wrap"><slot /></div></main>
     <footer class="site">
       <div class="wrap">
+        <div class="newsletter">
+          <div>
+            <h4 style="font-size:16px;text-transform:none;letter-spacing:-.01em;color:var(--fg);margin:0 0 4px">Stay in the loop</h4>
+            <p style="color:var(--muted);font-size:14px;margin:0">New modules, the live cost ledger, and OpenAPI&nbsp;v4 progress — no spam.</p>
+          </div>
+          <form id="newsletter-form" class="newsletter-form">
+            <input id="newsletter-email" type="email" required placeholder="you@example.com" aria-label="Email address" autocomplete="email" />
+            <button class="btn" type="submit" id="newsletter-btn">Subscribe</button>
+          </form>
+        </div>
         <div class="cols">
           <div>
             <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
@@ -376,6 +389,20 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         </div>
       </div>
     </footer>
+    <script is:inline>
+      (function () {
+        var f = document.getElementById("newsletter-form"); if (!f) return;
+        f.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var inp = document.getElementById("newsletter-email"), btn = document.getElementById("newsletter-btn");
+          var email = (inp.value || "").trim(); if (!email) return;
+          btn.disabled = true; var lbl = btn.textContent; btn.textContent = "…";
+          fetch("/newsletter/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email }) })
+            .then(function (r) { if (!r.ok) throw new Error(); f.innerHTML = '<p style="color:var(--accent);font-weight:600;margin:0">✓ Subscribed — thanks!</p>'; if (window.toast) window.toast("Subscribed ✓", { type: "success" }); })
+            .catch(function () { btn.disabled = false; btn.textContent = lbl; if (window.toast) window.toast("Could not subscribe — try again.", { type: "error" }); });
+        });
+      })();
+    </script>
     <!-- cart drawer (populated by the bundled @suluk/nano-stores module below) -->
     <!-- ⌘K command palette (global search-and-jump over /search) -->
     <div id="paletteback" class="paletteback" hidden></div>
