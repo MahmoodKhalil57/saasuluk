@@ -124,9 +124,17 @@ async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Promise<vo
       const qty = Math.max(1, Math.floor(Number(l.qty) || 1));
       return { name: l.variantLabel ? `${l.name ?? "Item"} — ${l.variantLabel}` : (l.name ?? "Item"), qty, totalCents: Math.max(0, Math.round(Number(l.priceCents) || 0)) * qty };
     });
+    // surface the ship-to on the receipt for physical orders (one display line per array entry; @suluk/email escapes them)
+    let ship: string[] | undefined;
+    if (o.shippingAddress) {
+      try {
+        const a = JSON.parse(o.shippingAddress) as ShipTo;
+        ship = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter((s): s is string => !!s && !!s.trim());
+      } catch { ship = undefined; }
+    }
     const origin = new URL(c.req.url).origin;
     const { subject, html } = orderConfirmationEmail(
-      { orderNumber: String(o.id), items: lines, totalCents: o.totalCents, currency: "usd", orderUrl: `${origin}/dashboard` },
+      { orderNumber: String(o.id), items: lines, totalCents: o.totalCents, currency: "usd", orderUrl: `${origin}/dashboard`, ...(ship && ship.length ? { shippingAddress: ship } : {}) },
       { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } },
     );
     sendEmailAsync({ to: o.customerEmail, subject, html }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
@@ -210,10 +218,13 @@ const obj = (properties: Record<string, unknown>, required?: string[]) => ({ typ
 const ID = 1_000_000_000_000;
 const cartLine = obj({ productId: v.int(1, ID), variantId: v.int(1, ID), qty: v.int(1, 1000), priceCents: v.cents() });
 const payLine = obj({ productId: v.int(1, ID), variantId: v.int(1, ID), qty: v.int(1, 1000) });
+// shipping address captured at checkout for physical goods — a JSON snapshot stored on the order. line2/state optional;
+// the rest are required IF an address is supplied (a digital-only order simply omits the whole object).
+const shipAddress = obj({ name: v.line(120), line1: v.line(160), line2: v.line(160), city: v.line(100), state: v.line(100), postalCode: v.line(20), country: v.line(56) }, ["name", "line1", "city", "postalCode", "country"]);
 
 /** The v4 path fragment for the custom operations — merged into the contract document (then hardened below). */
 export const OPERATION_PATHS: Record<string, unknown> = {
-  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: v.int(1, ID), items: { type: "array", maxItems: 200, items: cartLine }, discountCode: v.code(40) }), status: 201 }) } },
+  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: v.int(1, ID), items: { type: "array", maxItems: 200, items: cartLine }, discountCode: v.code(40), shippingAddress: shipAddress }), status: 201 }) } },
   "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: obj({ code: v.code(40), subtotalCents: v.cents(100_000_000_000) }, ["code"]) }) } },
   "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
@@ -225,7 +236,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
-  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40) }) }) } },
+  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40), shippingAddress: shipAddress }) }) } },
   "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: obj({ orderId: v.int(1, ID), sessionId: v.line(255, "^[A-Za-z0-9_]+$") }, ["orderId", "sessionId"]) }) } },
   "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: v.email() }) }) } },
   "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object", additionalProperties: false } }) } },
@@ -317,11 +328,24 @@ async function repriceLines(dz: Dz, items: LineItem[]): Promise<PricedLine[]> {
 const linesSubtotal = (lines: PricedLine[]) => lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
 const orderItemsJson = (lines: PricedLine[]) => JSON.stringify(lines.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, priceCents: l.priceCents, name: l.name, image: l.image, variantLabel: l.variantLabel })));
 
+/** Shipping address shape (the checkout form / contract); stored as a JSON snapshot on the order for physical goods. */
+export interface ShipTo { name?: string; line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }
+/** Strip <> + control chars (stored-XSS guard — this renders in the receipt + dashboard) and length-cap each field. */
+const cleanField = (x: unknown, max: number) => String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, max);
+/** Server-authoritative address sanitize: returns a JSON snapshot, or null if absent/incomplete (digital orders skip it). */
+function cleanAddress(a: unknown): string | null {
+  if (!a || typeof a !== "object") return null;
+  const r = a as ShipTo;
+  const out = { name: cleanField(r.name, 120), line1: cleanField(r.line1, 160), line2: cleanField(r.line2, 160), city: cleanField(r.city, 100), state: cleanField(r.state, 100), postalCode: cleanField(r.postalCode, 20), country: cleanField(r.country, 56) };
+  if (!out.name || !out.line1 || !out.city || !out.postalCode || !out.country) return null; // incomplete → treat as no address
+  return JSON.stringify(out);
+}
+
 /** Bind the custom-operation handlers to a Drizzle instance and mount them on a Hono app. */
 export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: (...a: unknown[]) => unknown }, dbFor: DbFor): void {
   const checkout = async (c: Context) => {
     const dz = dbFor(c);
-    const body = (await c.req.json().catch(() => ({}))) as { cartId?: number; items?: LineItem[]; discountCode?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { cartId?: number; items?: LineItem[]; discountCode?: string; shippingAddress?: ShipTo };
     let rawItems: LineItem[] = Array.isArray(body.items) ? body.items : [];
     let codeUsed: string | null = body.discountCode ?? null;
     if (body.cartId) {
@@ -337,7 +361,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
     const codeFinal = disc.valid ? codeUsed!.toUpperCase().trim() : null;
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeFinal, createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
     // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
@@ -468,7 +492,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   // hosted Checkout Session; the success page calls confirmCheckout, which retrieves the session from Stripe
   // (the source of truth) and marks the order paid — so it works WITHOUT a configured webhook endpoint.
   const payCheckout = async (c: Context) => {
-    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string; shippingAddress?: ShipTo };
     const dz = dbFor(c);
     const who = principal(c);
     // SERVER-AUTHORITATIVE, variant-aware re-pricing (the same path the free checkout uses) — client priceCents ignored.
@@ -480,7 +504,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const total = applyDiscount(subtotal, disc);
     const codeUsed = disc.valid ? body.discountCode!.toUpperCase().trim() : null;
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeUsed, createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
     // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.

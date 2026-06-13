@@ -38,7 +38,7 @@
     "@suluk/deploy": "^0.1.3",
     "@suluk/docs": "^0.1.3",
     "@suluk/drizzle": "^0.1.2",
-    "@suluk/email": "^0.1.1",
+    "@suluk/email": "^0.1.2",
     "@suluk/env": "^0.1.0",
     "@suluk/harden": "^0.1.0",
     "@suluk/hono": "^0.1.2",

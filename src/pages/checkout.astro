@@ -29,6 +29,10 @@ import Layout from "../layouts/Layout.astro";
     .co-trow.disc span { color:var(--accent); }
     #placeOrder { width:100%; justify-content:center; font-size:16px; padding:13px; }
     .co-note { color:var(--muted); font-size:12.5px; margin-top:9px; text-align:center; }
+    .addr-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:4px; }
+    .addr-grid input { width:100%; }
+    .addr-grid .addr-full { grid-column:1 / -1; }
+    .addr-hint { color:var(--muted); font-size:12.5px; margin:0 0 12px; }
   </style>
 
   <h1>Checkout</h1>
@@ -51,6 +55,19 @@ import Layout from "../layouts/Layout.astro";
       </div>
     </div>
     <div class="co-card card">
+      <h2 style="margin-top:0">Shipping address</h2>
+      <p class="addr-hint">For physical items (like the Founder Tee). Skip it if your order is digital only.</p>
+      <div class="addr-grid">
+        <input id="ad-name" class="addr-full" placeholder="Full name" autocomplete="name" aria-label="Full name" />
+        <input id="ad-line1" class="addr-full" placeholder="Address line 1" autocomplete="address-line1" aria-label="Address line 1" />
+        <input id="ad-line2" class="addr-full" placeholder="Address line 2 (optional)" autocomplete="address-line2" aria-label="Address line 2" />
+        <input id="ad-city" placeholder="City" autocomplete="address-level2" aria-label="City" />
+        <input id="ad-state" placeholder="State / Province" autocomplete="address-level1" aria-label="State or province" />
+        <input id="ad-postal" placeholder="Postal code" autocomplete="postal-code" aria-label="Postal code" />
+        <input id="ad-country" placeholder="Country (e.g. US)" autocomplete="country-name" aria-label="Country" />
+      </div>
+    </div>
+    <div class="co-card card">
       <button class="btn" id="placeOrder">Place order</button>
       <p class="co-note">Stripe test mode — card <code>4242 4242 4242 4242</code>, any future date + CVC. $0 orders complete instantly, no card needed.</p>
       <p id="result" style="margin-top:10px"></p>
@@ -65,6 +82,21 @@ import Layout from "../layouts/Layout.astro";
     const subtotal = () => cart().reduce((s, i) => s + i.priceCents * i.qty, 0);
     // server-authoritative discount state from the last /discount/validate ({ code, amount, total }) — or null.
     let disc = null;
+
+    // ── Shipping address (optional; sent only when complete — the server re-sanitizes + ignores a partial one). ──
+    const ADDR_IDS = { name: "ad-name", line1: "ad-line1", line2: "ad-line2", city: "ad-city", state: "ad-state", postalCode: "ad-postal", country: "ad-country" };
+    function readAddr() {
+      const a = {}; for (const k in ADDR_IDS) { const el = document.getElementById(ADDR_IDS[k]); a[k] = el ? el.value.trim() : ""; } return a;
+    }
+    function shipAddr() { // null unless every required field is filled (name/line1/city/postalCode/country)
+      const a = readAddr();
+      return (a.name && a.line1 && a.city && a.postalCode && a.country) ? a : null;
+    }
+    function restoreAddr() {
+      let saved = null; try { saved = JSON.parse(localStorage.getItem("ship_addr") || "null"); } catch (e) {}
+      if (saved) for (const k in ADDR_IDS) { const el = document.getElementById(ADDR_IDS[k]); if (el && saved[k]) el.value = saved[k]; }
+    }
+    function persistAddr() { try { localStorage.setItem("ship_addr", JSON.stringify(readAddr())); } catch (e) {} }
 
     async function postJson(url, body, action) {
       const res = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", ...(action ? { "x-suluk-action": action } : {}) }, body: JSON.stringify(body) });
@@ -141,7 +173,7 @@ import Layout from "../layouts/Layout.astro";
       const c = cart(); if (!c.length) return;
       const btn = document.getElementById("placeOrder"); const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Processing…";
       try {
-        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code }, "checkout");
+        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code, shippingAddress: shipAddr() }, "checkout");
         if (r.url) { location.href = r.url; return; } // chargeable → Stripe Checkout (leave the page)
         if (r.free || r.paid || r.order) { // free/$0 order completed server-side
           localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); if (window.discount) window.discount.clear(); disc = null;
@@ -163,6 +195,9 @@ import Layout from "../layouts/Layout.astro";
       if (saved && saved.code && subtotal() > 0) applyCode(saved.code, { silent: true }).then(() => { if (disc) showApplied(disc.code); });
     })();
     window.addEventListener("cart-changed", () => { if (disc) applyCode(disc.code, { silent: true }).catch(() => {}); else render(); });
+    // address: restore the last-used one + persist on edit (kept across orders — most buyers ship to the same place)
+    Object.values(ADDR_IDS).forEach((id) => { const el = document.getElementById(id); if (el) el.addEventListener("input", persistAddr); });
+    restoreAddr();
     render();
   </script>
 </Layout>
