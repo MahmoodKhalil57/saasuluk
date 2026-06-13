@@ -3,86 +3,166 @@ export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Checkout — saasuluk">
+  <!-- is:global so the order-summary lines/thumbnails (built via innerHTML at runtime) are styled (a scoped style
+       only matches build-time elements; runtime-injected ones lack the scope attribute → the 52px thumb wouldn't apply). -->
+  <style is:global>
+    .co-grid { display:grid; grid-template-columns:1fr; gap:18px; max-width:620px; margin-top:18px; }
+    .co-card { padding:18px 20px; }
+    .co-line { display:flex; gap:13px; align-items:center; padding:11px 0; border-bottom:1px solid var(--line); }
+    .co-line:last-of-type { border-bottom:0; }
+    .co-img { width:52px; height:52px; flex:none; border-radius:9px; object-fit:cover; border:1px solid var(--line); background:var(--bg-soft); }
+    .co-line-body { flex:1; min-width:0; }
+    .co-name { font-weight:600; font-size:14.5px; }
+    .co-variant { font-size:12.5px; color:var(--muted); margin-top:1px; }
+    .co-qty { font-size:12.5px; color:var(--muted); margin-top:1px; }
+    .co-line-price { font-family:ui-monospace,monospace; font-size:14px; white-space:nowrap; }
+    .co-disc { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:16px 0 4px; }
+    .co-disc input { flex:1; min-width:160px; }
+    .co-applied { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--accent); font-weight:600; }
+    .co-applied button { border:0; background:none; color:var(--muted); cursor:pointer; font-size:15px; line-height:1; padding:0 2px; }
+    .co-msg { font-size:13px; }
+    .co-totals { margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+    .co-trow { display:flex; justify-content:space-between; font-size:14.5px; padding:3px 0; }
+    .co-trow span:last-child { font-family:ui-monospace,monospace; }
+    .co-trow.total { font-size:19px; font-weight:800; margin-top:6px; padding-top:8px; border-top:1px solid var(--line); }
+    .co-trow.total span:last-child { color:var(--accent); }
+    .co-trow.disc span { color:var(--accent); }
+    #placeOrder { width:100%; justify-content:center; font-size:16px; padding:13px; }
+    .co-note { color:var(--muted); font-size:12.5px; margin-top:9px; text-align:center; }
+  </style>
+
   <h1>Checkout</h1>
-  <p class="tag">Your cart → an <b>Order</b> via the <code>/checkout</code> operation: it resolves the discount, computes the total, and is metered like everything else.</p>
-  <table style="margin-top:16px"><thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody id="lines"></tbody></table>
-  <div style="display:flex; gap:8px; margin:14px 0; align-items:center; flex-wrap:wrap">
-    <input id="code" placeholder="Discount code (try SAVE10)" aria-label="Discount code" />
-    <button class="btn ghost" id="apply">Apply</button>
-    <span id="discMsg" style="color:var(--muted); font-size:13px"></span>
+  <p class="tag">Your cart becomes an <b>Order</b> — server re-prices every line from the catalog, applies your discount, and (when the total is $0) completes for free without Stripe.</p>
+
+  <div class="co-grid">
+    <div class="co-card card">
+      <h2 style="margin-top:0">Order summary</h2>
+      <div id="lines"></div>
+      <div class="co-disc">
+        <input id="code" placeholder="Discount code (try FREEBIE, LAUNCH30)" aria-label="Discount code" />
+        <button class="btn ghost" id="apply">Apply</button>
+        <span id="applied" class="co-applied" hidden></span>
+        <span id="discMsg" class="co-msg"></span>
+      </div>
+      <div class="co-totals">
+        <div class="co-trow"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+        <div class="co-trow disc" id="discountRow" hidden><span id="discountLabel">Discount</span><span id="discountAmt"></span></div>
+        <div class="co-trow total"><span>Total</span><span id="total">$0.00</span></div>
+      </div>
+    </div>
+    <div class="co-card card">
+      <button class="btn" id="placeOrder">Place order</button>
+      <p class="co-note">Stripe test mode — card <code>4242 4242 4242 4242</code>, any future date + CVC. $0 orders complete instantly, no card needed.</p>
+      <p id="result" style="margin-top:10px"></p>
+    </div>
   </div>
-  <p style="font-size:20px">Total: <b style="color:var(--accent)" id="total">$0.00</b></p>
-  <div style="display:flex; gap:10px; flex-wrap:wrap">
-    <button class="btn" id="stripe">Pay with Stripe →</button>
-    <button class="btn ghost" id="pay">Place order (demo, no charge)</button>
-  </div>
-  <p style="color:var(--muted); font-size:13px; margin-top:8px">Stripe is in test mode — use card <code>4242 4242 4242 4242</code>, any future date + CVC.</p>
-  <p id="result" style="margin-top:10px"></p>
+
   <script is:inline>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
+    const esc = (s) => String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
-    // restore any applied discount the store persisted (survives navigation / refresh / another tab)
-    let discount = (window.discount && window.discount.get()) || null; // { code, type, value } | null
-    function subtotal() { return cart().reduce((s, i) => s + i.priceCents * i.qty, 0); }
-    function applyLocal(sub) { if (!discount) return sub; return discount.type === "percent" ? Math.max(0, Math.round(sub * (100 - discount.value) / 100)) : Math.max(0, sub - discount.value); }
-    const discLabel = (d) => d.type === "percent" ? d.value + "% off" : money(d.value) + " off";
-    function render() {
-      const c = cart();
-      document.getElementById("lines").innerHTML = c.length ? c.map((i) => `<tr><td>${i.name || "#" + i.productId}</td><td>${i.qty}</td><td>${money(i.priceCents * i.qty)}</td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">Cart is empty — <a href="/products">browse products</a>.</td></tr>`;
-      document.getElementById("total").textContent = money(applyLocal(subtotal()));
-    }
-    const applyBtn = document.getElementById("apply"), payBtn = document.getElementById("pay"), stripeBtn = document.getElementById("stripe");
-    // POST JSON, throwing a useful Error on a network failure, a non-2xx, or a non-JSON body — so every handler
-    // can show a real message instead of dying on `(await fetch()).json()` or assuming a success shape.
+    const STRIPE_FLOOR = 50;
+    const subtotal = () => cart().reduce((s, i) => s + i.priceCents * i.qty, 0);
+    // server-authoritative discount state from the last /discount/validate ({ code, amount, total }) — or null.
+    let disc = null;
+
     async function postJson(url, body, action) {
-      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-user": "demo-user", ...(action ? { "x-suluk-action": action } : {}) }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", ...(action ? { "x-suluk-action": action } : {}) }, body: JSON.stringify(body) });
       let data = null; try { data = await res.json(); } catch (e) {}
       if (!res.ok) throw new Error((data && data.error) || ("Request failed (" + res.status + ")"));
       return data || {};
     }
-    applyBtn.addEventListener("click", async () => {
+
+    function renderLines() {
+      const c = cart();
+      document.getElementById("lines").innerHTML = c.length ? c.map((i) => `
+        <div class="co-line">
+          ${i.image ? `<img class="co-img" src="${esc(i.image)}" alt="" loading="lazy" />` : `<span class="co-img"></span>`}
+          <div class="co-line-body">
+            <div class="co-name">${esc(i.name || "#" + i.productId)}</div>
+            ${i.variantLabel ? `<div class="co-variant">${esc(i.variantLabel)}</div>` : ""}
+            <div class="co-qty">Qty ${i.qty} × ${money(i.priceCents)}</div>
+          </div>
+          <div class="co-line-price">${money(i.priceCents * i.qty)}</div>
+        </div>`).join("") : `<p style="color:var(--muted)">Your cart is empty — <a href="/products">browse products</a>.</p>`;
+    }
+
+    function renderTotals() {
+      const sub = subtotal();
+      const amt = disc ? disc.amount : 0;
+      const total = Math.max(0, sub - amt);
+      document.getElementById("subtotal").textContent = money(sub);
+      const dr = document.getElementById("discountRow");
+      if (disc && amt > 0) { dr.hidden = false; document.getElementById("discountLabel").textContent = "Discount (" + disc.code + ")"; document.getElementById("discountAmt").textContent = "−" + money(amt); }
+      else { dr.hidden = true; }
+      document.getElementById("total").textContent = money(total);
+      // single ADAPTIVE button: a chargeable total → Stripe; a $0/free total → complete now (no card).
+      const btn = document.getElementById("placeOrder");
+      if (!cart().length) { btn.disabled = true; btn.textContent = "Cart is empty"; }
+      else if (total >= STRIPE_FLOOR) { btn.disabled = false; btn.textContent = "Pay " + money(total) + " with Stripe →"; }
+      else { btn.disabled = false; btn.textContent = "Place order — " + (total === 0 ? "Free" : money(total)); }
+    }
+    function render() { renderLines(); renderTotals(); }
+
+    function showApplied(code) {
+      const a = document.getElementById("applied");
+      a.hidden = false; a.innerHTML = "✓ " + esc(code) + ' applied <button id="removeDisc" title="Remove" aria-label="Remove discount">×</button>';
+      document.getElementById("removeDisc").addEventListener("click", removeDiscount);
+      document.getElementById("code").value = ""; document.getElementById("discMsg").textContent = "";
+    }
+    function removeDiscount() {
+      disc = null; if (window.discount) window.discount.clear();
+      document.getElementById("applied").hidden = true; document.getElementById("discMsg").textContent = "";
+      renderTotals();
+    }
+    async function applyCode(code, opts) {
+      opts = opts || {};
+      const r = await postJson("/discount/validate", { code, subtotalCents: subtotal(), items: cart() });
+      if (r.valid) {
+        disc = { code: code.toUpperCase(), amount: subtotal() - (typeof r.newTotalCents === "number" ? r.newTotalCents : subtotal()) };
+        if (window.discount) window.discount.apply({ code: disc.code, type: r.discountType, value: r.discountValue });
+        showApplied(disc.code);
+      } else {
+        disc = null; if (window.discount) window.discount.clear();
+        document.getElementById("applied").hidden = true;
+        if (!opts.silent) document.getElementById("discMsg").innerHTML = `<span style="color:var(--accent)">✗ ${esc(r.reason || "Invalid code.")}</span>`;
+      }
+      renderTotals();
+    }
+
+    document.getElementById("apply").addEventListener("click", async () => {
       const code = document.getElementById("code").value.trim(); if (!code) return;
-      applyBtn.disabled = true; // guard against double-apply
-      try {
-        const r = await postJson("/discount/validate", { code, subtotalCents: subtotal() });
-        if (r.valid) { discount = { code, type: r.discountType, value: r.discountValue }; if (window.discount) window.discount.apply(discount); }
-        else { discount = null; if (window.discount) window.discount.clear(); }
-        document.getElementById("discMsg").textContent = r.valid ? "✓ " + discLabel(discount) : `✗ ${r.reason || "invalid"}`;
-        render();
-      } catch (err) {
-        if (window.toast) window.toast(err.message || "Could not validate the code.", { type: "error" });
-      } finally { applyBtn.disabled = false; }
+      const b = document.getElementById("apply"); b.disabled = true;
+      try { await applyCode(code); } catch (err) { if (window.toast) window.toast(err.message || "Could not validate the code.", { type: "error" }); } finally { b.disabled = false; }
     });
-    payBtn.addEventListener("click", async () => {
+    document.getElementById("code").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("apply").click(); } });
+
+    document.getElementById("placeOrder").addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
-      const label = payBtn.textContent; payBtn.disabled = true; payBtn.textContent = "Placing…"; // double-submit guard
+      const btn = document.getElementById("placeOrder"); const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Processing…";
       try {
-        const r = await postJson("/checkout/order", { items: c, discountCode: discount?.code }, "place-order");
-        if (!r.order) throw new Error(r.error || "Order failed.");
-        localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); discount = null; if (window.discount) window.discount.clear(); render(); // clear ONLY on success
-        if (window.toast) window.toast("Order #" + r.order.id + " placed — total " + money(r.totalCents), { type: "success" });
-        document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block">✓ Order #${r.order.id} placed — total ${money(r.totalCents)}. <a href="/dashboard">View in your account →</a></span>`;
+        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code }, "checkout");
+        if (r.url) { location.href = r.url; return; } // chargeable → Stripe Checkout (leave the page)
+        if (r.free || r.paid || r.order) { // free/$0 order completed server-side
+          localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); if (window.discount) window.discount.clear(); disc = null;
+          const oid = (r.order && r.order.id) || r.orderId;
+          document.getElementById("result").innerHTML = `<span class="card" style="display:block">✓ Order #${oid} placed — ${money(r.totalCents)}. <a href="/dashboard">View it in your account →</a></span>`;
+          if (window.toast) window.toast("Order placed ✓", { type: "success" });
+          render();
+        } else throw new Error(r.error || "Checkout could not complete.");
       } catch (err) {
-        if (window.toast) window.toast(err.message || "Could not place the order.", { type: "error" }); // cart preserved
-      } finally { payBtn.disabled = false; payBtn.textContent = label; }
-    });
-    stripeBtn.addEventListener("click", async () => {
-      const c = cart(); if (!c.length) return;
-      stripeBtn.disabled = true; stripeBtn.textContent = "Redirecting to Stripe…";
-      try {
-        const r = await postJson("/checkout/pay", { items: c, discountCode: discount?.code }, "stripe-checkout");
-        if (r.url) { location.href = r.url; return; } // success → leave the page (button stays disabled)
-        throw new Error(r.error || "Could not start Stripe checkout.");
-      } catch (err) {
-        stripeBtn.disabled = false; stripeBtn.textContent = "Pay with Stripe →";
-        if (window.toast) window.toast(err.message || "Could not start Stripe checkout.", { type: "error" });
-        document.getElementById("result").innerHTML = `<span class="card" style="display:inline-block;color:#e5484d">${err.message || "Could not start Stripe checkout."}</span>`;
+        btn.disabled = false; btn.textContent = lbl;
+        if (window.toast) window.toast(err.message || "Checkout failed.", { type: "error" });
+        document.getElementById("result").innerHTML = `<span class="card" style="display:block;color:var(--accent)">${esc(err.message || "Checkout failed.")}</span>`;
       }
     });
-    // reflect a restored discount in the input + message on load
-    if (discount) { document.getElementById("code").value = discount.code; document.getElementById("discMsg").textContent = "✓ " + discLabel(discount); }
-    // keep this page's cart table + total in sync when the shell drawer (or another tab) mutates the cart
-    window.addEventListener("cart-changed", render);
+
+    // restore a persisted discount (re-validate against the current cart so a now-ineligible code drops cleanly)
+    (function () {
+      const saved = window.discount && window.discount.get();
+      if (saved && saved.code && subtotal() > 0) applyCode(saved.code, { silent: true }).then(() => { if (disc) showApplied(disc.code); });
+    })();
+    window.addEventListener("cart-changed", () => { if (disc) applyCode(disc.code, { silent: true }).catch(() => {}); else render(); });
     render();
   </script>
 </Layout>
