@@ -30,7 +30,7 @@
         "@suluk/openapi-compat": "^0.1.2",
         "@suluk/panel": "^0.3.1",
         "@suluk/reference": "^0.2.1",
-        "@suluk/scalar": "^0.7.2",
+        "@suluk/scalar": "^0.7.3",
         "@suluk/sdk": "^0.1.0",
         "@suluk/seo": "^0.1.2",
         "@suluk/shadcn": "^0.1.2",
@@ -412,7 +412,7 @@
 
     "@suluk/reference": ["@suluk/reference@0.2.1", "", { "dependencies": { "@suluk/core": "^0.1.11", "@suluk/harden": "^0.1.0" } }, "sha512-qURwCga9AB6tmpzTLzCT0LMYK3pAD279uA11YIY+51y7OVaSWjkTKLjsPv1VgSOs4LEaKC0yR5UCc/P8ds+rtA=="],
 
-    "@suluk/scalar": ["@suluk/scalar@0.7.2", "", { "dependencies": { "@suluk/core": "^0.1.11", "@suluk/openapi-compat": "^0.1.2" } }, "sha512-lMPZehk/AWSRN1B7BiIfnxqpvctu1IMRhY5zUrQdOil1ff57m0EFpW+uwwQLkRAPlPfT9HWrdBZAlgc4qT+G+A=="],
+    "@suluk/scalar": ["@suluk/scalar@0.7.3", "", { "dependencies": { "@suluk/core": "^0.1.11", "@suluk/openapi-compat": "^0.1.2" } }, "sha512-R14yRUy7QNegWoOyVxu4iG5lxaYaVo+AkCqrxnGF63HG6Mo/jwA0vMoNUGSTm5CwQqqOaE6i7E+6NHJHGiLg0A=="],
 
     "@suluk/sdk": ["@suluk/sdk@0.1.0", "", { "dependencies": { "@suluk/core": "^0.1.7" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1", "ofetch": "^1.5.1" } }, "sha512-UZI3qKa52RoGes0F7nG19e6sfTVVmOnNjvEi932hs42JhYm8iXFcmCsrQEQtIDgQC+VhSFBFva/cX8hulIXhmg=="],
 
