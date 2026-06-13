@@ -29,6 +29,7 @@
         "@suluk/reference": "^0.1.0",
         "@suluk/scalar": "^0.1.2",
         "@suluk/sdk": "^0.1.0",
+        "@suluk/seo": "^0.1.0",
         "@suluk/shadcn": "^0.1.2",
         "@suluk/stripe": "^0.1.2",
         "@suluk/swagger": "^0.1.2",
@@ -403,6 +404,8 @@
     "@suluk/scalar": ["@suluk/scalar@0.1.2", "", { "dependencies": { "@suluk/core": "^0.1.7", "@suluk/openapi-compat": "^0.1.2" } }, "sha512-+PjoQtaBjYmqawWmhMGISwZMD6tD7rWfDgc5XU8y04kBCZqBcaIckyxx7Dxxechvmyt9KzyxdaSwMUI4Fs0q+g=="],
 
     "@suluk/sdk": ["@suluk/sdk@0.1.0", "", { "dependencies": { "@suluk/core": "^0.1.7" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1", "ofetch": "^1.5.1" } }, "sha512-UZI3qKa52RoGes0F7nG19e6sfTVVmOnNjvEi932hs42JhYm8iXFcmCsrQEQtIDgQC+VhSFBFva/cX8hulIXhmg=="],
+
+    "@suluk/seo": ["@suluk/seo@0.1.0", "", {}, "sha512-zeZzKzbf44o4fR7hDPq92FLNng4iYnzEuRBCrYNRaoGf+VjyOU1R+danQn3k/AAN/W8F/4J5A2IwweKYd7x4qw=="],
 
     "@suluk/shadcn": ["@suluk/shadcn@0.1.2", "", { "dependencies": { "@suluk/core": "^0.1.7", "@suluk/theme": "^0.1.0" } }, "sha512-lVfcnT4+2onfMGhOWKmT8s+Dmxp2ewfKmsVJwYCANIGpdOVHWB6l1v2jYTqU3BIV+messnba+R1Vy8rT93mHcw=="],
 

@@ -8,3 +8,4 @@ dist/
 
 worker/dist/
 public/schemes.css
+src/build-id.ts

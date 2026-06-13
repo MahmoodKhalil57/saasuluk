@@ -1,8 +1,12 @@
 ---
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
+import { SEED_FAQS } from "../server/seed";
+import { faqPage } from "@suluk/seo";
+// FAQPage rich-result data, rendered server-side from the seed (the list itself hydrates client-side from /faq).
+const faqNodes = [faqPage(SEED_FAQS.map((f) => ({ question: f.question, answer: f.answer })))];
 ---
-<Layout title="FAQ — saasuluk">
+<Layout title="FAQ — saasuluk" description="Answers about Suluk, billing, self-hosting and what makes saasuluk a contract-projected ecommerce starter." jsonLd={faqNodes}>
   <h1>Frequently asked questions</h1>
   <p class="tag">Each FAQ is a <b>Faq</b> entity, sorted by <code>sortOrder</code>, served from the contract.</p>
   <div id="faqs" style="margin-top:18px"></div>

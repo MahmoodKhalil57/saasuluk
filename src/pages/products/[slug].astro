@@ -1,18 +1,31 @@
 ---
 export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
-import { SEED_PRODUCTS } from "../../server/seed";
-import { jsonLd } from "@suluk/builder";
+import { SEED_PRODUCTS, SEED_REVIEWS } from "../../server/seed";
+import { product as productSchema, breadcrumb } from "@suluk/seo";
 export function getStaticPaths() {
   return SEED_PRODUCTS.map((p) => ({ params: { slug: p.slug }, props: { product: p } }));
 }
 const { product } = Astro.props;
 const money = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
-// Product structured data → rich results. The detail page is prerendered from SEED_PRODUCTS, so this matches
-// exactly what's rendered (unlike the client-fetched lists), which is why JSON-LD belongs here and not on /faqs.
-const productLd = jsonLd("Product", { name: product.name, description: product.description, price: (product.priceCents / 100).toFixed(2), currency: "USD" });
+// Product + breadcrumb structured data → rich results (price · availability · rating). Prerendered from the seed,
+// so it matches what's rendered; @suluk/seo nodes compose into the Layout's single schema.org @graph.
+// NB: keep every `/` division on its OWN line — Astro's frontmatter tokenizer mis-reads `a / b` as a regex start
+// when a slash-bearing template literal (`${base}/...`) follows on the SAME line, which desyncs the compiler.
+const base = Astro.site ? Astro.site.href.replace(/\/$/, "") : "";
+const url = `${base}/products/${product.slug}`;
+const img = `${base}/img/products/${product.slug}.jpg`;
+const reviews = SEED_REVIEWS.filter((r) => r.productId === product.id);
+const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+const rating = reviews.length ? { ratingValue: Number(avg.toFixed(1)), reviewCount: reviews.length } : undefined;
+const priceUsd = product.priceCents / 100;
+const productNodes = [
+  productSchema({ name: product.name, description: product.description, image: img, sku: `SAAS-${product.id}`, url,
+    offers: { price: priceUsd, currency: "USD", availability: product.inventory > 0 ? "InStock" : "OutOfStock", url }, rating }),
+  breadcrumb([{ name: "Store", url: `${base}/products` }, { name: product.name, url }]),
+];
 ---
-<Layout title={`${product.name} — saasuluk`} description={product.description} jsonLd={productLd}>
+<Layout title={`${product.name} — saasuluk`} description={product.description} image={img} ogType="product" jsonLd={productNodes}>
   <p style="margin:6px 0 14px"><a href="/products" class="pill">← Store</a></p>
   <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start">
     <div style="width:300px; max-width:100%; aspect-ratio:1; border-radius:18px; overflow:hidden; border:1px solid var(--line)">

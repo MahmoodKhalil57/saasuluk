@@ -20,6 +20,8 @@ const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number; key: 
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { swaggerResponse } from "@suluk/swagger";
+import { ogImageSvg, DEPLOYMENT_HEADER } from "@suluk/seo";
+import { BUILD_ID } from "../build-id";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
@@ -131,6 +133,7 @@ export async function createApp() {
     try { const evt = provider.verifyWebhook(await c.req.text(), c.req.header("stripe-signature") ?? ""); return c.json({ received: true, type: evt.type }); }
     catch (e) { return c.json({ error: (e as Error).message }, 400); }
   });
-  app.get("/api/health", (c) => c.json({ ok: true, name: "saasuluk" }));
+  app.get("/api/health", (c) => c.json({ ok: true, name: "saasuluk", build: BUILD_ID }, 200, { [DEPLOYMENT_HEADER]: BUILD_ID }));
+  app.get("/og.svg", (c) => c.body(ogImageSvg({ title: c.req.query("title") || "saasuluk", subtitle: c.req.query("subtitle") || undefined, brand: "saasuluk", eyebrow: "saasuluk" }), 200, { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=86400" }));
   return { app, sink, document };
 }

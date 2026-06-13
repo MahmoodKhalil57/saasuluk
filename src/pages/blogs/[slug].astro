@@ -3,12 +3,20 @@ export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
 import { SEED_POSTS } from "../../server/seed";
 import { mdToHtml } from "@suluk/docs";
+import { article, breadcrumb } from "@suluk/seo";
 export function getStaticPaths() {
   return SEED_POSTS.map((p) => ({ params: { slug: p.slug }, props: { post: p } }));
 }
 const { post } = Astro.props;
+const base = Astro.site ? Astro.site.href.replace(/\/$/, "") : "";
+const cover = `${base}/img/blog/${post.slug}.jpg`;
+const postNodes = [
+  article({ headline: post.title, description: post.excerpt, image: cover, author: "The saasuluk team", url: `${base}/blogs/${post.slug}`,
+    publisher: { "@type": "Organization", name: "saasuluk", url: base || undefined } }),
+  breadcrumb([{ name: "Blog", url: `${base}/blogs` }, { name: post.title, url: `${base}/blogs/${post.slug}` }]),
+];
 ---
-<Layout title={`${post.title} — saasuluk blog`} description={post.excerpt}>
+<Layout title={`${post.title} — saasuluk blog`} description={post.excerpt} image={cover} ogType="article" jsonLd={postNodes}>
   <p style="margin:6px 0 14px"><a href="/blogs" class="pill">← Blog</a></p>
   <article style="max-width:680px; margin:0 auto">
     <img src={`/img/blog/${post.slug}.jpg`} alt="" style="width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:16px; border:1px solid var(--line); margin-bottom:6px" />

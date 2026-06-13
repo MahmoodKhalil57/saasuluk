@@ -1,25 +1,32 @@
 ---
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
 import { altSchemesCss, SCHEME_SWATCHES } from "../theme";
-import { seoMeta, jsonLd } from "@suluk/builder";
+import { seoTags, renderTags, organization, website, graph, deploymentMeta, skewGuardScript } from "@suluk/seo";
 import { renderBaseCss } from "@suluk/theme";
+import { BUILD_ID } from "../build-id";
 const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
 // the a11y + motion contract (focus-visible rings, reduced-motion, aria-invalid, sr-only/skip-link, shake/reveal/
 // nav-progress) — inherited from @suluk/theme, pointed at saasuluk's own color vars.
 const baseCss = renderBaseCss({ ring: "var(--accent)", destructive: "#ef4444" });
-const { title = "saasuluk — the SaaS that ships itself", description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk.", image, keywords, ogType, noindex, jsonLd: pageJsonLd } = Astro.props;
-// SEO is PROJECTED from @suluk/builder's seoMeta/jsonLd (originated — no saastarter equivalent): one resolve →
-// the full og/twitter/canonical set + WebSite/Organization structured data, rendered server-side into <head>.
+const { title = "saasuluk — the SaaS that ships itself", description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk.", image, keywords, ogType, noindex, jsonLd: pageNodes } = Astro.props;
+// SEO is PROJECTED from @suluk/seo (one toolkit → robots, sitemap, schema, meta, og, llms, skew). seoTags emits the
+// full title/description/canonical/og/twitter/robots set; the schema.org @graph carries Organization + WebSite
+// (with a SearchAction) plus any page-specific nodes (Product/BlogPosting/FAQPage/BreadcrumbList).
+const SITE_NAME = "saasuluk";
 const siteBase = Astro.site ? Astro.site.href.replace(/\/$/, "") : "";
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : Astro.url.href;
-const ogImage = image ?? (siteBase ? `${siteBase}/favicon.svg` : "/favicon.svg");
-const SITE_NAME = "saasuluk";
-const meta = seoMeta({ title, description, canonical, ogImage, ogType, keywords, locale: "en" });
-const structured = [
-  jsonLd("WebSite", { name: SITE_NAME, url: siteBase || canonical }),
-  jsonLd("Organization", { name: SITE_NAME, url: siteBase || canonical, logo: ogImage }),
-  ...(Array.isArray(pageJsonLd) ? pageJsonLd : pageJsonLd ? [pageJsonLd] : []),
-];
+// OG image: the page's OWN image (a product/cover photo — best for ecommerce) when present, else a generated
+// branded card from @suluk/seo's ogImageSvg (served by the /og.svg worker route).
+const ogImage = image ?? `${siteBase}/og.svg?title=${encodeURIComponent(title)}`;
+const headTags = renderTags(seoTags({
+  title, description, canonical, url: canonical, image: ogImage, imageAlt: title, siteName: SITE_NAME, locale: "en",
+  type: ogType, keywords: Array.isArray(keywords) ? keywords : undefined, noindex, twitterCard: "summary_large_image", themeColor: "#6366f1",
+}));
+const structured = graph(
+  organization({ name: SITE_NAME, url: siteBase || canonical, logo: `${siteBase}/favicon.svg`, description }),
+  website({ name: SITE_NAME, url: siteBase || canonical, searchUrl: `${siteBase}/products?q={search_term_string}` }),
+  ...(Array.isArray(pageNodes) ? pageNodes : pageNodes ? [pageNodes] : []),
+);
 // The frontend is static (Cloudflare assets), so locale + theme are applied CLIENT-SIDE. We render the English
 // chrome with a data-i18n key on each label; the inline script swaps it to the stored locale and sets <html
 // lang/dir> (RTL for Arabic). One dictionary (src/i18n.ts) feeds both the render and the client.
@@ -37,23 +44,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
-    <meta name="description" content={meta.description} />
-    {meta.keywords.length > 0 && <meta name="keywords" content={meta.keywords.join(", ")} />}
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
-    <link rel="canonical" href={meta.canonical} />
-    <meta property="og:title" content={meta.ogTitle} />
-    <meta property="og:description" content={meta.ogDescription} />
-    <meta property="og:type" content={meta.ogType} />
-    <meta property="og:url" content={meta.canonical} />
-    <meta property="og:site_name" content={SITE_NAME} />
-    <meta property="og:locale" content={meta.locale} />
-    {meta.ogImage && <meta property="og:image" content={meta.ogImage} />}
-    <meta name="twitter:card" content={meta.twitterCard} />
-    <meta name="twitter:title" content={meta.ogTitle} />
-    <meta name="twitter:description" content={meta.ogDescription} />
-    {meta.ogImage && <meta name="twitter:image" content={meta.ogImage} />}
-    {structured.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+    <Fragment set:html={headTags} />
+    <script type="application/ld+json" set:html={JSON.stringify(structured)} />
+    <Fragment set:html={deploymentMeta(BUILD_ID)} />
     <meta name="theme-color" content="#ffffff" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -481,5 +474,6 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         }).catch(function () {});
       })();
     </script>
+    <script is:inline set:html={skewGuardScript()}></script>
   </body>
 </html>

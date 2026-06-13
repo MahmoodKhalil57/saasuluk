@@ -20,8 +20,10 @@ import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse } from "@suluk/scalar";
 import { swaggerResponse } from "@suluk/swagger";
+import { ogImageSvg, DEPLOYMENT_HEADER } from "@suluk/seo";
 import { renderCockpitPage } from "../src/server/cockpit-view";
 import { themeHeadHtml } from "../src/themes/head";
+import { BUILD_ID } from "../src/build-id";
 import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
@@ -206,7 +208,8 @@ app.get("/config", (c) => {
   const h = configHealth(c.env as unknown as Record<string, string | undefined>);
   return (c.req.header("accept") ?? "").includes("text/html") ? c.html(renderConfigHealth(h)) : c.json(h);
 });
-app.get("/api/health", (c) => c.json({ ok: true, on: "cloudflare-workers", name: "saasuluk" }));
+app.get("/api/health", (c) => c.json({ ok: true, on: "cloudflare-workers", name: "saasuluk", build: BUILD_ID }, 200, { [DEPLOYMENT_HEADER]: BUILD_ID })); // build id → @suluk/seo skew-protection
+app.get("/og.svg", (c) => c.body(ogImageSvg({ title: c.req.query("title") || "saasuluk", subtitle: c.req.query("subtitle") || undefined, brand: "saasuluk", eyebrow: "saasuluk" }), 200, { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=86400" })); // dynamic branded OG card (@suluk/seo)
 
 // Stripe webhook — verifies the signature with Web Crypto (no SDK) and marks the order paid on completion.
 // Secondary to the success-page confirm (which retrieves the session directly); add an endpoint in Stripe
