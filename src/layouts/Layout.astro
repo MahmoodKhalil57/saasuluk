@@ -279,8 +279,25 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       @media (max-width:760px){
         .navtoggle { display:inline-grid; }
         .chrome #palette-open, .chrome #lang, .chrome #scheme-btn { display:none; }
-        #authlink span { display:none; }
+        .authname, .authcaret { display:none; }
       }
+      /* account menu — a real session-aware avatar + name dropdown (no "Sign in" flash; cached hint reveals it) */
+      /* [hidden] must beat the .btn/.authbtn/.authpop display rules (class specificity > the UA [hidden] rule). */
+      .authmenu [hidden] { display:none !important; }
+      .authmenu { position:relative; }
+      .authbtn { display:inline-flex; align-items:center; gap:7px; max-width:180px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:3px 11px 3px 4px; cursor:pointer; font:inherit; color:var(--fg); }
+      .authbtn:hover { border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); }
+      .authavatar { width:26px; height:26px; border-radius:50%; object-fit:cover; flex:none; background:var(--bg-soft); }
+      .authname { font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .authcaret { color:var(--muted); flex:none; }
+      .authpop { position:absolute; inset-inline-end:0; top:calc(100% + 8px); min-width:230px; z-index:60; padding:8px; display:flex; flex-direction:column; gap:2px; }
+      .authpop-head { display:flex; gap:10px; align-items:center; padding:6px 8px 10px; border-bottom:1px solid var(--line); margin-bottom:4px; }
+      .authpop-head img { width:38px; height:38px; border-radius:50%; object-fit:cover; flex:none; background:var(--bg-soft); }
+      .authpop-head strong { display:block; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+      .authpop-head span { display:block; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+      .authpop [role=menuitem] { text-align:start; padding:8px 10px; border-radius:8px; font-size:14px; color:var(--fg); text-decoration:none; background:none; border:0; cursor:pointer; font:inherit; width:100%; }
+      .authpop [role=menuitem]:hover { background:var(--bg-soft); }
+      #authsignout { color:var(--accent); font-weight:600; }
       .mobilenav .mnav-actions { margin-top:auto; padding-top:18px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
       .mobilenav .mnav-row { display:flex; gap:8px; flex-wrap:wrap; }
       .mobilenav .mnav-row .btn.ghost { flex:1; justify-content:center; }
@@ -298,7 +315,34 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
           <button id="scheme-btn" class="iconbtn" aria-label="Color scheme" title="Color scheme" aria-haspopup="dialog" aria-controls="schemepop" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 5.624 17.461 2 12 2Z"/></svg></button>
           <button id="theme" class="iconbtn theme-btn" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
           <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span id="cartcount" class="cartcount" hidden>0</span></button>
-          <a id="authlink" class="btn sm" href="/login">Sign in</a>
+          <div class="authmenu" id="authmenu">
+            <a id="authsignin" class="btn sm" href="/login" data-i18n="signIn" hidden>Sign in</a>
+            <button id="authbtn" class="authbtn" aria-haspopup="menu" aria-expanded="false" aria-controls="authpop" hidden>
+              <img id="authavatar" class="authavatar" alt="" /><span id="authname" class="authname"></span>
+              <svg class="authcaret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="authpop card" id="authpop" role="menu" hidden>
+              <div class="authpop-head"><img id="authpopavatar" alt="" /><div style="min-width:0"><strong id="authpopname"></strong><span id="authpopemail"></span></div></div>
+              <a role="menuitem" href="/dashboard" data-i18n="dashboard">Dashboard</a>
+              <a role="menuitem" href="/dashboard">Orders</a>
+              <a role="menuitem" href="/dashboard">Wishlist</a>
+              <button role="menuitem" id="authsignout" type="button">Sign out</button>
+            </div>
+          </div>
+          <noscript><a class="btn sm" href="/login">Sign in</a></noscript>
+          <script is:inline>
+            /* No-flash reveal: render the correct auth control during header PARSE (before paint) from the cached
+               session hint (localStorage su_user), so a returning signed-in user never sees a "Sign in" flash. */
+            (function () {
+              var su; try { su = JSON.parse(localStorage.getItem("su_user") || "null"); } catch (e) {}
+              var signin = document.getElementById("authsignin"), btn = document.getElementById("authbtn");
+              if (su && su.name && btn && signin) {
+                document.getElementById("authavatar").src = su.image || ("/avatar?seed=" + encodeURIComponent(su.email || su.name));
+                document.getElementById("authname").textContent = su.name;
+                btn.hidden = false; signin.hidden = true;
+              } else if (signin) { signin.hidden = false; }
+            })();
+          </script>
           <button id="navtoggle" class="iconbtn navtoggle" aria-label="Menu" aria-expanded="false" aria-controls="mobilenav" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
         </div>
       </div>
@@ -470,15 +514,33 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         window.dispatchEvent(new Event("locale-changed")); // re-render localized money/dates (cart drawer + pages)
       });
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
-      // session-aware header: swap "Sign in" for the user's avatar when a Better Auth session exists.
+      // Session-aware account menu: confirm the session, fill the avatar + name + dropdown, cache the hint for a
+      // flash-free next paint, and wire the dropdown + sign-out. Replaces the bolted-on avatar LINK with a real menu.
       (function () {
-        var link = document.getElementById("authlink"); if (!link) return;
-        fetch("/api/auth/get-session", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
-          var u = s && s.user; if (!u) return;
+        var signin = document.getElementById("authsignin"), btn = document.getElementById("authbtn"), pop = document.getElementById("authpop");
+        if (!btn) return;
+        function setIn(u) {
           var name = u.name || (u.email || "").split("@")[0];
-          link.href = "/dashboard"; link.className = "iconbtn"; link.style.display = "inline-flex"; link.style.alignItems = "center"; link.style.gap = "6px"; link.style.padding = "4px 9px 4px 5px";
-          link.innerHTML = '<img src="/avatar?seed=' + encodeURIComponent(u.email || name) + '" width="22" height="22" style="border-radius:50%"/> <span>' + name + '</span>';
-        }).catch(function () {});
+          var img = u.image || ("/avatar?seed=" + encodeURIComponent(u.email || name));
+          document.getElementById("authavatar").src = img;
+          document.getElementById("authname").textContent = name;
+          document.getElementById("authpopavatar").src = img;
+          document.getElementById("authpopname").textContent = name;
+          document.getElementById("authpopemail").textContent = u.email || "";
+          btn.hidden = false; if (signin) signin.hidden = true;
+          try { localStorage.setItem("su_user", JSON.stringify({ name: name, email: u.email, image: u.image })); } catch (e) {}
+        }
+        function setOut() {
+          btn.hidden = true; if (pop) pop.hidden = true; if (signin) signin.hidden = false;
+          try { localStorage.removeItem("su_user"); } catch (e) {}
+        }
+        fetch("/api/auth/get-session", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (s) { var u = s && s.user; if (u) setIn(u); else setOut(); }).catch(function () {});
+        btn.addEventListener("click", function (e) { e.stopPropagation(); var willOpen = pop.hidden; pop.hidden = !willOpen; btn.setAttribute("aria-expanded", String(willOpen)); });
+        document.addEventListener("click", function (e) { if (pop && !pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); } });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pop && !pop.hidden) { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); btn.focus(); } });
+        var so = document.getElementById("authsignout");
+        if (so) so.addEventListener("click", function () { so.textContent = "Signing out…"; fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" }).then(function () { setOut(); location.reload(); }).catch(function () { location.href = "/login"; }); });
       })();
     </script>
     <script is:inline set:html={skewGuardScript()}></script>
