@@ -26,6 +26,7 @@ import { referenceResponse } from "@suluk/reference";
 import { generateSdk } from "@suluk/sdk";
 import { generateTests } from "@suluk/testgen";
 import { adminApp } from "@suluk/admin";
+import { panelApp } from "@suluk/panel";
 import { costMeter, MemoryCostSink, summarize } from "@suluk/cost";
 import { stripeProvider, type StripeLike } from "@suluk/stripe";
 import { auth, ensureAuthTables } from "./auth";
@@ -120,6 +121,8 @@ export async function createApp() {
     return c.json({ ...summarize(events), opStats });
   });
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // /superadmin (verified session, not a header)
+  app.route("/", panelApp({ document, basePath: "/panel", title: "saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // @suluk/panel — Payload-style admin
+
   app.get("/config", (c) => {                                                                   // config health (@suluk/env) — one registry, projected
     if (!isAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const h = configHealth(process.env as Record<string, string | undefined>);

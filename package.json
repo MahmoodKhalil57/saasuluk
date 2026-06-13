@@ -64,7 +64,8 @@
     "react-hook-form": "^7.78.0",
     "stripe": "^22.2.0",
     "zod": "^4.4.3",
-    "@suluk/seo": "^0.1.0"
+    "@suluk/seo": "^0.1.0",
+    "@suluk/panel": "^0.1.0"
   },
   "devDependencies": {
     "wrangler": "^4.99.0"
