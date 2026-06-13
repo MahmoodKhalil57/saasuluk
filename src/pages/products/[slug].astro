@@ -60,8 +60,9 @@ const productNodes = [
     const esc = (s) => String(s || "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
     document.getElementById("add").addEventListener("click", () => {
       const c = JSON.parse(localStorage.getItem("cart") || "[]");
-      const ex = c.find((i) => i.productId === product.id);
-      if (ex) ex.qty++; else c.push({ productId: product.id, qty: 1, priceCents: product.priceCents, name: product.name });
+      const ex = c.find((i) => i.productId === product.id && i.variantId == null);
+      const img = (product.images && product.images[0] && product.images[0].url) || ("/img/products/" + product.slug + ".jpg");
+      if (ex) ex.qty++; else c.push({ productId: product.id, qty: 1, priceCents: product.priceCents, name: product.name, image: img });
       localStorage.setItem("cart", JSON.stringify(c));
       window.dispatchEvent(new Event("cart-changed"));
       if (window.toast) window.toast(product.name + " added to cart", { type: "success" });

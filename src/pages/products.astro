@@ -29,7 +29,7 @@ import Layout from "../layouts/Layout.astro";
           <p style="color:var(--muted);font-size:13.5px;margin:5px 0 0;flex:1">${esc((p.description || "").slice(0, 88))}</p>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
             <span style="font-size:22px;font-weight:800;letter-spacing:-.02em">${money(p.priceCents)}</span>
-            <button class="btn sm" data-id="${p.id}" data-name="${esc(p.name)}" data-price="${p.priceCents}">Add to cart</button>
+            <button class="btn sm" data-id="${p.id}" data-name="${esc(p.name)}" data-price="${p.priceCents}" data-img="${esc(p.imageUrl || "")}">Add to cart</button>
           </div>
         </div></div>`;
     }
@@ -37,8 +37,8 @@ import Layout from "../layouts/Layout.astro";
       const g = document.getElementById("grid");
       g.innerHTML = products.length ? products.map(card).join("") : `<p style="color:var(--muted);grid-column:1/-1">No products yet — seed some at <a href="/superadmin">/superadmin</a> or POST /product.</p>`;
       g.querySelectorAll("[data-id]").forEach((b) => b.addEventListener("click", () => {
-        const c = cart(), id = Number(b.dataset.id), ex = c.find((i) => i.productId === id);
-        if (ex) ex.qty++; else c.push({ productId: id, qty: 1, priceCents: Number(b.dataset.price), name: b.dataset.name });
+        const c = cart(), id = Number(b.dataset.id), ex = c.find((i) => i.productId === id && i.variantId == null);
+        if (ex) ex.qty++; else c.push({ productId: id, qty: 1, priceCents: Number(b.dataset.price), name: b.dataset.name, image: b.dataset.img || undefined });
         setCart(c); window.dispatchEvent(new Event("cart-changed")); if (window.toast) window.toast((b.dataset.name || "Item") + " added to cart", { type: "success" }); b.textContent = "Added ✓"; setTimeout(() => (b.textContent = "Add to cart"), 900);
       }));
     }

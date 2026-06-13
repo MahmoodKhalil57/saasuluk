@@ -46,13 +46,17 @@ function wire() {
       reapplyLang(); // the empty-state node carries a data-i18n key; line rows don't, so only re-translate here
     } else {
       linesBox.innerHTML = lines.map((l) => `
-        <div class="cartline" data-id="${esc(String(l.productId))}">
-          <div class="cartline-top"><span class="cartline-name">${esc(l.name)}</span><span class="cartline-price">${money(l.priceCents * l.qty)}</span></div>
-          <div class="cartline-ctrl">
-            <button class="qbtn" data-act="dec" aria-label="Decrease quantity">&minus;</button>
-            <span class="qty" aria-label="Quantity">${l.qty}</span>
-            <button class="qbtn" data-act="inc" aria-label="Increase quantity">+</button>
-            <button class="qbtn rm" data-act="rm" aria-label="Remove item">&times;</button>
+        <div class="cartline" data-id="${esc(String(l.productId))}" data-vid="${l.variantId != null ? esc(String(l.variantId)) : ""}">
+          ${l.image ? `<img class="cartline-img" src="${esc(l.image)}" alt="" loading="lazy" />` : `<span class="cartline-img cartline-img-ph" aria-hidden="true"></span>`}
+          <div class="cartline-body">
+            <div class="cartline-top"><span class="cartline-name">${esc(l.name)}</span><span class="cartline-price">${money(l.priceCents * l.qty)}</span></div>
+            ${l.variantLabel ? `<div class="cartline-variant">${esc(l.variantLabel)}</div>` : ""}
+            <div class="cartline-ctrl">
+              <button class="qbtn" data-act="dec" aria-label="Decrease quantity">&minus;</button>
+              <span class="qty" aria-label="Quantity">${l.qty}</span>
+              <button class="qbtn" data-act="inc" aria-label="Increase quantity">+</button>
+              <button class="qbtn rm" data-act="rm" aria-label="Remove item">&times;</button>
+            </div>
           </div>
         </div>`).join("");
     }
@@ -60,25 +64,29 @@ function wire() {
   cart.$items.subscribe(renderLines);
   // re-render localized money when the language switches (the store values don't change, so subscriptions won't fire)
   window.addEventListener("locale-changed", () => { renderLines(); if (subEl) subEl.textContent = money(cart.$subtotalCents.get()); });
-  cart.$subtotalCents.subscribe((s) => {
-    if (subEl) subEl.textContent = money(s);
-    if (checkout) {
-      const a = checkout as HTMLAnchorElement;
-      a.style.opacity = s ? "1" : ".45";
-      a.style.pointerEvents = s ? "auto" : "none";
-      a.setAttribute("aria-disabled", s ? "false" : "true"); // keyboard users can't activate an empty-cart checkout
-      a.tabIndex = s ? 0 : -1;
-    }
+  cart.$subtotalCents.subscribe((s) => { if (subEl) subEl.textContent = money(s); });
+  // Gate Checkout on item COUNT, not subtotal — a free ($0) cart (e.g. the free Starter, or a 100%-off code) must
+  // still be checkout-able. (Empty cart → disabled; any item → enabled, even at $0.00.)
+  cart.$count.subscribe((n) => {
+    if (!checkout) return;
+    const a = checkout as HTMLAnchorElement;
+    const on = n > 0;
+    a.style.opacity = on ? "1" : ".45";
+    a.style.pointerEvents = on ? "auto" : "none";
+    a.setAttribute("aria-disabled", on ? "false" : "true");
+    a.tabIndex = on ? 0 : -1;
   });
 
-  // qty steppers / remove (event delegation — survives re-render)
+  // qty steppers / remove (event delegation — survives re-render). The row carries the (productId, variantId) pair,
+  // so the stepper targets the exact variant line (two variants of one product don't share a counter).
   linesBox.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest("[data-act]"); if (!b) return;
     const row = b.closest(".cartline") as HTMLElement | null; const id = row?.dataset.id; if (id == null) return;
-    const act = b.getAttribute("data-act"); const cur = cart.get(id)?.qty ?? 0;
-    if (act === "inc") cart.setQty(id, cur + 1);
-    else if (act === "dec") cart.setQty(id, cur - 1);
-    else if (act === "rm") cart.remove(id);
+    const vidRaw = row?.dataset.vid; const vid = vidRaw ? Number(vidRaw) : undefined;
+    const act = b.getAttribute("data-act"); const cur = cart.get(id, vid)?.qty ?? 0;
+    if (act === "inc") cart.setQty(id, cur + 1, vid);
+    else if (act === "dec") cart.setQty(id, cur - 1, vid);
+    else if (act === "rm") cart.remove(id, vid);
   });
 
   // ---- open / close ----
