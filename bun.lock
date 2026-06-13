@@ -30,7 +30,7 @@
         "@suluk/openapi-compat": "^0.1.2",
         "@suluk/panel": "^0.3.1",
         "@suluk/reference": "^0.2.0",
-        "@suluk/scalar": "^0.6.0",
+        "@suluk/scalar": "^0.7.0",
         "@suluk/sdk": "^0.1.0",
         "@suluk/seo": "^0.1.2",
         "@suluk/shadcn": "^0.1.2",
@@ -412,7 +412,7 @@
 
     "@suluk/reference": ["@suluk/reference@0.2.0", "", { "dependencies": { "@suluk/core": "^0.1.9", "@suluk/harden": "^0.1.0" } }, "sha512-g7XQH8ezt9qwE76UxSnbcCkjB+hiy5HkJ1J4ITO6jMBtFp/+LHkvg81JrUAi2aKcbdBTfpSI7ewNCNDQrQ5ugw=="],
 
-    "@suluk/scalar": ["@suluk/scalar@0.6.0", "", { "dependencies": { "@suluk/core": "^0.1.9", "@suluk/openapi-compat": "^0.1.2" } }, "sha512-vN1DAPQynpJlau4gqe7/gFxA63UupIRXDl3DTnPVL/k5A/73VAoZ3euvb3Et4GqzTikJf0frO68/unciwGpbBw=="],
+    "@suluk/scalar": ["@suluk/scalar@0.7.0", "", { "dependencies": { "@suluk/core": "^0.1.11", "@suluk/openapi-compat": "^0.1.2" } }, "sha512-x8eXu4zxoFTg7kMAuIPRE1G1RO85ZMJONMy8o5WhaWjuifHfudNsh8a5D8AQQ4PRE1mfszrgGcB1/l2R+srcdw=="],
 
     "@suluk/sdk": ["@suluk/sdk@0.1.0", "", { "dependencies": { "@suluk/core": "^0.1.7" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1", "ofetch": "^1.5.1" } }, "sha512-UZI3qKa52RoGes0F7nG19e6sfTVVmOnNjvEi932hs42JhYm8iXFcmCsrQEQtIDgQC+VhSFBFva/cX8hulIXhmg=="],
 
@@ -1071,6 +1071,8 @@
     "@suluk/nano-stores/@suluk/core": ["@suluk/core@0.1.7", "", { "dependencies": { "ajv": "^8.17.0", "ajv-formats": "^3.0.1", "yaml": "^2.5.0" } }, "sha512-l63wsPg3CuS6VtvKoho7mizStRsOWVI6ZkaD9fnLHndw7B/RcNg3SuVnNC7xkMm+7LhrrGNTnefmBFWydqah1Q=="],
 
     "@suluk/openapi-compat/@suluk/core": ["@suluk/core@0.1.7", "", { "dependencies": { "ajv": "^8.17.0", "ajv-formats": "^3.0.1", "yaml": "^2.5.0" } }, "sha512-l63wsPg3CuS6VtvKoho7mizStRsOWVI6ZkaD9fnLHndw7B/RcNg3SuVnNC7xkMm+7LhrrGNTnefmBFWydqah1Q=="],
+
+    "@suluk/scalar/@suluk/core": ["@suluk/core@0.1.11", "", { "dependencies": { "ajv": "^8.17.0", "ajv-formats": "^3.0.1", "yaml": "^2.5.0" } }, "sha512-LWZMhb6ERSaUZmy1uTDMGv2IX6o4mXUpaBmaZtaqV+xirQ5qu2csEoUFHvPL1TiTC6JVmNjadFnUDG6MFAF0Hg=="],
 
     "@suluk/sdk/@suluk/core": ["@suluk/core@0.1.7", "", { "dependencies": { "ajv": "^8.17.0", "ajv-formats": "^3.0.1", "yaml": "^2.5.0" } }, "sha512-l63wsPg3CuS6VtvKoho7mizStRsOWVI6ZkaD9fnLHndw7B/RcNg3SuVnNC7xkMm+7LhrrGNTnefmBFWydqah1Q=="],
 

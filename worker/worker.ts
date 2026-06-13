@@ -18,7 +18,7 @@ import { parseListQuery, tableComponents } from "@suluk/drizzle";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
-import { scalarResponse, scalarV4Response, enrichedSpec, SCALAR_VERSION } from "@suluk/scalar";
+import { scalarResponse, scalarV4Response, enrichedSpec, enrichedV4, SCALAR_VERSION } from "@suluk/scalar";
 import { swaggerResponse } from "@suluk/swagger";
 import { ogImageSvg, DEPLOYMENT_HEADER } from "@suluk/seo";
 import { renderCockpitPage } from "../src/server/cockpit-view";
@@ -189,9 +189,10 @@ app.get("/reference", (c) => scalarV4Response(refBase(c as unknown as Context), 
   views: [{ label: "Anonymous", value: "anon" }, { label: "Signed-in", value: "user" }, { label: "Admin", value: "admin" }],
   insightsUrl: "/reference/insights",
 }));
-// The "View as" projector fetches this: the role-projected v4 doc, downgraded + facet-enriched for Scalar. A
-// non-admin never sees provenance (scrubbed base); projection only HIDES ops a role can't reach (concealment, not authz).
-app.get("/reference/spec", (c) => c.json(enrichedSpec(refProjected(c as unknown as Context)).spec));
+// The "View as" projector fetches this: the role-projected v4 doc, facet-enriched and served AS v4 (the forked Scalar
+// ingests it natively). A non-admin never sees provenance (scrubbed base); projection only HIDES ops a role can't
+// reach (concealment, not authz).
+app.get("/reference/spec", (c) => c.json(enrichedV4(refProjected(c as unknown as Context)).spec));
 // The ⚡ Insights drawer iframes this: the v4 superpower PANELS (cost explorer, reachability, ADA, hardening) — same
 // role projection as the spec, so the drawer reflects the selected "View as".
 app.get("/reference/insights", (c) => referenceInsightsResponse(refProjected(c as unknown as Context), { costLedgerUrl: "/cost", whoamiUrl: "/api/whoami" }));

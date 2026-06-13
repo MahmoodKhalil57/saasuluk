@@ -9,4 +9,9 @@ dist/
 worker/dist/
 public/schemes.css
 src/build-id.ts
-public/vendor/
+# Vendored Scalar bundles are build artifacts — EXCEPT our forked one, which we commit so the deployed
+# bytes are reproducible + version-controlled (a fresh checkout/CI deploy must not 404 the /reference script).
+public/vendor/*
+!public/vendor/scalar
+public/vendor/scalar/*
+!public/vendor/scalar/standalone-suluk.js
