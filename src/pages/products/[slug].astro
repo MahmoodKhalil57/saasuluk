@@ -206,7 +206,7 @@ const productNodes = [
       e.preventDefault();
       const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
       try {
-        const r = await fetch("/review", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value }) });
+        const r = await fetch("/review/submit", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value }) });
         if (!r.ok) throw new Error("Could not submit your review.");
         e.target.reset(); loadReviews();
         if (window.toast) window.toast("Review submitted ✓ — pending moderation.", { type: "success" });

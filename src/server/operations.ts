@@ -107,6 +107,21 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
 
 /** The buyer's email for the receipt — the verified session email the auth middleware stashed (null for guests). */
 const buyerEmail = (c: Context): string | null => (c.get("sessionEmail") as string | undefined) ?? null;
+
+/**
+ * Idempotency for FREE orders: a retry / double-submit / multi-tab must not mint a SECOND $0 order — that would
+ * double-send the receipt AND double-decrement inventory. Returns a recent (≤90s) PAID order id from the SAME buyer
+ * (principal, else the guest email) with the identical items snapshot + total, or null. Stripe orders are NOT deduped
+ * here: a duplicate PENDING order is benign (only one Checkout Session ever completes) and the client disables the
+ * button. The narrow SQL filter (paid + total + recent) keeps it cheap; items + buyer are matched in memory.
+ */
+async function recentPaidDuplicate(dz: Dz, opts: { who: string | null; email: string | null; itemsJson: string; total: number }): Promise<number | null> {
+  if (!opts.who && !opts.email) return null; // anonymous with no email can't be correlated — skip
+  const since = Date.now() - 90_000;
+  const rows = (await dz.select().from(order).where(and(eq(order.status, "paid"), eq(order.totalCents, opts.total), gte(order.createdAt, since))).all()) as { id: number; items: string | null; customerId: string | null; customerEmail: string | null }[];
+  const m = rows.find((o) => (o.items ?? "") === opts.itemsJson && (opts.who ? o.customerId === opts.who : o.customerEmail === opts.email));
+  return m ? m.id : null;
+}
 /** A guest's typed checkout email — lightly validated server-side so a guest order can still send a receipt. */
 const cleanEmail = (x: unknown): string | null => {
   const s = String(x ?? "").trim().toLowerCase();
@@ -210,7 +225,7 @@ function jsonOp(
 
 /** The per-operation cost models — merged into the contract's cost map so these are metered like CRUD. */
 export const OPERATION_COSTS: Record<string, CostModel> = {
-  checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20),
+  checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
@@ -233,6 +248,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: obj({ code: v.code(40), subtotalCents: v.cents(100_000_000_000) }, ["code"]) }) } },
   "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
+  "review/submit": { requests: { submitReview: jsonOp("post", "Submit a product review — auto-flags verified-purchase when the reviewer has a paid order for the product", { body: obj({ productId: v.int(1, ID), rating: v.int(1, 5), title: v.line(160), body: v.rich(5000) }, ["productId", "rating"]), status: 201 }) } },
   "analytics/summary": { requests: { analyticsSummary: jsonOp("get", "Store summary (orders, revenue, customers)") } },
   "analytics/revenue": { requests: { analyticsRevenue: jsonOp("get", "Revenue per day (last 30d)") } },
   "analytics/top-products": { requests: { analyticsTopProducts: jsonOp("get", "Best-selling products") } },
@@ -366,7 +382,14 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
     const codeFinal = disc.valid ? codeUsed!.toUpperCase().trim() : null;
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c) ?? cleanEmail(body.email), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
+    const itemsJson = orderItemsJson(lines);
+    const email = buyerEmail(c) ?? cleanEmail(body.email);
+    // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not create a second one.
+    if (!requiresStripe(total)) {
+      const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
+      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ order: o, subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid, free: true, duplicate: true }, 200); }
+    }
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
     // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
@@ -405,6 +428,24 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
     const r = await dz.select().from(review).where(eq(review.id, id)).get();
     return r ? c.json(r) : c.json({ error: "not found" }, 404);
+  };
+
+  // Submit a review AND stamp verified-purchase — review.verifiedPurchase was a dead column (never written). A review
+  // earns the "✓ Verified" badge iff the signed-in reviewer has a paid/shipped order whose items include this product.
+  const submitReview = async (c: Context) => {
+    const who = principal(c);
+    if (!who) return c.json({ error: "Sign in to leave a review." }, 401);
+    const dz = dbFor(c);
+    const b = (await c.req.json().catch(() => ({}))) as { productId?: number; rating?: number; title?: string; body?: string };
+    const productId = Number(b.productId);
+    const rating = Math.max(1, Math.min(5, Math.floor(Number(b.rating) || 0)));
+    if (!productId || !rating) return c.json({ error: "A product and a 1–5 rating are required." }, 422);
+    const myOrders = (await dz.select().from(order).where(and(eq(order.customerId, who), or(eq(order.status, "paid"), eq(order.status, "shipped")))).all()) as { items?: string }[];
+    const verified = myOrders.some((o) => { try { return (JSON.parse(o.items || "[]") as { productId?: number }[]).some((it) => Number(it.productId) === productId); } catch { return false; } });
+    const title = String(b.title ?? "").replace(/[<> -]/g, "").trim().slice(0, 160) || "Review";
+    const reviewBody = String(b.body ?? "").replace(/[ --]/g, "").trim().slice(0, 5000);
+    const row = await dz.insert(review).values({ productId, customerId: who, rating, title, body: reviewBody, verifiedPurchase: verified, status: "pending", createdAt: Date.now() }).returning();
+    return c.json({ ...row[0], verified }, 201);
   };
 
   const analyticsSummary = async (c: Context) => {
@@ -508,8 +549,15 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const total = applyDiscount(subtotal, disc);
     const codeUsed = disc.valid ? body.discountCode!.toUpperCase().trim() : null;
+    const itemsJson = orderItemsJson(lines);
+    const email = buyerEmail(c) ?? cleanEmail(body.email);
+    // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not mint a second one.
+    if (!requiresStripe(total)) {
+      const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
+      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ free: true, paid: true, order: o, orderId: dupId, totalCents: total, duplicate: true }); }
+    }
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: buyerEmail(c) ?? cleanEmail(body.email), items: orderItemsJson(lines), totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
     // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.
@@ -644,6 +692,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.post("/discount/validate", validateDiscount);
   app.get("/search", search);
   app.post("/review/:id/helpful", markReviewHelpful);
+  app.post("/review/submit", submitReview);
   app.get("/analytics/summary", analyticsSummary);
   app.get("/analytics/revenue", analyticsRevenue);
   app.get("/analytics/top-products", analyticsTopProducts);
