@@ -16,7 +16,7 @@ import { customerParams, subscriptionParams, meterEventParams, billingPortalSess
 import { shippingProvider, taxProvider } from "./commerce";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "@suluk/harden";
-import { claimOnce, rowsChanged } from "@suluk/drizzle";
+import { claimOnce, claimRows, rowsChanged } from "@suluk/drizzle";
 import { redactRow, superadminEmails } from "./access";
 import { v } from "./validations";
 
@@ -173,10 +173,10 @@ export async function sweepAbandonedCartEmails(dz: Dz, opts: { apiKey?: string; 
   const now = Date.now();
   const idleCutoff = now - (opts.idleMs ?? 3_600_000);  // idle ≥ 1h before we nudge
   const reapCutoff = now - (opts.reapMs ?? 86_400_000); // younger than the reap window (don't nudge about-to-be-cancelled orders)
-  const claimed = (await dz.update(order).set({ recoveryEmailedAt: now }).where(and(
+  const claimed = await claimRows<{ customerEmail?: string; items?: string | null }>(dz, order, and(
     eq(order.status, "pending"), isNull(order.recoveryEmailedAt), isNotNull(order.customerEmail),
     lt(order.createdAt, idleCutoff), gt(order.createdAt, reapCutoff),
-  )).returning()) as { customerEmail?: string; items?: string | null }[];
+  )!, { recoveryEmailedAt: now });
   let sent = 0;
   for (const o of claimed) {
     if (!o.customerEmail) continue;
@@ -373,7 +373,7 @@ export async function notifyBackInStock(c: Context, dz: Dz, productId: number): 
   const p = (await dz.select().from(product).where(eq(product.id, productId)).get()) as { name?: string; slug?: string } | undefined;
   if (!p) return; // the hook fires from this product's own update, so this is a defensive guard, not a real path
   // CLAIM first: only rows this UPDATE flips (notifiedAt was NULL) come back; a concurrent caller claims the rest.
-  const claimed = (await dz.update(stockNotification).set({ notifiedAt: Date.now() }).where(and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))).returning()) as { email?: string }[];
+  const claimed = await claimRows<{ email?: string }>(dz, stockNotification, and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))!, { notifiedAt: Date.now() });
   if (!claimed.length) return;
   const url = new URL(c.req.url).origin + "/products/" + String(p.slug ?? "");
   const apiKey = secret(c, "RESEND_API_KEY"), from = secret(c, "EMAIL_FROM");
