@@ -16,6 +16,7 @@ import { customerParams, subscriptionParams, meterEventParams, billingPortalSess
 import { shippingProvider, taxProvider } from "./commerce";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "@suluk/harden";
+import { claimOnce, rowsChanged } from "@suluk/drizzle";
 import { redactRow, superadminEmails } from "./access";
 import { v } from "./validations";
 
@@ -84,8 +85,8 @@ export async function reportPrincipalUsage(
   // if it is still `seen` — so the cron + the button (or two reports) can't double-bill the same usage.
   const identifier = `${opts.principal}:${total}`;
   await restStripe(opts.key).billing.meterEvents.create({ ...meterEventParams({ eventName: opts.eventName, customerId: acct.stripeCustomerId, value: delta }), identifier });
-  const res = (await dz.update(billingAccount).set({ lastReportedMicroUsd: total, lastReportedAt: Date.now() }).where(and(eq(billingAccount.id, acct.id), eq(billingAccount.lastReportedMicroUsd, seen))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-  const claimed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+  // high-water-mark CAS: only advance if no other isolate already reported past `seen` (claimOnce → exactly-once usage).
+  const claimed = await claimOnce(dz, billingAccount, and(eq(billingAccount.id, acct.id), eq(billingAccount.lastReportedMicroUsd, seen))!, { lastReportedMicroUsd: total, lastReportedAt: Date.now() });
   return { reported: claimed, deltaMicroUsd: delta, totalMicroUsd: total, customerId: acct.stripeCustomerId };
 }
 
@@ -107,8 +108,7 @@ async function alertLowStock(c: Context, dz: Dz, kind: "product" | "variant", id
   const tbl = (kind === "product" ? product : variant) as typeof product; // both share id/inventory/lowStockAlerted
   const row = (await dz.select().from(tbl).where(eq(tbl.id, id)).get()) as { inventory?: number; lowStockAlerted?: boolean; name?: string; title?: string } | undefined;
   if (!row || Number(row.inventory) > threshold || row.lowStockAlerted) return; // above threshold, or already alerted at this level
-  const res = (await dz.update(tbl).set({ lowStockAlerted: true }).where(and(eq(tbl.id, id), eq(tbl.lowStockAlerted, false))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-  if (Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) <= 0) return; // a concurrent paid order won the flip and already emailed
+  if (!(await claimOnce(dz, tbl, and(eq(tbl.id, id), eq(tbl.lowStockAlerted, false))!, { lowStockAlerted: true }))) return; // a concurrent paid order won the flip + already emailed
   const label = kind === "product" ? String(row.name ?? ("Product #" + id)) : ("Variant #" + id + (row.title ? " (" + row.title + ")" : ""));
   const origin = new URL(c.req.url).origin;
   sendEmailAsync( // fire-and-forget — a mail failure must never break the sale (same contract as the receipt)
@@ -125,8 +125,9 @@ async function alertLowStock(c: Context, dz: Dz, kind: "product" | "variant", id
 export async function markOrderPaid(c: Context, dz: Dz, orderId: number): Promise<boolean> {
   const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
   if (!o || o.status === "paid") return false;
-  const res = (await dz.update(order).set({ status: "paid" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-  const changed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+  // atomic claim of pending→paid (@suluk/drizzle claimOnce) — a webhook re-delivery / double-confirm finds it already
+  // paid and changes nothing, so the once-only side-effects below run for exactly the call that won the transition.
+  const changed = await claimOnce(dz, order, and(eq(order.id, orderId), eq(order.status, "pending"))!, { status: "paid" });
   if (changed) {
     if (o.discountCode) {
       await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
@@ -152,8 +153,7 @@ export async function markOrderPaid(c: Context, dz: Dz, orderId: number): Promis
 /** Cancel a still-PENDING order (Stripe session expired, or the abandoned-order reaper). Pending orders never
  *  decremented inventory (only markOrderPaid does), so there is nothing to restock — the once-only guard keeps it idempotent. */
 export async function cancelPendingOrder(dz: Dz, orderId: number): Promise<boolean> {
-  const res = (await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-  return Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+  return claimOnce(dz, order, and(eq(order.id, orderId), eq(order.status, "pending"))!, { status: "cancelled" });
 }
 
 /** Reaper — cancel PENDING orders older than `olderThanMs` (default 24h) so abandoned Stripe checkouts don't linger in
@@ -212,12 +212,12 @@ export async function refundOrder(dz: Dz, orderId: number): Promise<boolean> {
   // Stripe doesn't guarantee webhook ordering: a refund can arrive BEFORE checkout.session.completed. Terminate a
   // still-pending order so a later markOrderPaid (pending-only) can't resurrect it into a paid sale + decrement stock.
   if (o.status === "pending") {
-    await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run();
+    await claimOnce(dz, order, and(eq(order.id, orderId), eq(order.status, "pending"))!, { status: "cancelled" });
     return false; // nothing was decremented yet → nothing to restock
   }
   if (o.status !== "paid" && o.status !== "shipped") return false;
-  const res = (await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), inArray(order.status, ["paid", "shipped"]))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-  if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return false;
+  // claim paid/shipped→cancelled exactly once — a webhook re-delivery finds it already cancelled (no double-restock).
+  if (!(await claimOnce(dz, order, and(eq(order.id, orderId), inArray(order.status, ["paid", "shipped"]))!, { status: "cancelled" }))) return false;
   // restock ONLY a paid (not-yet-shipped) order — a shipped order's goods already left, so they don't return to stock.
   if (o.status === "paid") await restockOrderLines(dz, o);
   return true;
@@ -683,19 +683,18 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // Read-then-write keeps it driver-agnostic (bun:sqlite sync + D1 async differ on .run() affected-row reporting);
     // the (review_id, principal) UNIQUE index (migration 0003 / SCHEMA_SQL) is the race backstop via onConflictDoNothing.
     const existing = await dz.select().from(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).get();
-    const affected = (r: unknown): number => { const x = r as { meta?: { changes?: number }; changes?: number; rowsAffected?: number }; return Number(x?.meta?.changes ?? x?.changes ?? x?.rowsAffected ?? 0); };
     let voted: boolean;
     if (!existing) {
-      // Gate the +1 on the INSERT actually creating a row: two concurrent first-clicks both pass the read-check, but the
-      // unique index makes one insert a no-op (onConflictDoNothing → 0 rows) — only the winner increments, so the counter
-      // never drifts above the vote-row count.
+      // Gate the +1 on the INSERT actually creating a row (rowsChanged): two concurrent first-clicks both pass the
+      // read-check, but the unique index makes one insert a no-op (onConflictDoNothing → 0 rows) — only the winner
+      // increments, so the counter never drifts above the vote-row count.
       const ins = await dz.insert(reviewHelpfulVote).values({ reviewId: id, principal: who }).onConflictDoNothing().run();
-      if (affected(ins) > 0) await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
+      if (rowsChanged(ins) > 0) await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
       voted = true;
     } else {
       // Symmetrically gate the −1 on the DELETE removing a row, so a double un-vote decrements at most once.
       const del = await dz.delete(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).run();
-      if (affected(del) > 0) await dz.update(review).set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` }).where(eq(review.id, id)).run();
+      if (rowsChanged(del) > 0) await dz.update(review).set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` }).where(eq(review.id, id)).run();
       voted = false;
     }
     const r = await dz.select().from(review).where(eq(review.id, id)).get();
@@ -746,8 +745,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (needsRefund && !key) return c.json({ error: "Stripe is not configured — cannot refund; the order was NOT cancelled." }, 503);
     // CONDITIONAL flip FIRST (compare-and-swap on the pre-read status) — the once-only gate. Claiming the transition
     // atomically BEFORE the irreversible refund means a concurrent ship/cancel can't slip in: only the winner refunds.
-    const res = (await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(and(eq(order.id, id), eq(order.status, o.status))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-    if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no refund, no restock, no email
+    if (!(await claimOnce(dz, order, and(eq(order.id, id), eq(order.status, o.status))!, { status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }))) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no refund, no restock, no email
     // the winner of paid→cancelled reverses the money (idempotent). If the refund FAILS, ROLL BACK the flip so the order
     // is never left cancelled-while-still-charged, and abort 502 so the owner retries.
     if (needsRefund && key && !(await stripeRefund(key, o.stripePaymentIntentId!, `refund_${id}`))) {
@@ -933,8 +931,7 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     const who = principal(c);
     // SCOPED: you can only revoke YOUR OWN token (eq id AND userId) — without this any caller could revoke any
     // user's token by id. A foreign/anonymous caller matches nothing → 404 (honest: it wasn't yours to revoke).
-    const res = (await dz.update(apiToken).set({ revokedAt: Date.now() }).where(and(eq(apiToken.id, id), eq(apiToken.userId, who))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-    const changed = Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+    const changed = await claimOnce(dz, apiToken, and(eq(apiToken.id, id), eq(apiToken.userId, who))!, { revokedAt: Date.now() }); // owner-scoped: a foreign id matches nothing → 404
     return changed ? c.json({ revoked: true, id }) : c.json({ error: "not found" }, 404);
   };
 
