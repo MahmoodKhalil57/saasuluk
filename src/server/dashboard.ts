@@ -154,6 +154,11 @@ const DEVELOPER = `
 })();</script>`;
 
 const DANGER = `
+<div class="pf-section">
+  <h2>Your data</h2>
+  <p class="pf-sub">Download everything we hold for your account — orders, wishlist, reviews and API-key metadata — as a JSON file (GDPR data export).</p>
+  <a class="btn ghost sm" href="/account/export" download="saasuluk-data.json">Export your data</a>
+</div>
 <div class="pf-section" style="border-color:color-mix(in srgb,var(--danger) 32%,var(--line))">
   <h2 style="color:var(--danger)">Delete account</h2>
   <p class="pf-sub">Permanently delete your account and all your data — orders, wishlist, API keys, billing. This cannot be undone.</p>

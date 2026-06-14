@@ -23,6 +23,9 @@ const maxPrice = variantPrices.length ? Math.max(...variantPrices) : product.pri
 const priceLabel = hasVariants && variantPrices.length
   ? (minPrice === maxPrice ? moneyOrFree(minPrice) : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`)
   : moneyOrFree(product.priceCents);
+// compare-at (sale) strikethrough — only for a single-price product (a price-varying-variant range has no single "was").
+const onSale = !!product.compareAtCents && product.compareAtCents > product.priceCents && variantPrices.length === 0;
+const savePct = onSale ? Math.round((1 - product.priceCents / (product.compareAtCents as number)) * 100) : 0;
 // SEO/structured data — see the slash-on-its-own-line note below; keep `${base}/...` off shared lines.
 const base = Astro.site ? Astro.site.href.replace(/\/$/, "") : "";
 const url = `${base}/products/${product.slug}`;
@@ -70,6 +73,7 @@ const productNodes = [
       <h1 style="margin:12px 0 8px">{product.name}</h1>
       <p class="tag" style="font-size:17px">{product.description}</p>
       <p id="price" style="font-size:36px; font-weight:800; letter-spacing:-.03em; margin:16px 0 6px">{priceLabel}</p>
+      {onSale && <p style="margin:-2px 0 8px"><s style="color:var(--muted);font-size:18px">{moneyOrFree(product.compareAtCents)}</s> <span class="pill accent" style="font-size:12px;margin-inline-start:6px">Save {savePct}%</span></p>}
       {hasVariants && (
         <div id="variant-selector" style="margin:18px 0">
           {dimList.map((d) => (

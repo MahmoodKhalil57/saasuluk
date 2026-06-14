@@ -28,6 +28,7 @@ const OP_ACCESS: Record<string, AccessFacet> = {
   createToken: { requires: "authenticated" }, revokeToken: { requires: "authenticated", scope: "owner" },
   connectBilling: { requires: "authenticated" }, reportUsage: { requires: "authenticated", scope: "owner" },
   openBillingPortal: { requires: "authenticated" },
+  exportAccount: { requires: "authenticated" }, // your own data only (owner-scoped in the handler)
 };
 
 /** Annotate every operation with x-suluk-access, derived from the same registry that drives enforcement. In place. */

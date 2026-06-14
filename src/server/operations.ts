@@ -9,7 +9,7 @@
 import { and, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
+import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
 import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, type Discount } from "@suluk/stripe";
@@ -246,7 +246,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
-  connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40),
+  connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40), exportAccount: read(20),
 };
 
 // typed input bodies for the custom ops with REAL bounds (validations.ts) — a bare {type:"object"} is a free-form bag.
@@ -280,6 +280,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: v.email() }) }) } },
   "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object", additionalProperties: false } }) } },
   "billing/portal": { requests: { openBillingPortal: jsonOp("post", "Open the Stripe customer billing portal (manage saved cards + invoices)", { body: { type: "object", additionalProperties: false } }) } },
+  "account/export": { requests: { exportAccount: jsonOp("get", "Export all your account data (GDPR) — orders, wishlist, reviews, token metadata — as a downloadable JSON") } },
 };
 
 // HARDEN the custom-op inputs (the answer to @suluk/harden's findings): bound strings/numbers/arrays + close objects.
@@ -765,6 +766,27 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     }
   };
 
+  // GDPR data export (the privacy policy promises it): the signed-in user downloads ALL their own rows as JSON —
+  // orders, wishlist, reviews, and API-token METADATA (never the hashed secret). Owner-scoped; no other tenant's data.
+  const exportAccount = async (c: Context) => {
+    const who = principal(c);
+    if (!who) return c.json({ error: "Sign in to export your data." }, 401);
+    const dz = dbFor(c);
+    const [orders, wishlist, reviews, tokens] = await Promise.all([
+      dz.select().from(order).where(eq(order.customerId, who)).all(),
+      dz.select().from(wishlistItem).where(eq(wishlistItem.customerId, who)).all(),
+      dz.select().from(review).where(eq(review.customerId, who)).all(),
+      dz.select().from(apiToken).where(eq(apiToken.userId, who)).all(),
+    ]) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]];
+    const data = {
+      exportedAt: new Date(Date.now()).toISOString(),
+      account: { id: who, email: (c.get("sessionEmail") as string | undefined) ?? null },
+      orders, wishlist, reviews,
+      apiTokens: tokens.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, createdAt: t.createdAt, lastUsedAt: t.lastUsedAt, revokedAt: t.revokedAt })), // metadata only — no hashedKey
+    };
+    return c.json(data, 200, { "content-disposition": `attachment; filename="saasuluk-data-${String(who).replace(/[^a-zA-Z0-9_-]/g, "")}.json"` });
+  };
+
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
   const generateAvatar = (c: Context) => {
     const seed = c.req.query("seed") ?? "anon";
@@ -803,4 +825,5 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.post("/billing/connect", connectBilling);
   app.post("/billing/report", reportUsage);
   app.post("/billing/portal", openBillingPortal);
+  app.get("/account/export", exportAccount);
 }
