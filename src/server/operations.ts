@@ -122,6 +122,31 @@ export async function reapAbandonedOrders(dz: Dz, olderThanMs = 86_400_000): Pro
   return stale.length;
 }
 
+/** Reverse the inventory + discount-usage effects of a PAID sale (markOrderPaid did the decrement/increment) — used when
+ *  a paid order is refunded or admin-cancelled. The CALLER must ensure this runs exactly ONCE per order (gate on the
+ *  paid/shipped → cancelled transition), so a webhook re-delivery can't double-restock. */
+export async function restockOrderLines(dz: Dz, o: { items?: string | null; discountCode?: string | null }): Promise<void> {
+  let items: { productId?: number; variantId?: number; qty?: number }[] = [];
+  try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+  for (const it of items) {
+    const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
+    if (it.productId != null) await dz.update(product).set({ inventory: sql`${product.inventory} + ${qty}` }).where(eq(product.id, Number(it.productId))).run();
+    if (it.variantId != null) await dz.update(variant).set({ inventory: sql`${variant.inventory} + ${qty}` }).where(eq(variant.id, Number(it.variantId))).run();
+  }
+  if (o.discountCode) await dz.update(discountCode).set({ currentUses: sql`max(0, ${discountCode.currentUses} - 1)` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
+}
+
+/** Refund a paid order (Stripe charge.refunded): flip paid/shipped → cancelled ONCE and restock. The conditional UPDATE
+ *  is the once-only gate — a webhook re-delivery finds it already cancelled and does nothing (no double-restock). */
+export async function refundOrder(dz: Dz, orderId: number): Promise<boolean> {
+  const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
+  if (!o || (o.status !== "paid" && o.status !== "shipped")) return false;
+  const res = (await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), inArray(order.status, ["paid", "shipped"]))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+  if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return false;
+  await restockOrderLines(dz, o);
+  return true;
+}
+
 /** The buyer's email for the receipt — the verified session email the auth middleware stashed (null for guests). */
 const buyerEmail = (c: Context): string | null => (c.get("sessionEmail") as string | undefined) ?? null;
 
@@ -546,6 +571,8 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
     const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
     await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(eq(order.id, id)).run();
+    // cancelling a PAID order reverses the sale → restock + return the discount use (the guard above ran the flip once).
+    if (status === "cancelled" && o.status === "paid") await restockOrderLines(dz, o);
     if ((status === "shipped" || status === "cancelled") && o.customerEmail) {
       const origin = new URL(c.req.url).origin;
       const trackUrl = status === "shipped" ? (carrierTrackingUrl(carrier, trackingNumber) ?? `${origin}/dashboard/s/orders`) : undefined;
@@ -698,6 +725,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     form.set("cancel_url", `${origin}/checkout?cancelled=1`);
     form.set("client_reference_id", String(orderId));
     form.set("metadata[orderId]", String(orderId));
+    form.set("payment_intent_data[metadata][orderId]", String(orderId)); // so the charge carries orderId → charge.refunded maps back
     // CARD-SAVING: for a signed-in shopper, attach their Stripe customer + save the payment method for future
     // on-session reuse, so the card they pay with shows up in the billing portal. Defensive — a customer hiccup
     // (e.g. Stripe blip) must never block the sale, so we fall back to an anonymous Checkout Session.

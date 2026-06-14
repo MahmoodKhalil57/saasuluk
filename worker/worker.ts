@@ -36,7 +36,7 @@ import { chatApp, chatWidget } from "@suluk/chat";
 import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "../src/server/dashboard";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -357,12 +357,15 @@ app.post("/api/stripe/webhook", async (c) => {
   if (!secret) return c.json({ error: "stripe webhook not configured" }, 503);
   const raw = await c.req.text();
   if (!(await verifyStripe(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
-  const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string } } } };
+  const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean } } };
   const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
   if (evt.type === "checkout.session.completed") {
     if (oid) await markOrderPaid(drizzle(c.env.DB), oid); // pending-only + once (a re-delivery is a no-op)
   } else if (evt.type === "checkout.session.expired") {
     if (oid) await cancelPendingOrder(drizzle(c.env.DB), oid); // the buyer abandoned the hosted checkout → release the pending order
+  } else if (evt.type === "charge.refunded") {
+    // charge.refunded also fires on PARTIAL refunds (refunded=false); only a FULL refund cancels + restocks the order.
+    if (oid && evt.data?.object?.refunded === true) await refundOrder(drizzle(c.env.DB), oid);
   }
   return c.json({ received: true, type: evt.type });
 });
