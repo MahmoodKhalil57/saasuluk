@@ -66,6 +66,8 @@ import Layout from "../layouts/Layout.astro";
       <div class="co-totals">
         <div class="co-trow"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
         <div class="co-trow disc" id="discountRow" hidden><span id="discountLabel">Discount</span><span id="discountAmt"></span></div>
+        <div class="co-trow" id="shippingRow" hidden><span>Shipping</span><span id="shippingAmt"></span></div>
+        <div class="co-trow" id="taxRow" hidden><span>Sales tax</span><span id="taxAmt"></span></div>
         <div class="co-trow total"><span>Total</span><span id="total">$0.00</span></div>
       </div>
     </div>
@@ -167,14 +169,21 @@ import Layout from "../layouts/Layout.astro";
         </div>`).join("") : `<p style="color:var(--muted)">Your cart is empty — <a href="/products">browse products</a>.</p>`;
     }
 
+    // The server-authoritative breakdown (subtotal/discount/shipping/tax/total) from /checkout/quote — the single
+    // source of truth for shipping + tax (the @suluk/stripe adapters). null until the first quote (then client fallback).
+    let quote = null;
     function renderTotals() {
-      const sub = subtotal();
-      const amt = disc ? disc.amount : 0;
-      const total = Math.max(0, sub - amt);
+      const sub = quote ? quote.subtotalCents : subtotal();
+      const discAmt = quote ? quote.discountCents : (disc ? disc.amount : 0);
+      const shipAmt = quote ? quote.shippingCents : 0;
+      const taxAmt = quote ? quote.taxCents : 0;
+      const total = quote ? quote.totalCents : Math.max(0, sub - discAmt);
       document.getElementById("subtotal").textContent = money(sub);
       const dr = document.getElementById("discountRow");
-      if (disc && amt > 0) { dr.hidden = false; document.getElementById("discountLabel").textContent = "Discount (" + disc.code + ")"; document.getElementById("discountAmt").textContent = "−" + money(amt); }
+      if (discAmt > 0) { dr.hidden = false; document.getElementById("discountLabel").textContent = "Discount" + (disc ? " (" + disc.code + ")" : ""); document.getElementById("discountAmt").textContent = "−" + money(discAmt); }
       else { dr.hidden = true; }
+      const sr = document.getElementById("shippingRow"); if (shipAmt > 0) { sr.hidden = false; document.getElementById("shippingAmt").textContent = money(shipAmt); } else { sr.hidden = true; }
+      const xr = document.getElementById("taxRow"); if (taxAmt > 0) { xr.hidden = false; document.getElementById("taxAmt").textContent = money(taxAmt); } else { xr.hidden = true; }
       document.getElementById("total").textContent = money(total);
       // single ADAPTIVE button: a chargeable total → Stripe; a $0/free total → complete now (no card).
       const btn = document.getElementById("placeOrder");
@@ -182,7 +191,19 @@ import Layout from "../layouts/Layout.astro";
       else if (total >= STRIPE_FLOOR) { btn.disabled = false; btn.textContent = "Pay " + money(total) + " with Stripe →"; }
       else { btn.disabled = false; btn.textContent = "Place order — " + (total === 0 ? "Free" : money(total)); }
     }
-    function render() { renderLines(); renderTotals(); }
+    // Re-quote (debounced) whenever the cart, discount or address changes — shipping + tax are server-computed.
+    let quoteTimer = null;
+    function refreshQuote() {
+      const c = cart();
+      if (!c.length) { quote = null; renderTotals(); return; }
+      clearTimeout(quoteTimer);
+      quoteTimer = setTimeout(async () => {
+        try { quote = await postJson("/checkout/quote", { items: c, discountCode: disc && disc.code, shippingAddress: shipAddr() }); }
+        catch (e) { quote = null; } // fall back to the client subtotal − discount
+        renderTotals();
+      }, 250);
+    }
+    function render() { renderLines(); renderTotals(); refreshQuote(); }
 
     function showApplied(code) {
       const a = document.getElementById("applied");
@@ -193,7 +214,7 @@ import Layout from "../layouts/Layout.astro";
     function removeDiscount() {
       disc = null; if (window.discount) window.discount.clear();
       document.getElementById("applied").hidden = true; document.getElementById("discMsg").textContent = "";
-      renderTotals();
+      renderTotals(); refreshQuote();
     }
     async function applyCode(code, opts) {
       opts = opts || {};
@@ -207,7 +228,7 @@ import Layout from "../layouts/Layout.astro";
         document.getElementById("applied").hidden = true;
         if (!opts.silent) document.getElementById("discMsg").innerHTML = `<span style="color:var(--accent)">✗ ${esc(r.reason || "Invalid code.")}</span>`;
       }
-      renderTotals();
+      renderTotals(); refreshQuote();
     }
 
     document.getElementById("apply").addEventListener("click", async () => {
@@ -229,7 +250,7 @@ import Layout from "../layouts/Layout.astro";
       document.getElementById("email").removeAttribute("aria-invalid");
       const btn = document.getElementById("placeOrder"); const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Processing…";
       try {
-        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code, email, shippingAddress: shipAddr() }, "checkout");
+        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code, email, shippingAddress: shipAddr(), shippingMethod: quote && quote.shippingMethod }, "checkout");
         if (r.url) { location.href = r.url; return; } // chargeable → Stripe Checkout (leave the page)
         if (r.free || r.paid || r.order) { // free/$0 order completed server-side
           localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); if (window.discount) window.discount.clear(); disc = null;

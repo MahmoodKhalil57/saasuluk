@@ -18,7 +18,7 @@ const RULE_TO_REQUIRES = { any: "anyone", owner: "authenticated", admin: "admin"
 /** Custom (non-CRUD) operations. The declared access is ENFORCED on the wire by @suluk/hono's enforceAccess
  *  (api.ts / worker.ts) — so these facets are load-bearing, not decorative. */
 const OP_ACCESS: Record<string, AccessFacet> = {
-  checkout: { requires: "anyone" }, payCheckout: { requires: "anyone" }, confirmCheckout: { requires: "anyone" },
+  checkout: { requires: "anyone" }, payCheckout: { requires: "anyone" }, confirmCheckout: { requires: "anyone" }, quoteCheckout: { requires: "anyone" },
   validateDiscount: { requires: "anyone" }, search: { requires: "anyone" }, recommendRelated: { requires: "anyone" },
   // store analytics expose revenue / customer counts / order data — admin-only (was public; enforced via the gate now).
   analyticsSummary: { requires: "admin" }, analyticsRevenue: { requires: "admin" }, analyticsTopProducts: { requires: "admin" },

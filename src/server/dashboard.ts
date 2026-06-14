@@ -290,11 +290,13 @@ const ORDERS = `
     os=(os||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});box.className="";
     if(!os.length){box.innerHTML='<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';return;}
     box.innerHTML=os.map(function(o){var items=parse(o.items);var n=items.reduce(function(s,i){return s+(i.qty||1);},0);
-      var sub=items.reduce(function(s,i){return s+(i.priceCents||0)*(i.qty||1);},0);var disc=sub-(o.totalCents||0);
+      var sub=items.reduce(function(s,i){return s+(i.priceCents||0)*(i.qty||1);},0);var shipC=o.shippingCents||0,taxC=o.taxCents||0;var disc=sub-((o.totalCents||0)-shipC-taxC);
       return '<div class="od-card" data-id="'+esc(o.id)+'">'+
         '<button class="od-head" type="button"><span class="od-id">#'+esc(o.id)+'</span><span class="od-pill '+esc(o.status)+'">'+esc(o.status)+'</span><span class="od-when">'+esc(when(o.createdAt))+' · '+n+' item'+(n===1?"":"s")+'</span><span class="od-tot">'+money(o.totalCents)+'</span><span class="od-caret">›</span></button>'+
         '<div class="od-body">'+items.map(lineHtml).join("")+
           '<div style="margin-top:10px">'+(disc>0?'<div class="od-tot-row disc"><span>Discount'+(o.discountCode?" ("+esc(o.discountCode)+")":"")+'</span><span>−'+money(disc)+'</span></div>':"")+
+          (shipC>0?'<div class="od-tot-row"><span>Shipping</span><span>'+money(shipC)+'</span></div>':"")+
+          (taxC>0?'<div class="od-tot-row"><span>Sales tax</span><span>'+money(taxC)+'</span></div>':"")+
           '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+trackBlock(o)+addrBlock(o)+
           '<div class="od-actions"><button class="btn sm" type="button" data-buy="'+esc(o.id)+'">Buy again</button></div>'+
         '</div></div>';}).join("");

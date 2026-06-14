@@ -29,7 +29,8 @@ import Layout from "../../layouts/Layout.astro";
     function summaryHtml(o) {
       let items = []; try { items = JSON.parse(o.items || "[]"); } catch (e) {}
       const sub = items.reduce((s, i) => s + (i.priceCents || 0) * (i.qty || 1), 0);
-      const disc = sub - (o.totalCents || 0);
+      const shipC = o.shippingCents || 0, taxC = o.taxCents || 0;
+      const disc = sub - ((o.totalCents || 0) - shipC - taxC); // discount = subtotal − discounted-goods
       let ship = "";
       try { const a = o.shippingAddress ? JSON.parse(o.shippingAddress) : null;
         if (a) { const L = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter((x) => x && String(x).trim());
@@ -38,6 +39,8 @@ import Layout from "../../layouts/Layout.astro";
         items.map((it) => '<div class="sx-line">' + (it.image ? '<img class="sx-img" src="' + esc(it.image) + '" alt="" loading="lazy"/>' : '<span class="sx-img"></span>') +
           '<div class="sx-bd"><div class="sx-nm">' + esc(it.name || ("#" + it.productId)) + '</div><div class="sx-sub">' + (it.variantLabel ? esc(it.variantLabel) + " · " : "") + 'Qty ' + (it.qty || 1) + ' × ' + money(it.priceCents) + '</div></div><div class="sx-amt">' + money((it.priceCents || 0) * (it.qty || 1)) + '</div></div>').join("") +
         '<div style="margin-top:8px">' + (disc > 0 ? '<div class="sx-tot disc"><span>Discount' + (o.discountCode ? " (" + esc(o.discountCode) + ")" : "") + '</span><span>−' + money(disc) + '</span></div>' : "") +
+        (shipC > 0 ? '<div class="sx-tot"><span>Shipping</span><span>' + money(shipC) + '</span></div>' : "") +
+        (taxC > 0 ? '<div class="sx-tot"><span>Sales tax</span><span>' + money(taxC) + '</span></div>' : "") +
         '<div class="sx-tot g"><span>Total paid</span><span>' + money(o.totalCents) + '</span></div></div>' + ship + '</div>';
     }
     const params = new URLSearchParams(location.search);

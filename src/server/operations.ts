@@ -12,7 +12,8 @@ import type { CostModel } from "@suluk/cost";
 import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
-import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, type Discount } from "@suluk/stripe";
+import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, type Discount } from "@suluk/stripe";
+import { shippingProvider, taxProvider } from "./commerce";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
@@ -152,6 +153,13 @@ async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Promise<vo
       const qty = Math.max(1, Math.floor(Number(l.qty) || 1));
       return { name: l.variantLabel ? `${l.name ?? "Item"} — ${l.variantLabel}` : (l.name ?? "Item"), qty, totalCents: Math.max(0, Math.round(Number(l.priceCents) || 0)) * qty };
     });
+    // append the adjustment lines (discount/shipping/tax) so the receipt's lines sum EXACTLY to the total.
+    const goodsCents = lines.reduce((s, l) => s + l.totalCents, 0);
+    const shipC = Math.max(0, Number(o.shippingCents) || 0), taxC = Math.max(0, Number(o.taxCents) || 0);
+    const discC = goodsCents - ((o.totalCents || 0) - shipC - taxC);
+    if (discC > 0) lines.push({ name: o.discountCode ? `Discount (${o.discountCode})` : "Discount", qty: 1, totalCents: -discC });
+    if (shipC > 0) lines.push({ name: "Shipping", qty: 1, totalCents: shipC });
+    if (taxC > 0) lines.push({ name: "Sales tax", qty: 1, totalCents: taxC });
     // surface the ship-to on the receipt for physical orders (one display line per array entry; @suluk/email escapes them)
     let ship: string[] | undefined;
     if (o.shippingAddress) {
@@ -205,7 +213,7 @@ const write = (m: number): CostModel => ({ components: [{ source: "compute", bas
 interface LineItem { productId?: number; variantId?: number; qty?: number; priceCents?: number }
 interface ResolvedDiscount { valid: boolean; discountType?: "percent" | "fixed"; discountValue?: number; reason?: string; maxDiscountCents?: number; minSubtotalCents?: number }
 /** A server-re-priced order line — the client's priceCents is NEVER trusted; every cent comes from the product/variant row. */
-interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string; inventory: number }
+interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string; inventory: number; requiresShipping: boolean }
 
 /** The first stock problem in the cart (sold-out / over-qty), or null if everything is available. */
 function stockError(lines: PricedLine[]): string | null {
@@ -237,7 +245,7 @@ export const OPERATION_COSTS: Record<string, CostModel> = {
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
-  payCheckout: write(90), confirmCheckout: read(30),
+  payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
   connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40),
 };
 
@@ -252,7 +260,7 @@ const shipAddress = obj({ name: v.line(120), line1: v.line(160), line2: v.line(1
 
 /** The v4 path fragment for the custom operations — merged into the contract document (then hardened below). */
 export const OPERATION_PATHS: Record<string, unknown> = {
-  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: v.int(1, ID), items: { type: "array", maxItems: 200, items: cartLine }, discountCode: v.code(40), email: v.email(), shippingAddress: shipAddress }), status: 201 }) } },
+  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: v.int(1, ID), items: { type: "array", maxItems: 200, items: cartLine }, discountCode: v.code(40), email: v.email(), shippingMethod: v.line(40), shippingAddress: shipAddress }), status: 201 }) } },
   "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: obj({ code: v.code(40), subtotalCents: v.cents(100_000_000_000) }, ["code"]) }) } },
   "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
@@ -266,7 +274,8 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
-  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40), email: v.email(), shippingAddress: shipAddress }) }) } },
+  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40), email: v.email(), shippingMethod: v.line(40), shippingAddress: shipAddress }) }) } },
+  "checkout/quote": { requests: { quoteCheckout: jsonOp("post", "Quote the live order total — subtotal − discount + shipping + tax (via the pluggable @suluk/stripe adapters)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40), shippingMethod: v.line(40), shippingAddress: shipAddress }) }) } },
   "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: obj({ orderId: v.int(1, ID), sessionId: v.line(255, "^[A-Za-z0-9_]+$") }, ["orderId", "sessionId"]) }) } },
   "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: v.email() }) }) } },
   "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object", additionalProperties: false } }) } },
@@ -351,12 +360,31 @@ async function repriceLines(dz: Dz, items: LineItem[]): Promise<PricedLine[]> {
     const vrow = i.variantId != null ? byVid.get(Number(i.variantId)) : undefined;
     const vmatch = vrow && Number(vrow.productId) === Number(p.id) ? vrow : undefined;
     const priceCents = vmatch && vmatch.priceCentsEnabled ? Number(vmatch.priceCents) : Number(p.priceCents);
-    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined, inventory: Number(vmatch ? vmatch.inventory : p.inventory) });
+    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined, inventory: Number(vmatch ? vmatch.inventory : p.inventory), requiresShipping: !!p.requiresShipping });
   }
   return out;
 }
 const linesSubtotal = (lines: PricedLine[]) => lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
 const orderItemsJson = (lines: PricedLine[]) => JSON.stringify(lines.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, priceCents: l.priceCents, name: l.name, image: l.image, variantLabel: l.variantLabel })));
+
+export interface OrderTotals { subtotalCents: number; discountCents: number; shippingCents: number; taxCents: number; totalCents: number; shippingMethod: string | null }
+/**
+ * The authoritative full total — subtotal − discount + shipping + tax — via the pluggable @suluk/stripe adapters
+ * (./commerce). Shipping is quoted off the POST-discount goods total (so "free over $X" tracks what's actually spent)
+ * and is $0 for a digital-only cart; tax is computed on the discounted base. The SINGLE place the order total is
+ * composed, so checkout, the live quote, and the stored order can never disagree. Server-authoritative (the client
+ * only proposes a shipping-method id; everything else is recomputed here).
+ */
+async function computeOrderTotals(lines: PricedLine[], disc: ResolvedDiscount, opts: { address?: ShipTo; shippingMethod?: string } = {}): Promise<OrderTotals> {
+  const subtotalCents = linesSubtotal(lines);
+  const discountedGoods = applyDiscount(subtotalCents, disc); // subtotal − discount, already clamped to [0, subtotal]
+  const discountCents = subtotalCents - discountedGoods;
+  const ship = await resolveShipping(shippingProvider, { subtotalCents: discountedGoods, lines: lines.map((l) => ({ id: l.productId, qty: l.qty, requiresShipping: l.requiresShipping })), address: opts.address }, opts.shippingMethod);
+  const shippingCents = ship ? ship.amountCents : 0;
+  const tax = await resolveTax(taxProvider, { subtotalCents: discountedGoods, shippingCents, address: opts.address });
+  const totalCents = composeTotal({ subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents }).totalCents;
+  return { subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents, totalCents, shippingMethod: ship ? ship.id : null };
+}
 
 /** Shipping address shape (the checkout form / contract); stored as a JSON snapshot on the order for physical goods. */
 export interface ShipTo { name?: string; line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }
@@ -375,7 +403,7 @@ function cleanAddress(a: unknown): string | null {
 export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: (...a: unknown[]) => unknown }, dbFor: DbFor): void {
   const checkout = async (c: Context) => {
     const dz = dbFor(c);
-    const body = (await c.req.json().catch(() => ({}))) as { cartId?: number; items?: LineItem[]; discountCode?: string; email?: string; shippingAddress?: ShipTo };
+    const body = (await c.req.json().catch(() => ({}))) as { cartId?: number; items?: LineItem[]; discountCode?: string; email?: string; shippingAddress?: ShipTo; shippingMethod?: string };
     let rawItems: LineItem[] = Array.isArray(body.items) ? body.items : [];
     let codeUsed: string | null = body.discountCode ?? null;
     if (body.cartId) {
@@ -389,23 +417,38 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const subtotal = linesSubtotal(lines);
     const who = principal(c);
     const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
-    const total = applyDiscount(subtotal, disc);
+    // FULL total via the pluggable shipping + tax adapters: subtotal − discount + shipping + tax.
+    const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
+    const total = totals.totalCents;
     const codeFinal = disc.valid ? codeUsed!.toUpperCase().trim() : null;
     const itemsJson = orderItemsJson(lines);
     const email = buyerEmail(c) ?? cleanEmail(body.email);
     // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not create a second one.
     if (!requiresStripe(total)) {
       const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
-      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ order: o, subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid, free: true, duplicate: true }, 200); }
+      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ order: o, ...totals, discountApplied: disc.valid, free: true, duplicate: true }, 200); }
     }
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), shippingCents: totals.shippingCents, taxCents: totals.taxCents, shippingMethod: totals.shippingMethod, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
     // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
     const free = !requiresStripe(total);
     if (free && await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId);
     const final = await dz.select().from(order).where(eq(order.id, orderId)).get();
-    return c.json({ order: final, subtotalCents: subtotal, totalCents: total, discountApplied: disc.valid, free }, 201);
+    return c.json({ order: final, ...totals, discountApplied: disc.valid, free }, 201);
+  };
+
+  // Live checkout breakdown — the server-authoritative subtotal/discount/shipping/tax/total for the current cart, so
+  // the buyer sees the FULL total (incl. shipping + tax from the adapters) BEFORE paying. The client only proposes a
+  // shipping-method id + address; everything is recomputed here (never trusts a client amount).
+  const quoteCheckout = async (c: Context) => {
+    const dz = dbFor(c);
+    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string; shippingAddress?: ShipTo; shippingMethod?: string };
+    const lines = await repriceLines(dz, Array.isArray(body.items) ? body.items : []);
+    const subtotal = linesSubtotal(lines);
+    const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: principal(c), productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
+    const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
+    return c.json({ ...totals, discountApplied: disc.valid, discountCode: disc.valid ? (body.discountCode ?? "").toUpperCase().trim() : null, needsShipping: lines.some((l) => l.requiresShipping), free: !requiresStripe(totals.totalCents) }, 200);
   };
 
   const validateDiscount = async (c: Context) => {
@@ -578,7 +621,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   // hosted Checkout Session; the success page calls confirmCheckout, which retrieves the session from Stripe
   // (the source of truth) and marks the order paid — so it works WITHOUT a configured webhook endpoint.
   const payCheckout = async (c: Context) => {
-    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string; email?: string; shippingAddress?: ShipTo };
+    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string; email?: string; shippingAddress?: ShipTo; shippingMethod?: string };
     const dz = dbFor(c);
     const who = principal(c);
     // SERVER-AUTHORITATIVE, variant-aware re-pricing (the same path the free checkout uses) — client priceCents ignored.
@@ -587,7 +630,9 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const stock = stockError(lines); if (stock) return c.json({ error: stock }, 409); // never oversell
     const subtotal = linesSubtotal(lines);
     const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
-    const total = applyDiscount(subtotal, disc);
+    // FULL total via the pluggable shipping + tax adapters: subtotal − discount + shipping + tax (what Stripe charges).
+    const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
+    const total = totals.totalCents;
     const codeUsed = disc.valid ? body.discountCode!.toUpperCase().trim() : null;
     const itemsJson = orderItemsJson(lines);
     const email = buyerEmail(c) ?? cleanEmail(body.email);
@@ -597,7 +642,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
       if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ free: true, paid: true, order: o, orderId: dupId, totalCents: total, duplicate: true }); }
     }
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), createdAt: Date.now() }).returning();
+    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), shippingCents: totals.shippingCents, taxCents: totals.taxCents, shippingMethod: totals.shippingMethod, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
     // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
     // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.
@@ -631,6 +676,11 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const useCatalog = !disc.valid && lines.every((l) => l.stripePriceId);
     if (useCatalog) {
       lines.forEach((l, idx) => { form.set(`line_items[${idx}][price]`, l.stripePriceId as string); form.set(`line_items[${idx}][quantity]`, String(l.qty)); });
+      // append shipping + tax as their own line items so the catalog charge ALSO collects them (total stays authoritative).
+      let extra = lines.length;
+      const addLine = (cents: number, name: string) => { if (cents <= 0) return; form.set(`line_items[${extra}][quantity]`, "1"); form.set(`line_items[${extra}][price_data][currency]`, "usd"); form.set(`line_items[${extra}][price_data][unit_amount]`, String(cents)); form.set(`line_items[${extra}][price_data][product_data][name]`, name); extra++; };
+      addLine(totals.shippingCents, "Shipping");
+      addLine(totals.taxCents, "Sales tax");
     } else {
       form.set("line_items[0][quantity]", "1");
       form.set("line_items[0][price_data][currency]", "usd");
@@ -743,6 +793,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.post("/tokens/create", createToken);
   app.post("/tokens/:id/revoke", revokeToken);
   app.post("/checkout/pay", payCheckout);
+  app.post("/checkout/quote", quoteCheckout);
   app.post("/checkout/confirm", confirmCheckout);
   app.post("/billing/connect", connectBilling);
   app.post("/billing/report", reportUsage);

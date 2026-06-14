@@ -30,6 +30,7 @@ export const product = sqliteTable("product", {
   imageUrl: text("image_url"), // the PRIMARY image (kept as images[0] mirror for thin consumers)
   images: text("images"), // JSON gallery: [{ url, alt?, sortOrder? }] — the multi-image capability
   featured: integer("featured", { mode: "boolean" }).notNull().default(false),
+  requiresShipping: integer("requires_shipping", { mode: "boolean" }).notNull().default(false), // PHYSICAL good → shipping applies
   status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
   stripePriceId: text("stripe_price_id"), // set by scripts/sync-catalog.ts — the real Stripe Price for checkout
 });
@@ -85,6 +86,9 @@ export const order = sqliteTable("order", {
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   carrier: text("carrier"), // set on the shipped transition (admin fulfillment)
   trackingNumber: text("tracking_number"),
+  shippingCents: integer("shipping_cents").notNull().default(0),
+  taxCents: integer("tax_cents").notNull().default(0),
+  shippingMethod: text("shipping_method"),
   createdAt: integer("created_at"),
 });
 
@@ -223,11 +227,11 @@ export const project = sqliteTable("project", {
  */
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS category (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, long_description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, images TEXT, featured INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
+CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, long_description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, images TEXT, featured INTEGER NOT NULL DEFAULT 0, requires_shipping INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
 CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, options TEXT, images TEXT, price_cents INTEGER NOT NULL DEFAULT 0, price_cents_enabled INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, description TEXT, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, min_subtotal_cents INTEGER, max_discount_cents INTEGER, max_uses INTEGER, max_uses_per_customer INTEGER, applies_to_product_ids TEXT, starts_at INTEGER, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER);
 CREATE TABLE IF NOT EXISTS cart (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', discount_code TEXT, status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, customer_email TEXT, items TEXT NOT NULL DEFAULT '[]', shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, carrier TEXT, tracking_number TEXT, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, customer_email TEXT, items TEXT NOT NULL DEFAULT '[]', shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, carrier TEXT, tracking_number TEXT, shipping_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, shipping_method TEXT, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS review (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, customer_id TEXT, rating INTEGER NOT NULL DEFAULT 5, title TEXT NOT NULL, body TEXT, verified_purchase INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', helpful_count INTEGER NOT NULL DEFAULT 0, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS review_helpful_vote (id INTEGER PRIMARY KEY AUTOINCREMENT, review_id INTEGER NOT NULL, principal TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS address (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, name TEXT, line1 TEXT NOT NULL, line2 TEXT, city TEXT NOT NULL, state TEXT, postal_code TEXT, country TEXT NOT NULL DEFAULT 'US', is_default INTEGER NOT NULL DEFAULT 0);
