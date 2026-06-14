@@ -99,8 +99,11 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
     try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
     for (const it of items) {
       const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
-      if (it.productId != null) await dz.update(product).set({ inventory: sql`max(0, ${product.inventory} - ${qty})` }).where(eq(product.id, Number(it.productId))).run();
-      if (it.variantId != null) await dz.update(variant).set({ inventory: sql`max(0, ${variant.inventory} - ${qty})` }).where(eq(variant.id, Number(it.variantId))).run();
+      // no max(0) clamp: the decrement must be the EXACT inverse of restockOrderLines' +qty, or a refund over-inflates
+      // stock. stockError blocks overselling at checkout, so inventory stays >=0 in the normal path; a rare race that
+      // dips it below 0 renders as "Sold out" (the <=0 check) and a later refund returns it to the true value.
+      if (it.productId != null) await dz.update(product).set({ inventory: sql`${product.inventory} - ${qty}` }).where(eq(product.id, Number(it.productId))).run();
+      if (it.variantId != null) await dz.update(variant).set({ inventory: sql`${variant.inventory} - ${qty}` }).where(eq(variant.id, Number(it.variantId))).run();
     }
   }
   return changed;
@@ -140,10 +143,18 @@ export async function restockOrderLines(dz: Dz, o: { items?: string | null; disc
  *  is the once-only gate — a webhook re-delivery finds it already cancelled and does nothing (no double-restock). */
 export async function refundOrder(dz: Dz, orderId: number): Promise<boolean> {
   const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
-  if (!o || (o.status !== "paid" && o.status !== "shipped")) return false;
+  if (!o) return false;
+  // Stripe doesn't guarantee webhook ordering: a refund can arrive BEFORE checkout.session.completed. Terminate a
+  // still-pending order so a later markOrderPaid (pending-only) can't resurrect it into a paid sale + decrement stock.
+  if (o.status === "pending") {
+    await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run();
+    return false; // nothing was decremented yet → nothing to restock
+  }
+  if (o.status !== "paid" && o.status !== "shipped") return false;
   const res = (await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), inArray(order.status, ["paid", "shipped"]))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
   if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return false;
-  await restockOrderLines(dz, o);
+  // restock ONLY a paid (not-yet-shipped) order — a shipped order's goods already left, so they don't return to stock.
+  if (o.status === "paid") await restockOrderLines(dz, o);
   return true;
 }
 
@@ -570,8 +581,11 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (status === "cancelled" && !["pending", "paid"].includes(o.status)) return c.json({ error: `A ${o.status} order can't be cancelled.` }, 409);
     const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
     const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
-    await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(eq(order.id, id)).run();
-    // cancelling a PAID order reverses the sale → restock + return the discount use (the guard above ran the flip once).
+    // CONDITIONAL flip (compare-and-swap on the pre-read status) — the once-only gate, so two concurrent/duplicate
+    // requests can't both restock + re-email. The restock + status email run ONLY for the racer that actually flipped it.
+    const res = (await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(and(eq(order.id, id), eq(order.status, o.status))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+    if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no restock, no email
+    // cancelling a PAID order reverses the sale → restock + return the discount use (this racer won the flip exactly once).
     if (status === "cancelled" && o.status === "paid") await restockOrderLines(dz, o);
     if ((status === "shipped" || status === "cancelled") && o.customerEmail) {
       const origin = new URL(c.req.url).origin;
