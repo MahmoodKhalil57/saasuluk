@@ -26,6 +26,7 @@ import Layout from "../../layouts/Layout.astro";
   <script is:inline>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+    const safeUrl = (u) => /^(https?:\/\/|\/)/i.test(String(u == null ? "" : u)) ? u : "#"; // http(s) or relative only — never javascript:/data:
     function summaryHtml(o) {
       let items = []; try { items = JSON.parse(o.items || "[]"); } catch (e) {}
       const sub = items.reduce((s, i) => s + (i.priceCents || 0) * (i.qty || 1), 0);
@@ -37,7 +38,7 @@ import Layout from "../../layouts/Layout.astro";
           if (L.length) ship = '<div class="sx-ship"><b>Shipping to</b>' + L.map(esc).join("<br>") + '</div>'; } } catch (e) {}
       // digital delivery — a PAID order's downloadable lines get an immediate access link (also lives on /dashboard/s/orders).
       const dls = items.filter((it) => it.downloadUrl);
-      const dlBlock = dls.length ? '<div class="card sx-card" style="margin-top:14px"><h2 style="margin-top:0;font-size:16px">Your downloads</h2><p style="color:var(--muted);font-size:13px;margin:0 0 10px">Instant access — also in <a href="/dashboard/s/orders">your orders</a>.</p>' + dls.map((it) => '<a class="btn sm" href="' + esc(it.downloadUrl) + '" target="_blank" rel="noopener" style="margin:0 8px 8px 0">&darr; ' + esc(it.name || "Download") + '</a>').join("") + '</div>' : "";
+      const dlBlock = dls.length ? '<div class="card sx-card" style="margin-top:14px"><h2 style="margin-top:0;font-size:16px">Your downloads</h2><p style="color:var(--muted);font-size:13px;margin:0 0 10px">Instant access — also in <a href="/dashboard/s/orders">your orders</a>.</p>' + dls.map((it) => '<a class="btn sm" href="' + esc(safeUrl(it.downloadUrl)) + '" target="_blank" rel="noopener" style="margin:0 8px 8px 0">&darr; ' + esc(it.name || "Download") + '</a>').join("") + '</div>' : "";
       return '<div class="card sx-card"><h2 style="margin-top:0;font-size:16px">Order summary</h2>' +
         items.map((it) => '<div class="sx-line">' + (it.image ? '<img class="sx-img" src="' + esc(it.image) + '" alt="" loading="lazy"/>' : '<span class="sx-img"></span>') +
           '<div class="sx-bd"><div class="sx-nm">' + esc(it.name || ("#" + it.productId)) + '</div><div class="sx-sub">' + (it.variantLabel ? esc(it.variantLabel) + " · " : "") + 'Qty ' + (it.qty || 1) + ' × ' + money(it.priceCents) + '</div></div><div class="sx-amt">' + money((it.priceCents || 0) * (it.qty || 1)) + '</div></div>').join("") +

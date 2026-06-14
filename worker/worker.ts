@@ -10,7 +10,7 @@
  */
 import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { and, eq, asc, desc, type SQL } from "drizzle-orm";
+import { and, eq, asc, desc, getTableName, type SQL } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { mount, enforceAccess, enforceRateLimit, MemoryRateLimitStore, type RateLimitStore, type RouteContract } from "@suluk/hono";
 import { RATE_LIMITS } from "../src/server/ratelimits";
@@ -38,7 +38,7 @@ import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardH
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder, sendOrderReceipt } from "../src/server/operations";
-import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
+import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
 import { annotateSource } from "../src/server/source-facet";
@@ -148,6 +148,7 @@ function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
   const cols = table as unknown as Record<string, SQLiteColumn>;
   const pk = cols.id;
   const policy = policyFor(access, ownerCol);
+  const tname = getTableName(table); // for private-column redaction on public reads (mirrors crud.ts)
   const dz = (c: Context<{ Bindings: Env }>) => drizzle(c.env.DB);
   const rid = (c: Context) => Number(c.req.param("id"));
   const forbidden = (c: Context, g: { status?: 401 | 403 }) => c.json({ error: g.status === 401 ? "unauthorized" : "forbidden" }, g.status ?? 403); // 401 anon vs 403 forbidden — the wire enforces x-suluk-access
@@ -173,11 +174,12 @@ function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
       // Pagination OPT-IN (page/perPage) — full list otherwise, matching the dev server so dev/prod never diverge.
       const raw = c.req.query();
       if (raw.page != null || raw.perPage != null) qb = qb.limit(lq.limit).offset(lq.offset);
-      return c.json(await qb.all());
+      const admin = isAdmin(c);
+      return c.json((await qb.all()).map((row) => redactRow(tname, row as Record<string, unknown>, admin)));
     },
     get: async (c: Context<{ Bindings: Env }>) => {
       const g = gate(c, policy.get, principal(c)); if (!g.ok) return forbidden(c, g);
-      const r = await dz(c).select().from(table).where(scoped(c, g.scopeOwner, true)!); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404);
+      const r = await dz(c).select().from(table).where(scoped(c, g.scopeOwner, true)!); return r[0] ? c.json(redactRow(tname, r[0] as Record<string, unknown>, isAdmin(c))) : c.json({ error: "not found" }, 404);
     },
     create: async (c: Context<{ Bindings: Env }>) => {
       const g = gate(c, policy.create, principal(c)); if (!g.ok) return forbidden(c, g);

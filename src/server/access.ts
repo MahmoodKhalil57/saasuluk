@@ -37,6 +37,24 @@ export function policyFor(access: AccessMode | undefined, ownerCol?: string): Po
 export const isAdmin = (c: Context): boolean => c.get("isAdmin") === true;
 
 /**
+ * Columns that must NEVER be serialized to a non-admin reader. A digital good's `downloadUrl` is the delivered
+ * asset — a purchaser receives it via their own order snapshot (repriceLines copies it onto the order line), never
+ * from the world-readable catalog. Without this, an anonymous `GET /product` enumerates every product's delivery
+ * URL. The data-admin editor (isAdmin) still reads the full row so it can edit the field.
+ */
+export const PRIVATE_READ_COLS: Record<string, string[]> = { product: ["downloadUrl", "download_url"] };
+
+/** Strip a table's private columns from a row unless the caller is an admin. Used by BOTH CRUD twins (dev + worker). */
+export function redactRow<T extends Record<string, unknown> | undefined>(tableName: string, row: T, admin: boolean): T {
+  if (!row || admin) return row;
+  const priv = PRIVATE_READ_COLS[tableName];
+  if (!priv?.length) return row;
+  const out = { ...(row as Record<string, unknown>) };
+  for (const k of priv) delete out[k];
+  return out as T;
+}
+
+/**
  * Decide whether a caller may run an op (per the rule), whether to scope the query to their own rows, and — when
  * denied — the honest status. The `owner` rule REQUIRES a verified caller: an anonymous caller (no principal) is
  * denied 401, because the op declares `x-suluk-access: authenticated` and the WIRE must enforce what the contract

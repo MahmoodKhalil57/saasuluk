@@ -17,7 +17,24 @@ import { shippingProvider, taxProvider } from "./commerce";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
+import { redactRow } from "./access";
 import { v } from "./validations";
+
+/** Strip private columns (a digital good's downloadUrl) from product rows headed to a PUBLIC display surface
+ *  (search, related). The delivery URL reaches a buyer only via their order snapshot, never the open catalog. */
+const publicProducts = <T extends Record<string, unknown>>(rows: T[]): T[] => rows.map((r) => redactRow("product", r, false));
+
+/** Buyer-facing projection of an order row (the /checkout/confirm response + success page). Strips ops-only columns
+ *  — the customerId principal and stripePaymentIntentId — so the session-capability holder sees only their receipt. */
+const publicOrderShape = <T extends Record<string, unknown> | undefined>(o: T): Record<string, unknown> | null => {
+  if (!o) return null;
+  const r = o as Record<string, unknown>;
+  return {
+    id: r.id, status: r.status, items: r.items, shippingAddress: r.shippingAddress, customerEmail: r.customerEmail,
+    totalCents: r.totalCents, shippingCents: r.shippingCents, taxCents: r.taxCents, shippingMethod: r.shippingMethod,
+    discountCode: r.discountCode, carrier: r.carrier, trackingNumber: r.trackingNumber, createdAt: r.createdAt,
+  };
+};
 
 /** Demo personas (testimonials + seed reviewers) get a REAL stock headshot; everyone else gets a generated
  *  identicon. Keyed by the avatar seed (handle / customerId), lower-cased. Real signed-up users are never in this
@@ -187,14 +204,25 @@ const carrierTrackingUrl = (carrier: string | null, num: string | null): string 
 /** Issue a Stripe refund for a paid order. The order stores its Checkout SESSION id (stripePaymentIntentId), so first
  *  resolve the PaymentIntent, then refund it. Returns true on success — OR when there is nothing to refund (a $0/free
  *  order has no PaymentIntent). Any Stripe error → false, so the caller can refuse to cancel an order it couldn't refund. */
-async function stripeRefund(key: string, sessionId: string): Promise<boolean> {
+async function stripeRefund(key: string, sessionId: string, idemKey: string): Promise<boolean> {
   try {
     const s = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, { headers: { authorization: `Bearer ${key}` } });
     if (!s.ok) return false;
     const sess = (await s.json()) as { payment_intent?: string };
     if (!sess.payment_intent) return true; // no charge to reverse (free / $0 order)
-    const r = await fetch("https://api.stripe.com/v1/refunds", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body: `payment_intent=${encodeURIComponent(sess.payment_intent)}` });
-    return r.ok;
+    const pi = sess.payment_intent;
+    // ALREADY fully refunded (out-of-band in the dashboard, or a retry after a lost HTTP response)? Treat as success so
+    // the cancel completes instead of looping on 502. Check the PI's latest charge's refunded state.
+    const piRes = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(pi)}?expand[]=latest_charge`, { headers: { authorization: `Bearer ${key}` } });
+    if (piRes.ok) {
+      const ch = ((await piRes.json()) as { latest_charge?: { amount?: number; amount_refunded?: number; refunded?: boolean } }).latest_charge;
+      if (ch && (ch.refunded === true || (typeof ch.amount === "number" && typeof ch.amount_refunded === "number" && ch.amount_refunded >= ch.amount))) return true;
+    }
+    // Idempotency-Key so a retried request (after a lost response) returns the SAME refund, never a duplicate.
+    const r = await fetch("https://api.stripe.com/v1/refunds", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": idemKey }, body: `payment_intent=${encodeURIComponent(pi)}` });
+    if (r.ok) return true;
+    const err = (await r.json().catch(() => ({}))) as { error?: { code?: string } };
+    return err.error?.code === "charge_already_refunded"; // nothing left to refund → success for our purpose
   } catch { return false; }
 }
 /** A guest's typed checkout email — lightly validated server-side so a guest order can still send a receipt. */
@@ -517,7 +545,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not create a second one.
     if (!requiresStripe(total)) {
       const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
-      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ order: o, ...totals, discountApplied: disc.valid, free: true, duplicate: true }, 200); }
+      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ order: publicOrderShape(o), ...totals, discountApplied: disc.valid, free: true, duplicate: true }, 200); }
     }
     const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), shippingCents: totals.shippingCents, taxCents: totals.taxCents, shippingMethod: totals.shippingMethod, createdAt: Date.now() }).returning();
     const orderId = created[0].id;
@@ -559,7 +587,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // match the product NAME or DESCRIPTION (was name-only), and posts on title or excerpt — a real store search.
     const products = await dz.select().from(product).where(and(eq(product.status, "published"), or(like(product.name, term), like(product.description, term)))).limit(10).all();
     const posts = await dz.select().from(post).where(and(eq(post.status, "published"), or(like(post.title, term), like(post.excerpt, term)))).limit(10).all();
-    return c.json({ products, posts });
+    return c.json({ products: publicProducts(products as Record<string, unknown>[]), posts });
   };
 
   const markReviewHelpful = async (c: Context) => {
@@ -611,18 +639,22 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (status === "cancelled" && !["pending", "paid"].includes(o.status)) return c.json({ error: `A ${o.status} order can't be cancelled.` }, 409);
     const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
     const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
-    // Cancelling a PAID order is a REFUND — reverse the money in Stripe BEFORE the local flip, and ABORT if it fails
-    // (never mark an order cancelled + restock while the buyer is still charged — the published policy promises a refund).
-    const isRefund = status === "cancelled" && o.status === "paid";
-    if (isRefund && o.stripePaymentIntentId) {
-      const key = secret(c, "STRIPE_SECRET_KEY");
-      if (key && !(await stripeRefund(key, o.stripePaymentIntentId))) return c.json({ error: "Stripe refund failed — the order was NOT cancelled. Refund it in the Stripe dashboard, then retry." }, 502);
-    }
-    // CONDITIONAL flip (compare-and-swap on the pre-read status) — the once-only gate, so two concurrent/duplicate
-    // requests can't both restock + re-email. The restock + status email run ONLY for the racer that actually flipped it.
+    const isRefund = status === "cancelled" && o.status === "paid"; // cancelling a PAID order reverses the money
+    const needsRefund = isRefund && !!o.stripePaymentIntentId; // a free/$0 paid order has no charge to reverse
+    const key = needsRefund ? secret(c, "STRIPE_SECRET_KEY") : undefined;
+    // FAIL CLOSED: never cancel + restock + email "refunded" while the buyer is still charged. No key ⇒ can't refund ⇒ abort.
+    if (needsRefund && !key) return c.json({ error: "Stripe is not configured — cannot refund; the order was NOT cancelled." }, 503);
+    // CONDITIONAL flip FIRST (compare-and-swap on the pre-read status) — the once-only gate. Claiming the transition
+    // atomically BEFORE the irreversible refund means a concurrent ship/cancel can't slip in: only the winner refunds.
     const res = (await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(and(eq(order.id, id), eq(order.status, o.status))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
-    if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no restock, no email
-    // cancelling a PAID order reverses the sale → restock + return the discount use (this racer won the flip exactly once).
+    if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no refund, no restock, no email
+    // the winner of paid→cancelled reverses the money (idempotent). If the refund FAILS, ROLL BACK the flip so the order
+    // is never left cancelled-while-still-charged, and abort 502 so the owner retries.
+    if (needsRefund && key && !(await stripeRefund(key, o.stripePaymentIntentId!, `refund_${id}`))) {
+      await dz.update(order).set({ status: "paid" as never }).where(and(eq(order.id, id), eq(order.status, "cancelled"))).run();
+      return c.json({ error: "Stripe refund failed — the order was NOT cancelled. Refund it in the Stripe dashboard, then retry." }, 502);
+    }
+    // restock + return the discount use (this racer won the flip exactly once; the money is now reversed).
     if (isRefund) await restockOrderLines(dz, o);
     if ((status === "shipped" || status === "cancelled") && o.customerEmail) {
       const origin = new URL(c.req.url).origin;
@@ -683,7 +715,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const related = await dz.select().from(product)
       .where(and(eq(product.status, "published"), p.categoryId != null ? eq(product.categoryId, p.categoryId) : lt(product.id, productId)))
       .limit(8).all();
-    return c.json({ related: (related as { id: number }[]).filter((r) => r.id !== productId).slice(0, 8) });
+    return c.json({ related: publicProducts((related as Record<string, unknown>[]).filter((r) => r.id !== productId).slice(0, 8)) });
   };
 
   const subscribeNewsletter = async (c: Context) => {
@@ -757,7 +789,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not mint a second one.
     if (!requiresStripe(total)) {
       const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
-      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ free: true, paid: true, order: o, orderId: dupId, totalCents: total, duplicate: true }); }
+      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ free: true, paid: true, order: publicOrderShape(o), orderId: dupId, totalCents: total, duplicate: true }); }
     }
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
     const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), shippingCents: totals.shippingCents, taxCents: totals.taxCents, shippingMethod: totals.shippingMethod, createdAt: Date.now() }).returning();
@@ -767,7 +799,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (!requiresStripe(total)) {
       if (await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId);
       const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
-      return c.json({ free: true, paid: true, order: o, orderId, totalCents: total });
+      return c.json({ free: true, paid: true, order: publicOrderShape(o), orderId, totalCents: total });
     }
     // a real charge is required → only NOW do we need Stripe configured.
     const key = secret(c, "STRIPE_SECRET_KEY");
@@ -825,9 +857,13 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const session = (await r.json().catch(() => ({}))) as { payment_status?: string; client_reference_id?: string; amount_total?: number };
     // Stripe is the source of truth: payment cleared, the session is THIS order's, AND the amount matches our total.
     const paid = r.ok && session.payment_status === "paid" && String(session.client_reference_id) === String(orderId) && Number(session.amount_total) === Number(ord.totalCents);
-    if (paid && await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId); // pending-only transition + once-per-order discount bump + receipt (all idempotent)
+    // CAPABILITY CHECK: the order body is returned ONLY when Stripe validates this session as paid-for-THIS-order.
+    // The session id is the secret (Stripe hands it to the buyer at redirect), so this gates the receipt to the buyer
+    // alone — a bogus/guessed session against a sequential orderId yields {paid:false} and NO order (no email/address leak).
+    if (!paid) return c.json({ paid: false });
+    if (await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId); // pending-only transition + once-per-order discount bump + receipt (all idempotent)
     const row = await dz.select().from(order).where(eq(order.id, orderId)).get();
-    return c.json({ paid, order: row });
+    return c.json({ paid: true, order: publicOrderShape(row) });
   };
 
   // ── @suluk/cost → Stripe Billing Meters: connect a customer + metered subscription, then report usage. ──

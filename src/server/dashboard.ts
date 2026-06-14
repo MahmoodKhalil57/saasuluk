@@ -282,8 +282,9 @@ const ORDERS = `
     var L=[a.name,a.line1,a.line2,[a.city,a.state,a.postalCode].filter(Boolean).join(", "),a.country].filter(function(x){return x&&String(x).trim();});
     return L.length?'<div class="od-ship"><b>Shipping to</b>'+L.map(esc).join("<br>")+'</div>':"";}
   function trackBlock(o){if(o.status!=="shipped"||!o.trackingNumber)return "";return '<div class="od-ship"><b>Tracking</b>'+esc(o.carrier||"Carrier")+' · '+esc(o.trackingNumber)+'</div>';}
+  function safeUrl(u){u=String(u==null?"":u);return /^(https?:\\/\\/|\\/)/i.test(u)?u:"#";} // http(s) or relative only — never javascript:/data:
   function downloadsBlock(o,items){if(o.status!=="paid"&&o.status!=="shipped")return "";var dls=items.filter(function(it){return it.downloadUrl;});if(!dls.length)return "";
-    return '<div class="od-dl"><b>Your downloads</b><div class="od-dl-list">'+dls.map(function(it){return '<a class="btn sm" href="'+esc(it.downloadUrl)+'" target="_blank" rel="noopener">&darr; '+esc(it.name||"Download")+'</a>';}).join("")+'</div></div>';}
+    return '<div class="od-dl"><b>Your downloads</b><div class="od-dl-list">'+dls.map(function(it){return '<a class="btn sm" href="'+esc(safeUrl(it.downloadUrl))+'" target="_blank" rel="noopener">&darr; '+esc(it.name||"Download")+'</a>';}).join("")+'</div></div>';}
   function lineHtml(it){var sub=it.variantLabel?esc(it.variantLabel):"";
     return '<div class="od-line">'+(it.image?'<img class="od-img" src="'+esc(it.image)+'" alt="" loading="lazy"/>':'<span class="od-img"></span>')+
       '<div class="od-ln-body"><div class="od-ln-name">'+esc(it.name||("#"+it.productId))+'</div><div class="od-ln-sub">'+(sub?sub+" · ":"")+'Qty '+(it.qty||1)+' × '+money(it.priceCents)+'</div></div>'+

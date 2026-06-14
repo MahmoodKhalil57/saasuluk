@@ -10,13 +10,13 @@
  *    world-writable holes (mint a discount code, delete a catalog product, PATCH an order to "paid").
  * Without an explicit access mode the default is owned (if ownerCol) or public — see access.ts.
  */
-import { and, eq, asc, desc, type SQL } from "drizzle-orm";
+import { and, eq, asc, desc, getTableName, type SQL } from "drizzle-orm";
 import type { Context } from "hono";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { parseListQuery } from "@suluk/drizzle";
 import { db } from "./db";
 import { principal } from "./operations";
-import { policyFor, gate, type AccessMode } from "./access";
+import { policyFor, gate, isAdmin, redactRow, type AccessMode } from "./access";
 
 type AnyRow = Record<string, unknown>;
 const numId = (c: Context) => Number(c.req.param("id"));
@@ -34,6 +34,7 @@ export interface CrudHandlers {
 export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: AccessMode): CrudHandlers {
   const cols = table as unknown as Record<string, SQLiteColumn>;
   const policy = policyFor(access, ownerCol);
+  const tname = getTableName(table); // for private-column redaction on public reads
   // when a rule scopes to the owner, AND the pk filter (for one row) with `ownerCol = principal`.
   const scoped = (c: Context, scopeOwner: boolean, withPk: boolean) => {
     const own = scopeOwner && ownerCol ? eq(cols[ownerCol], principal(c)) : undefined;
@@ -59,13 +60,14 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: Acc
       // so every consumer that fetches-then-filters-client-side keeps working until it migrates to server params.
       const raw = c.req.query();
       if (raw.page != null || raw.perPage != null) qb = qb.limit(lq.limit).offset(lq.offset);
-      return c.json(qb.all());
+      const admin = isAdmin(c);
+      return c.json(qb.all().map((row) => redactRow(tname, row as AnyRow, admin)));
     },
     get: (c) => {
       const g = gate(c, policy.get, principal(c));
       if (!g.ok) return denied(c, g);
       const r = db.select().from(table).where(scoped(c, g.scopeOwner, true)!).get();
-      return r ? c.json(r) : c.json({ error: "not found" }, 404);
+      return r ? c.json(redactRow(tname, r as AnyRow, isAdmin(c))) : c.json({ error: "not found" }, 404);
     },
     create: async (c) => {
       const g = gate(c, policy.create, principal(c));
