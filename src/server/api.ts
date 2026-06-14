@@ -10,13 +10,7 @@ import { mount, enforceAccess, enforceRateLimit, type RouteContract } from "@sul
 /** Per-operation rate budgets (saastarter-parity: abuse protection on the money + write paths). Undeclared ops fall
  *  to a generous blanket. Keyed by operation name. NOTE: MemoryRateLimitStore is per-process — correct on the dev
  *  server; the Worker needs a Durable Object / KV-backed store for true cross-isolate limiting. */
-const RATE_LIMITS: Record<string, { windowMs: number; maxRequests: number; key: "ip" }> = {
-  checkout: { windowMs: 60000, maxRequests: 60, key: "ip" },
-  payCheckout: { windowMs: 60000, maxRequests: 30, key: "ip" },
-  validateDiscount: { windowMs: 60000, maxRequests: 60, key: "ip" },
-  createContactSubmission: { windowMs: 60000, maxRequests: 20, key: "ip" },
-  createReview: { windowMs: 60000, maxRequests: 20, key: "ip" },
-};
+import { RATE_LIMITS } from "./ratelimits"; // shared with the Worker so dev/prod budgets never drift
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
 import { scalarResponse, scalarV4Response, enrichedSpec, enrichedV4, SCALAR_VERSION } from "@suluk/scalar";
 import { SCALAR_FORK_HASH } from "../../worker/gen/scalar-fork";

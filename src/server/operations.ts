@@ -191,6 +191,20 @@ const cleanEmail = (x: unknown): string | null => {
 /** base64url(email) — obscures the address in the unsubscribe URL (not a bare email in the query string). */
 const unsubToken = (email: string) => btoa(email).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
+/** Best-effort mirror of a subscriber into the Resend AUDIENCE (where broadcasts are sent from), so the list isn't
+ *  only the local table. No-op until RESEND_AUDIENCE_ID is configured. The local newsletter_subscriber row stays the
+ *  source of truth; this just keeps Resend in sync (create on subscribe, flag unsubscribed:true on unsubscribe). */
+function resendAudienceSync(c: Context, email: string, unsubscribed: boolean): void {
+  const key = secret(c, "RESEND_API_KEY"), audience = secret(c, "RESEND_AUDIENCE_ID");
+  if (!key || !audience) return;
+  const h = { authorization: `Bearer ${key}`, "content-type": "application/json" };
+  const base = `https://api.resend.com/audiences/${audience}/contacts`;
+  const p = unsubscribed
+    ? fetch(`${base}/${encodeURIComponent(email)}`, { method: "PATCH", headers: h, body: JSON.stringify({ unsubscribed: true }) })
+    : fetch(base, { method: "POST", headers: h, body: JSON.stringify({ email, unsubscribed: false }) });
+  p.catch(() => {});
+}
+
 /**
  * Fire the order-confirmation receipt via @suluk/email's rich, locale-aware template (icon + line table + CTA) —
  * the SINGLE receipt site, called only on the once-only pending→paid transition (so a webhook re-deliver / double
@@ -656,6 +670,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const existing = await dz.select().from(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).get();
     if (existing) return c.json({ subscribed: true, already: true });
     await dz.insert(newsletterSubscriber).values({ email, subscribedAt: Date.now() }).run();
+    resendAudienceSync(c, email, false); // mirror into the Resend audience (where broadcasts are sent)
     const unsubUrl = `${new URL(c.req.url).origin}/newsletter/unsubscribe?t=${unsubToken(email)}`;
     sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", `<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p><p style="font-size:12px;color:#8a8a8a;margin-top:24px">Not interested? <a href="${unsubUrl}" style="color:#8a8a8a">Unsubscribe</a> any time.</p>`) }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
     return c.json({ subscribed: true, already: false }, 201);
@@ -668,6 +683,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     try { email = atob((c.req.query("t") ?? "").replace(/-/g, "+").replace(/_/g, "/")).trim().toLowerCase(); } catch { email = ""; }
     if (!email || !email.includes("@")) return c.html("<!doctype html><meta charset=utf-8><title>Invalid link</title><body style=\"font-family:system-ui;max-width:520px;margin:80px auto;text-align:center\"><h1>Invalid unsubscribe link</h1><p><a href=\"/\">Back to saasuluk</a></p></body>", 400);
     await dbFor(c).delete(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).run();
+    resendAudienceSync(c, email, true); // flag unsubscribed:true in the Resend audience (broadcasts will skip them)
     const safe = email.replace(/[<>&"]/g, "");
     return c.html(`<!doctype html><meta charset=utf-8><title>Unsubscribed</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:0 20px;text-align:center"><h1>You're unsubscribed</h1><p style="color:#666"><b>${safe}</b> won't receive the saasuluk newsletter anymore. Changed your mind? Re-subscribe from the footer on <a href="/">saasuluk</a>.</p></body>`);
   };

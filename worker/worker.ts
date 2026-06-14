@@ -12,7 +12,8 @@ import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { and, eq, asc, desc, type SQL } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
-import { mount, enforceAccess, type RouteContract } from "@suluk/hono";
+import { mount, enforceAccess, enforceRateLimit, MemoryRateLimitStore, type RateLimitStore, type RouteContract } from "@suluk/hono";
+import { RATE_LIMITS } from "../src/server/ratelimits";
 import { buildApp } from "@suluk/builder";
 import { parseListQuery, tableComponents } from "@suluk/drizzle";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
@@ -59,7 +60,8 @@ const access = accessIndex(document); // op → x-suluk-access, for the wire enf
 // minimal R2 surface (avoids pulling @cloudflare/workers-types) — for @suluk/panel media uploads.
 type R2Object = { body: ReadableStream; httpMetadata?: { contentType?: string } };
 type MediaBucket = { put(key: string, value: ReadableStream | ArrayBuffer | string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>; get(key: string): Promise<R2Object | null> };
-type Env = { DB: D1Database; MEDIA?: MediaBucket; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string; OPENROUTER_API_KEY?: string };
+type KvLike = { get: (k: string) => Promise<string | null>; put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void> };
+type Env = { DB: D1Database; MEDIA?: MediaBucket; RATE_LIMIT_KV?: KvLike; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; RESEND_AUDIENCE_ID?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string; OPENROUTER_API_KEY?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; sessionEmail?: string; isAdmin?: boolean } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
@@ -94,6 +96,34 @@ app.use("*", enforceAccess({
   accessOf: (op) => access[op],
   principal: (c) => principal(c),
   isAdmin: (c) => isAdmin(c as unknown as Context),
+}));
+
+// RATE LIMIT (parity with the dev server) — a DISTRIBUTED counter backed by Workers KV so the budget holds across
+// isolates, not just per-instance. The KV binding lives in c.env (per-request), but enforceRateLimit takes one store
+// at config time, so we capture the binding into RL_KV on the first request. Fails OPEN to a per-isolate memory store
+// when KV is unbound or hiccups (a rate-limit outage must never take checkout down).
+let RL_KV: KvLike | undefined;
+const memRL = new MemoryRateLimitStore();
+const rlStore: RateLimitStore = {
+  async consume(key, opts) {
+    if (!RL_KV) return memRL.consume(key, opts);
+    try {
+      const raw = await RL_KV.get(key);
+      let e = raw ? (JSON.parse(raw) as { count: number; resetAt: number }) : null;
+      if (!e || opts.now > e.resetAt) e = { count: 1, resetAt: opts.now + opts.windowMs };
+      else e.count++;
+      const limited = e.count > opts.maxRequests;
+      await RL_KV.put(key, JSON.stringify(e), { expirationTtl: Math.max(60, Math.ceil(opts.windowMs / 1000) + 5) });
+      return { limited, remaining: Math.max(0, opts.maxRequests - e.count), retryAfterMs: limited ? opts.windowMs : 0 };
+    } catch { return memRL.consume(key, opts); } // KV blip → fail open
+  },
+};
+app.use("*", async (c, next) => { if (!RL_KV && (c.env as Env).RATE_LIMIT_KV) RL_KV = (c.env as Env).RATE_LIMIT_KV; return next(); });
+app.use("*", enforceRateLimit({
+  operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
+  rateLimitOf: (op) => RATE_LIMITS[op],
+  store: rlStore,
+  defaultFacet: { windowMs: 60000, maxRequests: 300, key: "ip" }, // generous blanket so every op has basic protection
 }));
 
 // durable cost meter — persist each operation's cost to D1 so /cost accumulates across isolates.
@@ -352,12 +382,23 @@ async function verifyStripe(raw: string, sig: string, secret: string, toleranceS
   const expected = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
   return timingSafeHexEqual(expected, parts.v1);
 }
+/** Resolve an order id from a Stripe PaymentIntent (its metadata.orderId, stamped at checkout) — for dispute events
+ *  whose object carries the PI but not the order metadata directly. One read-only Stripe call; 0 if unresolvable. */
+async function orderIdFromPI(piId: string, key: string): Promise<number> {
+  if (!piId || !key) return 0;
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(piId)}`, { headers: { authorization: `Bearer ${key}` } });
+    if (!r.ok) return 0;
+    const pi = (await r.json()) as { metadata?: { orderId?: string } };
+    return Number(pi.metadata?.orderId) || 0;
+  } catch { return 0; }
+}
 app.post("/api/stripe/webhook", async (c) => {
   const secret = c.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) return c.json({ error: "stripe webhook not configured" }, 503);
   const raw = await c.req.text();
   if (!(await verifyStripe(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
-  const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean } } };
+  const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean; status?: string; payment_intent?: string } } };
   const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
   if (evt.type === "checkout.session.completed") {
     if (oid) await markOrderPaid(drizzle(c.env.DB), oid); // pending-only + once (a re-delivery is a no-op)
@@ -366,7 +407,16 @@ app.post("/api/stripe/webhook", async (c) => {
   } else if (evt.type === "charge.refunded") {
     // charge.refunded also fires on PARTIAL refunds (refunded=false); only a FULL refund cancels + restocks the order.
     if (oid && evt.data?.object?.refunded === true) await refundOrder(drizzle(c.env.DB), oid);
+  } else if (evt.type === "charge.dispute.closed") {
+    // best practice: a WON dispute keeps the order paid; a LOST dispute means the funds are reversed → reverse the order
+    // (cancel + restock, same as a refund). The dispute object carries no order metadata, so resolve via its PaymentIntent.
+    if (evt.data?.object?.status === "lost") {
+      const did = oid || await orderIdFromPI(evt.data?.object?.payment_intent ?? "", c.env.STRIPE_SECRET_KEY ?? "");
+      if (did) await refundOrder(drizzle(c.env.DB), did);
+    }
   }
+  // charge.dispute.created is intentionally NOT acted on — a dispute can still be WON; Stripe emails the merchant to
+  // submit evidence, and pre-emptively cancelling/restocking would be wrong. The order reverses only on a LOST close.
   return c.json({ received: true, type: evt.type });
 });
 

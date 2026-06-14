@@ -62,6 +62,7 @@ const res = await deployWith(
     compatibilityFlags: ["nodejs_compat"],
     d1: { binding: "DB", databaseName: "saasuluk-db", migrations },
     r2: [{ binding: "MEDIA", bucketName: "saasuluk-media" }], // @suluk/panel media uploads (provisioned + bound)
+    kv: [{ binding: "RATE_LIMIT_KV", title: "saasuluk-ratelimit" }], // distributed rate-limit counter (provisioned + bound)
     assets,
     assetsConfig: { html_handling: "auto-trailing-slash" },
     vars: {
@@ -75,6 +76,7 @@ const res = await deployWith(
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
       RESEND_API_KEY: process.env.RESEND_API_KEY,
+      RESEND_AUDIENCE_ID: process.env.RESEND_AUDIENCE_ID, // newsletter → Resend audience mirror
       EMAIL_FROM: process.env.EMAIL_FROM,
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY, // powers the @suluk/chat in-page agent
     },
