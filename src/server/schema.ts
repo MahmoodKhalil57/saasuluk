@@ -26,6 +26,7 @@ export const product = sqliteTable("product", {
   longDescription: text("long_description"), // rich body shown in the product-detail "Details" section
   priceCents: integer("price_cents").notNull().default(0),
   compareAtCents: integer("compare_at_cents"), // was/MSRP — when > priceCents the storefront shows a sale strikethrough
+  downloadUrl: text("download_url"), // digital delivery: the access/download link a buyer gets once PAID (null for physical)
   categoryId: integer("category_id"),
   inventory: integer("inventory").notNull().default(0),
   imageUrl: text("image_url"), // the PRIMARY image (kept as images[0] mirror for thin consumers)
@@ -228,7 +229,7 @@ export const project = sqliteTable("project", {
  */
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS category (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, long_description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, compare_at_cents INTEGER, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, images TEXT, featured INTEGER NOT NULL DEFAULT 0, requires_shipping INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
+CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, long_description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, compare_at_cents INTEGER, download_url TEXT, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, images TEXT, featured INTEGER NOT NULL DEFAULT 0, requires_shipping INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT);
 CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, options TEXT, images TEXT, price_cents INTEGER NOT NULL DEFAULT 0, price_cents_enabled INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, description TEXT, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, min_subtotal_cents INTEGER, max_discount_cents INTEGER, max_uses INTEGER, max_uses_per_customer INTEGER, applies_to_product_ids TEXT, starts_at INTEGER, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER);
 CREATE TABLE IF NOT EXISTS cart (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', discount_code TEXT, status TEXT NOT NULL DEFAULT 'active');

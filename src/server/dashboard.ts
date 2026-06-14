@@ -270,6 +270,7 @@ const ORDERS = `
   .od-tot-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}.od-tot-row.g{font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:9px}
   .od-tot-row.disc span{color:var(--accent)}
   .od-ship{margin-top:12px;font-size:13px;line-height:1.55}.od-ship b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px}
+  .od-dl{margin-top:12px}.od-dl b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px}.od-dl-list{display:flex;gap:7px;flex-wrap:wrap}
   .od-actions{margin-top:13px;display:flex;gap:8px;flex-wrap:wrap}
 </style>
 <script>(function(){
@@ -281,6 +282,8 @@ const ORDERS = `
     var L=[a.name,a.line1,a.line2,[a.city,a.state,a.postalCode].filter(Boolean).join(", "),a.country].filter(function(x){return x&&String(x).trim();});
     return L.length?'<div class="od-ship"><b>Shipping to</b>'+L.map(esc).join("<br>")+'</div>':"";}
   function trackBlock(o){if(o.status!=="shipped"||!o.trackingNumber)return "";return '<div class="od-ship"><b>Tracking</b>'+esc(o.carrier||"Carrier")+' · '+esc(o.trackingNumber)+'</div>';}
+  function downloadsBlock(o,items){if(o.status!=="paid"&&o.status!=="shipped")return "";var dls=items.filter(function(it){return it.downloadUrl;});if(!dls.length)return "";
+    return '<div class="od-dl"><b>Your downloads</b><div class="od-dl-list">'+dls.map(function(it){return '<a class="btn sm" href="'+esc(it.downloadUrl)+'" target="_blank" rel="noopener">&darr; '+esc(it.name||"Download")+'</a>';}).join("")+'</div></div>';}
   function lineHtml(it){var sub=it.variantLabel?esc(it.variantLabel):"";
     return '<div class="od-line">'+(it.image?'<img class="od-img" src="'+esc(it.image)+'" alt="" loading="lazy"/>':'<span class="od-img"></span>')+
       '<div class="od-ln-body"><div class="od-ln-name">'+esc(it.name||("#"+it.productId))+'</div><div class="od-ln-sub">'+(sub?sub+" · ":"")+'Qty '+(it.qty||1)+' × '+money(it.priceCents)+'</div></div>'+
@@ -302,7 +305,7 @@ const ORDERS = `
           '<div style="margin-top:10px">'+(disc>0?'<div class="od-tot-row disc"><span>Discount'+(o.discountCode?" ("+esc(o.discountCode)+")":"")+'</span><span>−'+money(disc)+'</span></div>':"")+
           (shipC>0?'<div class="od-tot-row"><span>Shipping</span><span>'+money(shipC)+'</span></div>':"")+
           (taxC>0?'<div class="od-tot-row"><span>Sales tax</span><span>'+money(taxC)+'</span></div>':"")+
-          '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+trackBlock(o)+addrBlock(o)+
+          '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+downloadsBlock(o,items)+trackBlock(o)+addrBlock(o)+
           '<div class="od-actions"><button class="btn sm" type="button" data-buy="'+esc(o.id)+'">Buy again</button></div>'+
         '</div></div>';}).join("");
     box.querySelectorAll(".od-head").forEach(function(h){h.addEventListener("click",function(){h.closest(".od-card").classList.toggle("open");});});

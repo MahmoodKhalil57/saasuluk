@@ -297,7 +297,7 @@ const write = (m: number): CostModel => ({ components: [{ source: "compute", bas
 interface LineItem { productId?: number; variantId?: number; qty?: number; priceCents?: number }
 interface ResolvedDiscount { valid: boolean; discountType?: "percent" | "fixed"; discountValue?: number; reason?: string; maxDiscountCents?: number; minSubtotalCents?: number }
 /** A server-re-priced order line — the client's priceCents is NEVER trusted; every cent comes from the product/variant row. */
-interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string; inventory: number; requiresShipping: boolean }
+interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string; inventory: number; requiresShipping: boolean; downloadUrl?: string }
 
 /** The first stock problem in the cart (sold-out / over-qty), or null if everything is available. */
 function stockError(lines: PricedLine[]): string | null {
@@ -446,12 +446,12 @@ async function repriceLines(dz: Dz, items: LineItem[]): Promise<PricedLine[]> {
     const vrow = i.variantId != null ? byVid.get(Number(i.variantId)) : undefined;
     const vmatch = vrow && Number(vrow.productId) === Number(p.id) ? vrow : undefined;
     const priceCents = vmatch && vmatch.priceCentsEnabled ? Number(vmatch.priceCents) : Number(p.priceCents);
-    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined, inventory: Number(vmatch ? vmatch.inventory : p.inventory), requiresShipping: !!p.requiresShipping });
+    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined, inventory: Number(vmatch ? vmatch.inventory : p.inventory), requiresShipping: !!p.requiresShipping, downloadUrl: (p.downloadUrl as string) ?? undefined });
   }
   return out;
 }
 const linesSubtotal = (lines: PricedLine[]) => lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
-const orderItemsJson = (lines: PricedLine[]) => JSON.stringify(lines.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, priceCents: l.priceCents, name: l.name, image: l.image, variantLabel: l.variantLabel })));
+const orderItemsJson = (lines: PricedLine[]) => JSON.stringify(lines.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, priceCents: l.priceCents, name: l.name, image: l.image, variantLabel: l.variantLabel, downloadUrl: l.downloadUrl })));
 
 export interface OrderTotals { subtotalCents: number; discountCents: number; shippingCents: number; taxCents: number; totalCents: number; shippingMethod: string | null }
 /**

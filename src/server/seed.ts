@@ -8,7 +8,7 @@
 const T = 1780000000000; // a fixed timestamp so the seed is deterministic
 
 export interface SeedImage { url: string; alt?: string }
-export interface SeedProduct { id: number; name: string; slug: string; description: string; longDescription?: string; priceCents: number; compareAtCents?: number; categoryId: number; inventory: number; status: "draft" | "published"; featured?: boolean; requiresShipping?: boolean; images?: SeedImage[] }
+export interface SeedProduct { id: number; name: string; slug: string; description: string; longDescription?: string; priceCents: number; compareAtCents?: number; downloadUrl?: string; categoryId: number; inventory: number; status: "draft" | "published"; featured?: boolean; requiresShipping?: boolean; images?: SeedImage[] }
 export interface SeedVariant { id: number; productId: number; title: string; options: { label: string; value: string }[]; priceCents: number; priceCentsEnabled: boolean; inventory: number; images?: SeedImage[] }
 export interface SeedPost { id: number; title: string; slug: string; excerpt: string; body: string; author: string }
 export interface SeedFaq { id: number; question: string; answer: string }
@@ -41,7 +41,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
       { url: "/img/products/cost-ledger.jpg", alt: "The live cost ledger" },
     ] },
   // a TIER-variant product: one product, three priced variants (Personal $0 / Team $99 / Enterprise $299).
-  { id: 11, name: "Saasuluk License", slug: "saasuluk-license", description: "Commercial license for the saasuluk platform — pick the tier that matches your team. Personal is free.", priceCents: 0, categoryId: 1, inventory: 999, status: "published", featured: true,
+  { id: 11, name: "Saasuluk License", slug: "saasuluk-license", description: "Commercial license for the saasuluk platform — pick the tier that matches your team. Personal is free.", priceCents: 0, downloadUrl: "https://saasuluk.saastemly.com/license", categoryId: 1, inventory: 999, status: "published", featured: true,
     longDescription: "One product, three tiers. **Personal** is free for solo builders; **Team** unlocks shared seats and priority updates; **Enterprise** adds an SLA and a private support channel. The price you see updates as you pick a tier — a real OpenAPI v4 variant, priced per-variant.",
     images: [{ url: "/img/products/stripe-billing.jpg", alt: "Saasuluk License" }] },
   // a SIZE × COLOR merch product: physical good, multiple option dimensions, per-color image swap.
@@ -109,8 +109,8 @@ const qn = (s: string | null | undefined) => (s == null ? "NULL" : q(s)); // nul
 export const SEED_SQL = [
   "INSERT OR REPLACE INTO category (id, name, slug) VALUES\n  " +
     SEED_CATEGORIES.map((c) => `(${c.id}, ${q(c.name)}, ${q(c.slug)})`).join(",\n  ") + ";",
-  "INSERT OR REPLACE INTO product (id, name, slug, description, long_description, price_cents, compare_at_cents, category_id, inventory, image_url, images, featured, requires_shipping, status) VALUES\n  " +
-    SEED_PRODUCTS.map((p) => { const imgs = p.images ?? [{ url: `/img/products/${p.slug}.jpg` }]; return `(${p.id}, ${q(p.name)}, ${q(p.slug)}, ${q(p.description)}, ${qn(p.longDescription)}, ${p.priceCents}, ${p.compareAtCents ?? "NULL"}, ${p.categoryId}, ${p.inventory}, ${q(imgs[0].url)}, ${q(JSON.stringify(imgs))}, ${p.featured ? 1 : 0}, ${p.requiresShipping ? 1 : 0}, ${q(p.status)})`; }).join(",\n  ") + ";",
+  "INSERT OR REPLACE INTO product (id, name, slug, description, long_description, price_cents, compare_at_cents, download_url, category_id, inventory, image_url, images, featured, requires_shipping, status) VALUES\n  " +
+    SEED_PRODUCTS.map((p) => { const imgs = p.images ?? [{ url: `/img/products/${p.slug}.jpg` }]; const dl = p.downloadUrl ?? (p.requiresShipping ? null : "https://github.com/MahmoodKhalil57/suluk"); return `(${p.id}, ${q(p.name)}, ${q(p.slug)}, ${q(p.description)}, ${qn(p.longDescription)}, ${p.priceCents}, ${p.compareAtCents ?? "NULL"}, ${qn(dl)}, ${p.categoryId}, ${p.inventory}, ${q(imgs[0].url)}, ${q(JSON.stringify(imgs))}, ${p.featured ? 1 : 0}, ${p.requiresShipping ? 1 : 0}, ${q(p.status)})`; }).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO variant (id, product_id, title, options, images, price_cents, price_cents_enabled, inventory) VALUES\n  " +
     SEED_VARIANTS.map((v) => `(${v.id}, ${v.productId}, ${q(v.title)}, ${q(JSON.stringify(v.options))}, ${v.images ? q(JSON.stringify(v.images)) : "NULL"}, ${v.priceCents}, ${v.priceCentsEnabled ? 1 : 0}, ${v.inventory})`).join(",\n  ") + ";",
   "INSERT OR REPLACE INTO discount_code (id, code, description, discount_type, discount_value, min_subtotal_cents, max_discount_cents, max_uses, max_uses_per_customer, is_active, current_uses, expires_at) VALUES\n  " +
