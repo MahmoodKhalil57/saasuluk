@@ -192,6 +192,13 @@ import Layout from "../layouts/Layout.astro";
       if (shipAmt > 0) { sr.hidden = false; document.getElementById("shippingAmt").textContent = money(shipAmt); } else { sr.hidden = true; }
       if (taxAmt > 0) { xr.hidden = false; document.getElementById("taxAmt").textContent = money(taxAmt); } else { xr.hidden = true; }
       document.getElementById("total").textContent = money(total);
+      // a sold-out / over-qty line (server-checked) blocks the order BEFORE the buyer tries to pay — not a 409 surprise.
+      if (quote.stockError) {
+        btn.disabled = true; btn.textContent = "Sold out — adjust your cart";
+        document.getElementById("result").innerHTML = `<span class="card" style="display:block;color:var(--accent)">${esc(quote.stockError)}</span>`;
+        return;
+      }
+      document.getElementById("result").innerHTML = "";
       // single ADAPTIVE button: a chargeable total → Stripe; a $0/free total → complete now (no card).
       if (total >= STRIPE_FLOOR) { btn.disabled = false; btn.textContent = "Pay " + money(total) + " with Stripe →"; }
       else { btn.disabled = false; btn.textContent = "Place order — " + (total === 0 ? "Free" : money(total)); }

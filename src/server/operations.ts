@@ -183,6 +183,20 @@ const carrierTrackingUrl = (carrier: string | null, num: string | null): string 
   const base = CARRIER_TRACK[String(carrier ?? "").toLowerCase().trim()];
   return base ? base + encodeURIComponent(num) : undefined;
 };
+
+/** Issue a Stripe refund for a paid order. The order stores its Checkout SESSION id (stripePaymentIntentId), so first
+ *  resolve the PaymentIntent, then refund it. Returns true on success — OR when there is nothing to refund (a $0/free
+ *  order has no PaymentIntent). Any Stripe error → false, so the caller can refuse to cancel an order it couldn't refund. */
+async function stripeRefund(key: string, sessionId: string): Promise<boolean> {
+  try {
+    const s = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, { headers: { authorization: `Bearer ${key}` } });
+    if (!s.ok) return false;
+    const sess = (await s.json()) as { payment_intent?: string };
+    if (!sess.payment_intent) return true; // no charge to reverse (free / $0 order)
+    const r = await fetch("https://api.stripe.com/v1/refunds", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body: `payment_intent=${encodeURIComponent(sess.payment_intent)}` });
+    return r.ok;
+  } catch { return false; }
+}
 /** A guest's typed checkout email — lightly validated server-side so a guest order can still send a receipt. */
 const cleanEmail = (x: unknown): string | null => {
   const s = String(x ?? "").trim().toLowerCase();
@@ -213,7 +227,7 @@ function resendAudienceSync(c: Context, email: string, unsubscribed: boolean): v
  * confirm can't double-send). Best-effort: a render/send hiccup must NEVER break a completed sale, so it's wrapped.
  * Reads order.customerEmail (snapshotted at checkout from the session), so guests with no email simply get no email.
  */
-async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Promise<void> {
+export async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Promise<void> {
   try {
     const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
     if (!o || o.status !== "paid" || !o.customerEmail) return;
@@ -525,7 +539,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const subtotal = linesSubtotal(lines);
     const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: principal(c), productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
     const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
-    return c.json({ ...totals, discountApplied: disc.valid, discountCode: disc.valid ? (body.discountCode ?? "").toUpperCase().trim() : null, needsShipping: lines.some((l) => l.requiresShipping), free: !requiresStripe(totals.totalCents) }, 200);
+    return c.json({ ...totals, discountApplied: disc.valid, discountCode: disc.valid ? (body.discountCode ?? "").toUpperCase().trim() : null, needsShipping: lines.some((l) => l.requiresShipping), stockError: stockError(lines), free: !requiresStripe(totals.totalCents) }, 200);
   };
 
   const validateDiscount = async (c: Context) => {
@@ -597,16 +611,24 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (status === "cancelled" && !["pending", "paid"].includes(o.status)) return c.json({ error: `A ${o.status} order can't be cancelled.` }, 409);
     const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
     const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
+    // Cancelling a PAID order is a REFUND — reverse the money in Stripe BEFORE the local flip, and ABORT if it fails
+    // (never mark an order cancelled + restock while the buyer is still charged — the published policy promises a refund).
+    const isRefund = status === "cancelled" && o.status === "paid";
+    if (isRefund && o.stripePaymentIntentId) {
+      const key = secret(c, "STRIPE_SECRET_KEY");
+      if (key && !(await stripeRefund(key, o.stripePaymentIntentId))) return c.json({ error: "Stripe refund failed — the order was NOT cancelled. Refund it in the Stripe dashboard, then retry." }, 502);
+    }
     // CONDITIONAL flip (compare-and-swap on the pre-read status) — the once-only gate, so two concurrent/duplicate
     // requests can't both restock + re-email. The restock + status email run ONLY for the racer that actually flipped it.
     const res = (await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(and(eq(order.id, id), eq(order.status, o.status))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
     if (!(Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0)) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no restock, no email
     // cancelling a PAID order reverses the sale → restock + return the discount use (this racer won the flip exactly once).
-    if (status === "cancelled" && o.status === "paid") await restockOrderLines(dz, o);
+    if (isRefund) await restockOrderLines(dz, o);
     if ((status === "shipped" || status === "cancelled") && o.customerEmail) {
       const origin = new URL(c.req.url).origin;
+      const emailStatus = isRefund ? "refunded" : status; // a refunded buyer should be told their money is coming back, not just "cancelled"
       const trackUrl = status === "shipped" ? (carrierTrackingUrl(carrier, trackingNumber) ?? `${origin}/dashboard/s/orders`) : undefined;
-      const m = orderStatusEmail({ orderNumber: String(id), status, ...(trackUrl ? { trackingUrl: trackUrl } : {}) }, { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } });
+      const m = orderStatusEmail({ orderNumber: String(id), status: emailStatus, ...(trackUrl ? { trackingUrl: trackUrl } : {}) }, { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } });
       sendEmailAsync({ to: o.customerEmail, subject: m.subject, html: m.html }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
     }
     const row = await dz.select().from(order).where(eq(order.id, id)).get();

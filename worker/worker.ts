@@ -37,7 +37,7 @@ import { chatApp, chatWidget } from "@suluk/chat";
 import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "../src/server/dashboard";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder, sendOrderReceipt } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -405,7 +405,10 @@ app.post("/api/stripe/webhook", async (c) => {
   const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean; status?: string; payment_intent?: string } } };
   const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
   if (evt.type === "checkout.session.completed") {
-    if (oid) await markOrderPaid(drizzle(c.env.DB), oid); // pending-only + once (a re-delivery is a no-op)
+    // mark paid AND send the receipt — gated on the once-only transition so a buyer who closed the tab (never hit the
+    // success page → confirmCheckout) still gets their receipt, and a tab-returner + this webhook can't double-send.
+    const dz = drizzle(c.env.DB);
+    if (oid && await markOrderPaid(dz, oid)) await sendOrderReceipt(c as unknown as Parameters<typeof sendOrderReceipt>[0], dz, oid);
   } else if (evt.type === "checkout.session.expired") {
     if (oid) await cancelPendingOrder(drizzle(c.env.DB), oid); // the buyer abandoned the hosted checkout → release the pending order
   } else if (evt.type === "charge.refunded") {
