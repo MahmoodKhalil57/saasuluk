@@ -344,20 +344,22 @@ type Dz = {
 };
 export type DbFor = (c: Context) => Dz;
 
-/** Email everyone on a product's back-in-stock waitlist (un-notified rows), then stamp them notified so the same
- *  subscription never fires twice. Best-effort sends; fired when a restock raises inventory back above 0. */
+/** Email a product's back-in-stock waitlist exactly once. ATOMIC claim-then-send (the compare-and-set gate
+ *  alertLowStock/markOrderPaid use): stamp notifiedAt + RETURNING the rows this call won, then email ONLY those —
+ *  so concurrent restocks each claim a disjoint set (no double-send) and a row inserted mid-flight is either claimed
+ *  (and emailed) or left for the next restock (never stamped-but-unsent). Best-effort sends; fired on a 0→+ restock. */
 export async function notifyBackInStock(c: Context, dz: Dz, productId: number): Promise<void> {
-  const waiting = (await dz.select().from(stockNotification).where(and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))).all()) as { email?: string }[];
-  if (!waiting.length) return;
   const p = (await dz.select().from(product).where(eq(product.id, productId)).get()) as { name?: string; slug?: string } | undefined;
-  if (!p) return;
+  if (!p) return; // the hook fires from this product's own update, so this is a defensive guard, not a real path
+  // CLAIM first: only rows this UPDATE flips (notifiedAt was NULL) come back; a concurrent caller claims the rest.
+  const claimed = (await dz.update(stockNotification).set({ notifiedAt: Date.now() }).where(and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))).returning()) as { email?: string }[];
+  if (!claimed.length) return;
   const url = new URL(c.req.url).origin + "/products/" + String(p.slug ?? "");
   const apiKey = secret(c, "RESEND_API_KEY"), from = secret(c, "EMAIL_FROM");
-  for (const s of waiting) {
+  for (const s of claimed) {
     if (!s.email) continue;
     sendEmailAsync({ to: String(s.email), subject: ("Back in stock: " + (p.name ?? "your item")).slice(0, 180), html: brandedEmail("Back in stock 🎉", "<p><b>" + escHtml(String(p.name ?? "Your item")) + "</b> is available again — but it may not last.</p><p><a href=\"" + url + "\">Get it now →</a></p>") }, { apiKey, from });
   }
-  await dz.update(stockNotification).set({ notifiedAt: Date.now() }).where(and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))).run();
 }
 
 /** afterUpdate hooks for the generic CRUD, keyed by table name (mirrors PRIVATE_READ_COLS). When inventory crosses
