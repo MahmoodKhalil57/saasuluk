@@ -68,6 +68,9 @@ const res = await deployWith(
     vars: {
       STRIPE_METER_EVENT_NAME: process.env.STRIPE_METER_EVENT_NAME ?? "saasuluk_cost",
       STRIPE_METERED_PRICE_ID: process.env.STRIPE_METERED_PRICE_ID ?? "",
+      // owner-recipient list for contact-form + low-stock alerts (non-secret; a var matches its env.ts surface)
+      ...(process.env.SUPERADMIN_EMAILS ? { SUPERADMIN_EMAILS: process.env.SUPERADMIN_EMAILS } : {}),
+      ...(process.env.LOW_STOCK_THRESHOLD ? { LOW_STOCK_THRESHOLD: process.env.LOW_STOCK_THRESHOLD } : {}),
     },
     secrets: {
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,

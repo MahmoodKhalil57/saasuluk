@@ -101,11 +101,29 @@ export async function sweepBillingUsage(dz: Dz, key: string, eventName: string):
   return { swept: accts.length, reported };
 }
 
+/** Email the store owner ONCE when a product/variant dips to/below the low-stock threshold after a paid sale. The
+ *  conditional latch flip is the once-only gate (re-armed on restock), so concurrent paid orders don't multi-send. */
+async function alertLowStock(c: Context, dz: Dz, kind: "product" | "variant", id: number, threshold: number, owners: string[]): Promise<void> {
+  if (!owners.length) return; // no recipients configured → skip the extra read+write entirely
+  const tbl = (kind === "product" ? product : variant) as typeof product; // both share id/inventory/lowStockAlerted
+  const row = (await dz.select().from(tbl).where(eq(tbl.id, id)).get()) as { inventory?: number; lowStockAlerted?: boolean; name?: string; title?: string } | undefined;
+  if (!row || Number(row.inventory) > threshold || row.lowStockAlerted) return; // above threshold, or already alerted at this level
+  const res = (await dz.update(tbl).set({ lowStockAlerted: true }).where(and(eq(tbl.id, id), eq(tbl.lowStockAlerted, false))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+  if (Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) <= 0) return; // a concurrent paid order won the flip and already emailed
+  const label = kind === "product" ? String(row.name ?? ("Product #" + id)) : ("Variant #" + id + (row.title ? " (" + row.title + ")" : ""));
+  const origin = new URL(c.req.url).origin;
+  sendEmailAsync( // fire-and-forget — a mail failure must never break the sale (same contract as the receipt)
+    { to: owners.join(","), subject: ("Low stock: " + label).slice(0, 180), html: brandedEmail("Low stock alert", "<p><b>" + escHtml(label) + "</b> is down to " + Number(row.inventory) + " unit(s) (threshold " + threshold + "). Restock soon.</p><p><a href=\"" + origin + "/superadmin\">Open the admin cockpit →</a></p>") },
+    { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") },
+  );
+}
+
 /**
  * Mark an order paid EXACTLY ONCE: a pending→paid transition (so a webhook re-delivery or a second confirm is a
  * no-op), and only on that transition do we bump the discount's usage. Returns true iff this call did the work.
+ * Takes Context so a stock dip can email the owner (low-stock alert) — threaded through every call site.
  */
-export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
+export async function markOrderPaid(c: Context, dz: Dz, orderId: number): Promise<boolean> {
   const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
   if (!o || o.status === "paid") return false;
   const res = (await dz.update(order).set({ status: "paid" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
@@ -114,6 +132,8 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
     if (o.discountCode) {
       await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
     }
+    const owners = superadminEmails(secret(c, "SUPERADMIN_EMAILS")); // low-stock alert recipients (empty → checks no-op)
+    const threshold = Number(secret(c, "LOW_STOCK_THRESHOLD")) || 5;
     // decrement stock for each paid line (product + variant), clamped at 0 — the SINGLE place inventory is reduced,
     // on the once-only paid transition, so a webhook re-delivery / double-confirm can't double-decrement.
     let items: { productId?: number; variantId?: number; qty?: number }[] = [];
@@ -123,8 +143,8 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
       // no max(0) clamp: the decrement must be the EXACT inverse of restockOrderLines' +qty, or a refund over-inflates
       // stock. stockError blocks overselling at checkout, so inventory stays >=0 in the normal path; a rare race that
       // dips it below 0 renders as "Sold out" (the <=0 check) and a later refund returns it to the true value.
-      if (it.productId != null) await dz.update(product).set({ inventory: sql`${product.inventory} - ${qty}` }).where(eq(product.id, Number(it.productId))).run();
-      if (it.variantId != null) await dz.update(variant).set({ inventory: sql`${variant.inventory} - ${qty}` }).where(eq(variant.id, Number(it.variantId))).run();
+      if (it.productId != null) { await dz.update(product).set({ inventory: sql`${product.inventory} - ${qty}` }).where(eq(product.id, Number(it.productId))).run(); await alertLowStock(c, dz, "product", Number(it.productId), threshold, owners); }
+      if (it.variantId != null) { await dz.update(variant).set({ inventory: sql`${variant.inventory} - ${qty}` }).where(eq(variant.id, Number(it.variantId))).run(); await alertLowStock(c, dz, "variant", Number(it.variantId), threshold, owners); }
     }
   }
   return changed;
@@ -154,8 +174,9 @@ export async function restockOrderLines(dz: Dz, o: { items?: string | null; disc
   try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
   for (const it of items) {
     const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
-    if (it.productId != null) await dz.update(product).set({ inventory: sql`${product.inventory} + ${qty}` }).where(eq(product.id, Number(it.productId))).run();
-    if (it.variantId != null) await dz.update(variant).set({ inventory: sql`${variant.inventory} + ${qty}` }).where(eq(variant.id, Number(it.variantId))).run();
+    // restock RAISES stock → re-arm the low-stock latch so a future dip alerts again (else the owner is warned once, never again).
+    if (it.productId != null) await dz.update(product).set({ inventory: sql`${product.inventory} + ${qty}`, lowStockAlerted: false }).where(eq(product.id, Number(it.productId))).run();
+    if (it.variantId != null) await dz.update(variant).set({ inventory: sql`${variant.inventory} + ${qty}`, lowStockAlerted: false }).where(eq(variant.id, Number(it.variantId))).run();
   }
   if (o.discountCode) await dz.update(discountCode).set({ currentUses: sql`max(0, ${discountCode.currentUses} - 1)` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
 }
@@ -557,7 +578,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
     // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
     const free = !requiresStripe(total);
-    if (free && await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId);
+    if (free && await markOrderPaid(c, dz, orderId)) await sendOrderReceipt(c, dz, orderId);
     const final = await dz.select().from(order).where(eq(order.id, orderId)).get();
     return c.json({ order: final, ...totals, discountApplied: disc.valid, free }, 201);
   };
@@ -833,7 +854,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
     // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.
     if (!requiresStripe(total)) {
-      if (await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId);
+      if (await markOrderPaid(c, dz, orderId)) await sendOrderReceipt(c, dz, orderId);
       const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
       return c.json({ free: true, paid: true, order: publicOrderShape(o), orderId, totalCents: total });
     }
@@ -897,7 +918,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // The session id is the secret (Stripe hands it to the buyer at redirect), so this gates the receipt to the buyer
     // alone — a bogus/guessed session against a sequential orderId yields {paid:false} and NO order (no email/address leak).
     if (!paid) return c.json({ paid: false });
-    if (await markOrderPaid(dz, orderId)) await sendOrderReceipt(c, dz, orderId); // pending-only transition + once-per-order discount bump + receipt (all idempotent)
+    if (await markOrderPaid(c, dz, orderId)) await sendOrderReceipt(c, dz, orderId); // pending-only transition + once-per-order discount bump + receipt (all idempotent)
     const row = await dz.select().from(order).where(eq(order.id, orderId)).get();
     return c.json({ paid: true, order: publicOrderShape(row) });
   };

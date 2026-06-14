@@ -26,7 +26,8 @@ export const env = defineEnv({
   EMAIL_FROM:              { default: "saasuluk <onboarding@resend.dev>", surfaces: ["local", "cloudflare"], description: "From address for outbound email" },
   GOOGLE_CLIENT_ID:        { surfaces: ["local", "cloudflare"], description: "Google OAuth client id" },
   GOOGLE_CLIENT_SECRET:    { secret: true, surfaces: ["local", "cloudflare"], description: "Google OAuth client secret" },
-  SUPERADMIN_EMAILS:       { surfaces: ["local", "cloudflare"], description: 'JSON array of admin emails, e.g. ["you@example.com"]' },
+  SUPERADMIN_EMAILS:       { surfaces: ["local", "cloudflare"], description: 'JSON array of admin emails, e.g. ["you@example.com"] — also the contact-form + low-stock alert recipients' },
+  LOW_STOCK_THRESHOLD:     { default: "5", surfaces: ["local", "cloudflare"], description: "Inventory level at/below which a paid sale emails the owner a low-stock alert (default 5)" },
   OPENROUTER_API_KEY:      { secret: true, surfaces: ["local", "cloudflare"], description: "OpenRouter API key — powers the @suluk/chat in-page assistant (omit ⇒ /chat returns a graceful 503)" },
   // build/script-only knobs (declared so /config doesn't under-report what the code reads)
   CATALOG_BASE:            { surfaces: ["ci"], description: "Base URL the catalog-sync script fetches live prices from" },
