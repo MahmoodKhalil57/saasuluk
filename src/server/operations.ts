@@ -627,14 +627,19 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // Read-then-write keeps it driver-agnostic (bun:sqlite sync + D1 async differ on .run() affected-row reporting);
     // the (review_id, principal) UNIQUE index (migration 0003 / SCHEMA_SQL) is the race backstop via onConflictDoNothing.
     const existing = await dz.select().from(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).get();
+    const affected = (r: unknown): number => { const x = r as { meta?: { changes?: number }; changes?: number; rowsAffected?: number }; return Number(x?.meta?.changes ?? x?.changes ?? x?.rowsAffected ?? 0); };
     let voted: boolean;
     if (!existing) {
-      await dz.insert(reviewHelpfulVote).values({ reviewId: id, principal: who }).onConflictDoNothing().run();
-      await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
+      // Gate the +1 on the INSERT actually creating a row: two concurrent first-clicks both pass the read-check, but the
+      // unique index makes one insert a no-op (onConflictDoNothing → 0 rows) — only the winner increments, so the counter
+      // never drifts above the vote-row count.
+      const ins = await dz.insert(reviewHelpfulVote).values({ reviewId: id, principal: who }).onConflictDoNothing().run();
+      if (affected(ins) > 0) await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
       voted = true;
     } else {
-      await dz.delete(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).run();
-      await dz.update(review).set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` }).where(eq(review.id, id)).run();
+      // Symmetrically gate the −1 on the DELETE removing a row, so a double un-vote decrements at most once.
+      const del = await dz.delete(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).run();
+      if (affected(del) > 0) await dz.update(review).set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` }).where(eq(review.id, id)).run();
       voted = false;
     }
     const r = await dz.select().from(review).where(eq(review.id, id)).get();
@@ -778,7 +783,13 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const body = (await c.req.json().catch(() => ({}))) as { name?: string; email?: string; subject?: string; message?: string };
     const name = String(body.name ?? "").trim(), email = String(body.email ?? "").trim().toLowerCase();
     const subject = String(body.subject ?? "").trim(), message = String(body.message ?? "").trim();
-    if (!name || !email.includes("@") || !subject || !message) return c.json({ error: "name, email, subject and message are required" }, 422);
+    // Custom ops bypass the CRUD zValidator, so bound the input HERE — restoring the line()/email() limits the generic
+    // ContactSubmission route enforced before the form moved to this op (length caps + email shape + no <>/control chars).
+    const badLine = (s: string) => /[<> -]/.test(s);
+    if (!name || name.length > 120 || badLine(name)) return c.json({ error: "name is required (max 120 chars)" }, 422);
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ error: "a valid email is required" }, 422);
+    if (!subject || subject.length > 200 || badLine(subject)) return c.json({ error: "subject is required (max 200 chars)" }, 422);
+    if (!message || message.length > 5000) return c.json({ error: "message is required (max 5000 chars)" }, 422);
     const row = await dz.insert(contactSubmission).values({ name, email, subject, message, createdAt: Date.now() }).returning(); // persist FIRST — survives a mail outage
     // BEST-EFFORT owner notification — to the first SUPERADMIN_EMAILS entry, else EMAIL_FROM. esc() the user fields
     // (they land in the owner's inbox as HTML). sendEmailAsync is itself fire-and-forget; the try guards arg-building.

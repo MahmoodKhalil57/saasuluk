@@ -20,6 +20,8 @@ const OWNED: [name: string, table: Record<string, unknown>, ownerCol: string][] 
   ["orders", s.order as unknown as Record<string, unknown>, "customerId"],
   ["carts", s.cart as unknown as Record<string, unknown>, "customerId"],
   ["reviews", s.review as unknown as Record<string, unknown>, "customerId"],
+  ["reviewHelpfulVotes", s.reviewHelpfulVote as unknown as Record<string, unknown>, "principal"], // (review_id, principal) votes tie a user id to reviews — owned PII
+
   ["wishlist", s.wishlistItem as unknown as Record<string, unknown>, "customerId"],
   ["addresses", s.address as unknown as Record<string, unknown>, "customerId"], // saved address book is owned PII
   ["projects", s.project as unknown as Record<string, unknown>, "ownerId"],
