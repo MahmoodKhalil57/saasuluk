@@ -29,6 +29,8 @@ import Layout from "../layouts/Layout.astro";
     .co-trow.disc span { color:var(--accent); }
     #placeOrder { width:100%; justify-content:center; font-size:16px; padding:13px; }
     .co-note { color:var(--muted); font-size:12.5px; margin-top:9px; text-align:center; }
+    .co-trust { list-style:none; padding:0; margin:12px 0 0; display:flex; flex-direction:column; gap:5px; }
+    .co-trust li { font-size:12.5px; color:var(--muted); display:flex; gap:7px; align-items:center; }
     .addr-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:4px; }
     .addr-grid input { width:100%; }
     .addr-saved { margin:4px 0 12px; }
@@ -95,6 +97,11 @@ import Layout from "../layouts/Layout.astro";
     </div>
     <div class="co-card card">
       <button class="btn" id="placeOrder">Place order</button>
+      <ul class="co-trust" aria-label="Checkout reassurances">
+        <li>🔒 Secure checkout — payments by Stripe</li>
+        <li>🛡️ Card details never touch our servers</li>
+        <li>↩︎ 30-day returns &amp; refunds</li>
+      </ul>
       <p class="co-note">Stripe test mode — card <code>4242 4242 4242 4242</code>, any future date + CVC. $0 orders complete instantly, no card needed.</p>
       <p id="result" style="margin-top:10px"></p>
     </div>
