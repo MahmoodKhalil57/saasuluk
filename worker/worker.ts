@@ -10,13 +10,12 @@
  */
 import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { and, eq, asc, desc, getTableName, type SQL } from "drizzle-orm";
-import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { mount, enforceAccess, enforceRateLimit, MemoryRateLimitStore, type RouteContract } from "@suluk/hono";
 import { kvRateLimitStore } from "@suluk/cloudflare";
 import { RATE_LIMITS } from "../src/server/ratelimits";
 import { buildApp } from "@suluk/builder";
-import { parseListQuery, tableComponents } from "@suluk/drizzle";
+import { tableComponents, crudHandlers } from "@suluk/drizzle";
 import { annotateCosts, computeCost, summarize, type CostEvent } from "@suluk/cost";
 import { authSecuritySchemes, mergeAuth } from "@suluk/better-auth";
 import { buildAda, matchRequest, scrubSource, sourceIndex, sourceCoverage } from "@suluk/core";
@@ -40,7 +39,7 @@ import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, sweepAbandonedCartEmails, refundOrder, sendOrderReceipt, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "../src/server/operations";
 import { verifyStripeSignature, retrievePaymentIntent, webhookRouter, STRIPE_EVENTS, type WebhookEvent } from "@suluk/stripe";
-import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
+import { isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
 import { annotateSource } from "../src/server/source-facet";
@@ -133,64 +132,15 @@ app.use("*", async (c, next) => {
 // generic D1 CRUD (async) — the D1 twin of src/server/crud.ts. ACCESS-CONTROLLED: each entity's access mode
 // (registry → access.ts) maps to per-op rules — `owner` rules scope to the caller's principal (no cross-tenant
 // dump/mutate), `admin` rules hard-deny (403) for non-superadmins (closes catalog/discount/billing writes).
+// The D1 binding of @suluk/drizzle's crudHandlers factory — the SAME implementation the dev server uses
+// (src/server/crud.ts), differing ONLY in the injected db resolver (D1 here vs bun:sqlite there). No twin to drift.
 function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
-  const cols = table as unknown as Record<string, SQLiteColumn>;
-  const pk = cols.id;
-  const policy = policyFor(access, ownerCol);
-  const tname = getTableName(table); // for private-column redaction on public reads (mirrors crud.ts)
-  const dz = (c: Context<{ Bindings: Env }>) => drizzle(c.env.DB);
-  const rid = (c: Context) => Number(c.req.param("id"));
-  const forbidden = (c: Context, g: { status?: 401 | 403 }) => c.json({ error: g.status === 401 ? "unauthorized" : "forbidden" }, g.status ?? 403); // 401 anon vs 403 forbidden — the wire enforces x-suluk-access
-  const scoped = (c: Context, scopeOwner: boolean, withPk: boolean) => {
-    const own = scopeOwner && ownerCol ? eq(cols[ownerCol], principal(c)) : undefined;
-    const id = withPk ? eq(pk, rid(c)) : undefined;
-    return own && id ? and(id, own) : (id ?? own);
-  };
-  return {
-    list: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.list, principal(c)); if (!g.ok) return forbidden(c, g);
-      const own = scoped(c, g.scopeOwner, false);
-      // Owner-scope AND per-column equality filters (real columns only — parseListQuery drops unknown keys, so a
-      // filter never widens the owner scope). Identical query-build to the dev twin (crud.ts); only `await` differs.
-      const lq = parseListQuery(c.req.query(), table);
-      const conds: SQL[] = [];
-      if (own) conds.push(own);
-      for (const [col, val] of Object.entries(lq.filters)) if (cols[col]) conds.push(eq(cols[col], val));
-      const where = conds.length > 1 ? and(...conds) : conds[0];
-      let qb = dz(c).select().from(table).$dynamic();
-      if (where) qb = qb.where(where);
-      if (lq.orderBy && cols[lq.orderBy.column]) qb = qb.orderBy(lq.orderBy.dir === "desc" ? desc(cols[lq.orderBy.column]) : asc(cols[lq.orderBy.column]));
-      // Pagination OPT-IN (page/perPage) — full list otherwise, matching the dev server so dev/prod never diverge.
-      const raw = c.req.query();
-      if (raw.page != null || raw.perPage != null) qb = qb.limit(lq.limit).offset(lq.offset);
-      const admin = isAdmin(c);
-      return c.json((await qb.all()).map((row) => redactRow(tname, row as Record<string, unknown>, admin)));
-    },
-    get: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.get, principal(c)); if (!g.ok) return forbidden(c, g);
-      const r = await dz(c).select().from(table).where(scoped(c, g.scopeOwner, true)!); return r[0] ? c.json(redactRow(tname, r[0] as Record<string, unknown>, isAdmin(c))) : c.json({ error: "not found" }, 404);
-    },
-    create: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.create, principal(c)); if (!g.ok) return forbidden(c, g);
-      const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; const owner = ownerCol ? { [ownerCol]: principal(c) } : {};
-      const r = await dz(c).insert(table).values({ ...b, ...owner } as never).returning(); return c.json(r[0], 201);
-    },
-    update: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.update, principal(c)); if (!g.ok) return forbidden(c, g);
-      const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; delete b.id; if (ownerCol) delete b[ownerCol];
-      const w = scoped(c, g.scopeOwner, true)!;
-      const hooked = CRUD_AFTER_UPDATE_TABLES.has(tname); // pre-read the before-row only when a hook needs it (mirrors crud.ts)
-      const before = hooked ? (await dz(c).select().from(table).where(w))[0] as Record<string, unknown> | undefined : undefined;
-      await dz(c).update(table).set(b as never).where(w);
-      const r = await dz(c).select().from(table).where(w);
-      if (hooked && before && r[0]) await crudAfterUpdate(tname, c as never, dz(c) as never, before, r[0] as Record<string, unknown>); // e.g. back-in-stock on a restock
-      return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404);
-    },
-    delete: async (c: Context<{ Bindings: Env }>) => {
-      const g = gate(c, policy.delete, principal(c)); if (!g.ok) return forbidden(c, g);
-      await dz(c).delete(table).where(scoped(c, g.scopeOwner, true)!); return c.body(null, 204);
-    },
-  };
+  return crudHandlers(table, {
+    ownerCol, access,
+    db: (c) => drizzle((c as Context<{ Bindings: Env }>).env.DB) as never,
+    principal, isAdmin, redact: redactRow,
+    afterUpdate: crudAfterUpdate, afterUpdateTables: CRUD_AFTER_UPDATE_TABLES,
+  });
 }
 
 type D1Handlers = ReturnType<typeof d1Crud>;
