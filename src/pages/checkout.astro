@@ -169,37 +169,44 @@ import Layout from "../layouts/Layout.astro";
         </div>`).join("") : `<p style="color:var(--muted)">Your cart is empty — <a href="/products">browse products</a>.</p>`;
     }
 
-    // The server-authoritative breakdown (subtotal/discount/shipping/tax/total) from /checkout/quote — the single
-    // source of truth for shipping + tax (the @suluk/stripe adapters). null until the first quote (then client fallback).
-    let quote = null;
+    // The server-authoritative breakdown (subtotal/discount/shipping/tax/total) from /checkout/quote — the SINGLE
+    // source of truth for shipping + tax (the @suluk/stripe adapters). FAIL CLOSED: until a fresh quote exists we never
+    // show a chargeable total or enable Pay (a subtotal-only number would understate the real shipping+tax charge).
+    let quote = null, quoteError = false;
     function renderTotals() {
-      const sub = quote ? quote.subtotalCents : subtotal();
-      const discAmt = quote ? quote.discountCents : (disc ? disc.amount : 0);
-      const shipAmt = quote ? quote.shippingCents : 0;
-      const taxAmt = quote ? quote.taxCents : 0;
-      const total = quote ? quote.totalCents : Math.max(0, sub - discAmt);
-      document.getElementById("subtotal").textContent = money(sub);
-      const dr = document.getElementById("discountRow");
-      if (discAmt > 0) { dr.hidden = false; document.getElementById("discountLabel").textContent = "Discount" + (disc ? " (" + disc.code + ")" : ""); document.getElementById("discountAmt").textContent = "−" + money(discAmt); }
-      else { dr.hidden = true; }
-      const sr = document.getElementById("shippingRow"); if (shipAmt > 0) { sr.hidden = false; document.getElementById("shippingAmt").textContent = money(shipAmt); } else { sr.hidden = true; }
-      const xr = document.getElementById("taxRow"); if (taxAmt > 0) { xr.hidden = false; document.getElementById("taxAmt").textContent = money(taxAmt); } else { xr.hidden = true; }
+      const btn = document.getElementById("placeOrder");
+      const dr = document.getElementById("discountRow"), sr = document.getElementById("shippingRow"), xr = document.getElementById("taxRow");
+      if (!cart().length) {
+        document.getElementById("subtotal").textContent = money(0); dr.hidden = true; sr.hidden = true; xr.hidden = true;
+        document.getElementById("total").textContent = money(0); btn.disabled = true; btn.textContent = "Cart is empty"; return;
+      }
+      document.getElementById("subtotal").textContent = money(quote ? quote.subtotalCents : subtotal());
+      if (!quote) { // computing (or failed) — the total isn't known yet; don't let the buyer pay a stale/understated amount
+        dr.hidden = true; sr.hidden = true; xr.hidden = true;
+        document.getElementById("total").textContent = quoteError ? "—" : "…";
+        btn.disabled = !quoteError; btn.textContent = quoteError ? "Couldn't calculate total — retry" : "Calculating total…";
+        return;
+      }
+      const discAmt = quote.discountCents, shipAmt = quote.shippingCents, taxAmt = quote.taxCents, total = quote.totalCents;
+      if (discAmt > 0) { dr.hidden = false; document.getElementById("discountLabel").textContent = "Discount" + (disc ? " (" + disc.code + ")" : ""); document.getElementById("discountAmt").textContent = "−" + money(discAmt); } else { dr.hidden = true; }
+      if (shipAmt > 0) { sr.hidden = false; document.getElementById("shippingAmt").textContent = money(shipAmt); } else { sr.hidden = true; }
+      if (taxAmt > 0) { xr.hidden = false; document.getElementById("taxAmt").textContent = money(taxAmt); } else { xr.hidden = true; }
       document.getElementById("total").textContent = money(total);
       // single ADAPTIVE button: a chargeable total → Stripe; a $0/free total → complete now (no card).
-      const btn = document.getElementById("placeOrder");
-      if (!cart().length) { btn.disabled = true; btn.textContent = "Cart is empty"; }
-      else if (total >= STRIPE_FLOOR) { btn.disabled = false; btn.textContent = "Pay " + money(total) + " with Stripe →"; }
+      if (total >= STRIPE_FLOOR) { btn.disabled = false; btn.textContent = "Pay " + money(total) + " with Stripe →"; }
       else { btn.disabled = false; btn.textContent = "Place order — " + (total === 0 ? "Free" : money(total)); }
     }
-    // Re-quote (debounced) whenever the cart, discount or address changes — shipping + tax are server-computed.
+    // Re-quote (debounced) on cart/discount change. Invalidate the stale quote first so renderTotals shows "Calculating"
+    // + disables Pay until the fresh server total returns — the displayed Pay amount always equals what Stripe charges.
     let quoteTimer = null;
     function refreshQuote() {
       const c = cart();
-      if (!c.length) { quote = null; renderTotals(); return; }
+      if (!c.length) { quote = null; quoteError = false; renderTotals(); return; }
+      quote = null; quoteError = false; renderTotals();
       clearTimeout(quoteTimer);
       quoteTimer = setTimeout(async () => {
-        try { quote = await postJson("/checkout/quote", { items: c, discountCode: disc && disc.code, shippingAddress: shipAddr() }); }
-        catch (e) { quote = null; } // fall back to the client subtotal − discount
+        try { quote = await postJson("/checkout/quote", { items: c, discountCode: disc && disc.code, shippingAddress: shipAddr() }); quoteError = false; }
+        catch (e) { quote = null; quoteError = true; } // surface a retry — never silently understate the charge
         renderTotals();
       }, 250);
     }
@@ -240,6 +247,7 @@ import Layout from "../layouts/Layout.astro";
 
     document.getElementById("placeOrder").addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
+      if (!quote) { if (quoteError) refreshQuote(); return; } // total not confirmed yet → never place at a guessed amount
       const email = emailValue();
       if (!emailValid(email)) { // a receipt needs a destination — block before creating the order
         const el = document.getElementById("email"); el.focus(); el.setAttribute("aria-invalid", "true");

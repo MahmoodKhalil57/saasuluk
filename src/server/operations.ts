@@ -379,11 +379,16 @@ async function computeOrderTotals(lines: PricedLine[], disc: ResolvedDiscount, o
   const subtotalCents = linesSubtotal(lines);
   const discountedGoods = applyDiscount(subtotalCents, disc); // subtotal − discount, already clamped to [0, subtotal]
   const discountCents = subtotalCents - discountedGoods;
-  const ship = await resolveShipping(shippingProvider, { subtotalCents: discountedGoods, lines: lines.map((l) => ({ id: l.productId, qty: l.qty, requiresShipping: l.requiresShipping })), address: opts.address }, opts.shippingMethod);
+  // the free-over threshold must track only what ACTUALLY ships — a digital line never ships, so it can't earn free
+  // physical shipping. Use the shippable-only subtotal (discounted proportionally) for the threshold check.
+  const shippableSubtotal = lines.filter((l) => l.requiresShipping).reduce((s, l) => s + l.priceCents * l.qty, 0);
+  const shippableForThreshold = subtotalCents > 0 ? Math.round(shippableSubtotal * (discountedGoods / subtotalCents)) : 0;
+  const ship = await resolveShipping(shippingProvider, { subtotalCents: shippableForThreshold, lines: lines.map((l) => ({ id: l.productId, qty: l.qty, requiresShipping: l.requiresShipping })), address: opts.address }, opts.shippingMethod);
   const shippingCents = ship ? ship.amountCents : 0;
-  const tax = await resolveTax(taxProvider, { subtotalCents: discountedGoods, shippingCents, address: opts.address });
+  const tax = await resolveTax(taxProvider, { subtotalCents: discountedGoods, shippingCents, address: opts.address }); // tax stays on the full discounted base
   const totalCents = composeTotal({ subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents }).totalCents;
-  return { subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents, totalCents, shippingMethod: ship ? ship.id : null };
+  // persist a method only when a fee is actually charged — a free/digital order has no method (matches shippingCents 0).
+  return { subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents, totalCents, shippingMethod: shippingCents > 0 && ship ? ship.id : null };
 }
 
 /** Shipping address shape (the checkout form / contract); stored as a JSON snapshot on the order for physical goods. */
