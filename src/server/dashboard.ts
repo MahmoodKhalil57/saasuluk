@@ -275,6 +275,7 @@ const ORDERS = `
   function addrBlock(o){var a=null;try{a=o.shippingAddress?JSON.parse(o.shippingAddress):null;}catch(e){}if(!a)return "";
     var L=[a.name,a.line1,a.line2,[a.city,a.state,a.postalCode].filter(Boolean).join(", "),a.country].filter(function(x){return x&&String(x).trim();});
     return L.length?'<div class="od-ship"><b>Shipping to</b>'+L.map(esc).join("<br>")+'</div>':"";}
+  function trackBlock(o){if(o.status!=="shipped"||!o.trackingNumber)return "";return '<div class="od-ship"><b>Tracking</b>'+esc(o.carrier||"Carrier")+' · '+esc(o.trackingNumber)+'</div>';}
   function lineHtml(it){var sub=it.variantLabel?esc(it.variantLabel):"";
     return '<div class="od-line">'+(it.image?'<img class="od-img" src="'+esc(it.image)+'" alt="" loading="lazy"/>':'<span class="od-img"></span>')+
       '<div class="od-ln-body"><div class="od-ln-name">'+esc(it.name||("#"+it.productId))+'</div><div class="od-ln-sub">'+(sub?sub+" · ":"")+'Qty '+(it.qty||1)+' × '+money(it.priceCents)+'</div></div>'+
@@ -294,7 +295,7 @@ const ORDERS = `
         '<button class="od-head" type="button"><span class="od-id">#'+esc(o.id)+'</span><span class="od-pill '+esc(o.status)+'">'+esc(o.status)+'</span><span class="od-when">'+esc(when(o.createdAt))+' · '+n+' item'+(n===1?"":"s")+'</span><span class="od-tot">'+money(o.totalCents)+'</span><span class="od-caret">›</span></button>'+
         '<div class="od-body">'+items.map(lineHtml).join("")+
           '<div style="margin-top:10px">'+(disc>0?'<div class="od-tot-row disc"><span>Discount'+(o.discountCode?" ("+esc(o.discountCode)+")":"")+'</span><span>−'+money(disc)+'</span></div>':"")+
-          '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+addrBlock(o)+
+          '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+trackBlock(o)+addrBlock(o)+
           '<div class="od-actions"><button class="btn sm" type="button" data-buy="'+esc(o.id)+'">Buy again</button></div>'+
         '</div></div>';}).join("");
     box.querySelectorAll(".od-head").forEach(function(h){h.addEventListener("click",function(){h.closest(".od-card").classList.toggle("open");});});
@@ -374,12 +375,69 @@ export async function adminStats(db: AnyDb): Promise<StatCard[]> {
 
 export const adminGroups = [
   { title: "Catalog", entities: ["Product", "Category", "Variant", "DiscountCode"] },
-  { title: "Commerce", entities: ["Order", "Cart", "WishlistItem", "Review"] },
+  { title: "Commerce", entities: ["Order", "Cart", "WishlistItem", "Review"], sections: ["fulfillment"] },
   { title: "Content", entities: ["Post", "Faq"] },
   { title: "Accounts", entities: ["Project", "ApiToken", "BillingAccount"] },
   { title: "Ops", sections: ["cost"] },
 ];
 
+// Admin FULFILLMENT — the workflow order.status never had: list paid orders waiting to ship + recent shipments, and
+// transition paid → shipped (with carrier + tracking) or → cancelled via POST /order/:id/status, which emails the
+// buyer (orderStatusEmail). Admin sees ALL orders (gate: owner-rule + isAdmin → unscoped).
+const FULFILL = `
+<div class="pf-section">
+  <h2 style="margin-top:0">Fulfillment</h2>
+  <p class="pf-sub">Paid orders waiting to ship, and recent shipments. Marking an order shipped emails the buyer with tracking.</p>
+  <div id="ff-list" class="pf-muted">Loading…</div>
+</div>
+<style>
+  .ff-card{border:1px solid var(--line);border-radius:12px;margin:10px 0;padding:13px 15px;background:var(--panel)}
+  .ff-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ff-id{font-weight:700}
+  .ff-pill{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:999px;background:var(--bg-soft);border:1px solid var(--line)}
+  .ff-pill.paid{color:#16794a;border-color:#16794a55}.ff-pill.shipped{color:#1d6fb8;border-color:#1d6fb855}.ff-pill.cancelled{color:#b03636;border-color:#b0363655}
+  .ff-meta{color:var(--muted);font-size:12.5px;margin-inline-start:auto}
+  .ff-sub{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+  .ff-ship{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .ff-ship input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg-soft);color:var(--fg);font:inherit;font-size:13px}
+  .ff-ship .ff-carrier{width:170px}.ff-ship .ff-track{flex:1;min-width:140px}
+</style>
+<script>(function(){
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function money(c){return window.fmtMoney?window.fmtMoney(c):"$"+(Number(c||0)/100).toFixed(2);}
+  function when(t){return t?(window.fmtDate?window.fmtDate(Number(t)):new Date(Number(t)).toLocaleDateString()):"";}
+  function nItems(o){try{return JSON.parse(o.items||"[]").reduce(function(s,i){return s+(i.qty||1);},0);}catch(e){return 0;}}
+  var box=document.getElementById("ff-list");
+  function post(id,body,btn){
+    fetch("/order/"+encodeURIComponent(id)+"/status",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(body)}).then(function(r){
+      if(r.ok){if(window.toast)window.toast("Order #"+id+" → "+body.status,{type:"success"});load();}
+      else{if(btn)btn.disabled=false;if(window.toast)window.toast("Update failed ("+r.status+").",{type:"error"});}
+    }).catch(function(){if(btn)btn.disabled=false;});
+  }
+  function load(){
+    fetch("/order",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(os){
+      os=(os||[]).filter(function(o){return o.status==="paid"||o.status==="shipped";}).sort(function(a,b){
+        var rank={paid:0,shipped:1};return (rank[a.status]-rank[b.status])||((b.createdAt||0)-(a.createdAt||0));});
+      box.className="";
+      if(!os.length){box.innerHTML='<div class="pf-empty">No paid orders to fulfill yet.</div>';return;}
+      box.innerHTML=os.map(function(o){
+        var ship=o.status==="paid"
+          ? '<div class="ff-ship"><input class="ff-carrier" placeholder="Carrier (ups/usps/fedex/dhl)" data-c="'+esc(o.id)+'"/><input class="ff-track" placeholder="Tracking number (optional)" data-t="'+esc(o.id)+'"/><button class="btn sm" type="button" data-ship="'+esc(o.id)+'">Mark shipped</button><button class="btn ghost sm" type="button" data-cancel="'+esc(o.id)+'">Cancel</button></div>'
+          : (o.trackingNumber?'<p class="ff-sub">Shipped via '+esc(o.carrier||"carrier")+' · tracking '+esc(o.trackingNumber)+'</p>':'<p class="ff-sub">Shipped.</p>');
+        return '<div class="ff-card" data-id="'+esc(o.id)+'"><div class="ff-head"><span class="ff-id">#'+esc(o.id)+'</span><span class="ff-pill '+esc(o.status)+'">'+esc(o.status)+'</span><span class="ff-meta">'+money(o.totalCents)+' · '+nItems(o)+' item(s) · '+esc(when(o.createdAt))+'</span></div>'+
+          '<p class="ff-sub">'+(o.customerEmail?esc(o.customerEmail):"(guest — no email on file)")+'</p>'+ship+'</div>';
+      }).join("");
+      box.querySelectorAll("[data-ship]").forEach(function(b){b.addEventListener("click",function(){
+        var id=b.dataset.ship,carrier=(document.querySelector('[data-c="'+id+'"]')||{}).value||"",track=(document.querySelector('[data-t="'+id+'"]')||{}).value||"";
+        b.disabled=true;post(id,{status:"shipped",carrier:carrier.trim(),trackingNumber:track.trim()},b);});});
+      box.querySelectorAll("[data-cancel]").forEach(function(b){b.addEventListener("click",function(){
+        if(!confirm("Cancel order #"+b.dataset.cancel+"? The buyer will be emailed."))return;b.disabled=true;post(b.dataset.cancel,{status:"cancelled"},b);});});
+    }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load orders.</div>';});
+  }
+  load();
+})();</script>`;
+
 export const adminSections: PanelSection[] = [
+  { id: "fulfillment", label: "Fulfillment", summary: "Ship orders + tracking", render: () => FULFILL },
   { id: "cost", label: "Cost ledger", summary: "Per-request spend, metered", render: () => '<div class="pf-section" style="padding:0;overflow:hidden;border-radius:16px"><iframe src="/cost" title="Cost ledger" style="width:100%;height:72vh;border:0;display:block"></iframe></div>' },
 ];

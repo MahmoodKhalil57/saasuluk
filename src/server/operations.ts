@@ -11,7 +11,7 @@ import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
 import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
-import { orderConfirmationEmail } from "@suluk/email";
+import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
 import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, type Discount } from "@suluk/stripe";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
@@ -122,6 +122,14 @@ async function recentPaidDuplicate(dz: Dz, opts: { who: string | null; email: st
   const m = rows.find((o) => (o.items ?? "") === opts.itemsJson && (opts.who ? o.customerId === opts.who : o.customerEmail === opts.email));
   return m ? m.id : null;
 }
+
+/** Known-carrier tracking deep-link for the order-status email (else the email links to the buyer's orders page). */
+const CARRIER_TRACK: Record<string, string> = { ups: "https://www.ups.com/track?tracknum=", usps: "https://tools.usps.com/go/TrackConfirmAction?tLabels=", fedex: "https://www.fedex.com/fedextrack/?trknbr=", dhl: "https://www.dhl.com/en/express/tracking.html?AWB=" };
+const carrierTrackingUrl = (carrier: string | null, num: string | null): string | undefined => {
+  if (!num) return undefined;
+  const base = CARRIER_TRACK[String(carrier ?? "").toLowerCase().trim()];
+  return base ? base + encodeURIComponent(num) : undefined;
+};
 /** A guest's typed checkout email — lightly validated server-side so a guest order can still send a receipt. */
 const cleanEmail = (x: unknown): string | null => {
   const s = String(x ?? "").trim().toLowerCase();
@@ -225,7 +233,7 @@ function jsonOp(
 
 /** The per-operation cost models — merged into the contract's cost map so these are metered like CRUD. */
 export const OPERATION_COSTS: Record<string, CostModel> = {
-  checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25),
+  checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25), setOrderStatus: write(30),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
   recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
@@ -249,6 +257,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
   "review/submit": { requests: { submitReview: jsonOp("post", "Submit a product review — auto-flags verified-purchase when the reviewer has a paid order for the product", { body: obj({ productId: v.int(1, ID), rating: v.int(1, 5), title: v.line(160), body: v.rich(5000) }, ["productId", "rating"]), status: 201 }) } },
+  "order/{id}/status": { requests: { setOrderStatus: jsonOp("post", "Admin: advance an order's fulfillment status (paid/shipped/cancelled) + record tracking; emails the buyer on shipped/cancelled", { params: idParam, body: obj({ status: v.line(20), carrier: v.line(60), trackingNumber: v.line(80) }, ["status"]) }) } },
   "analytics/summary": { requests: { analyticsSummary: jsonOp("get", "Store summary (orders, revenue, customers)") } },
   "analytics/revenue": { requests: { analyticsRevenue: jsonOp("get", "Revenue per day (last 30d)") } },
   "analytics/top-products": { requests: { analyticsTopProducts: jsonOp("get", "Best-selling products") } },
@@ -447,6 +456,31 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const reviewBody = String(b.body ?? "").replace(/[ --]/g, "").trim().slice(0, 5000);
     const row = await dz.insert(review).values({ productId, customerId: who, rating, title, body: reviewBody, verifiedPurchase: verified, status: "pending", createdAt: Date.now() }).returning();
     return c.json({ ...row[0], verified }, 201);
+  };
+
+  // Admin fulfillment — advance an order pending/paid → shipped → cancelled, record carrier + tracking, and EMAIL the
+  // buyer on shipped/cancelled via @suluk/email's orderStatusEmail (the order-status template that previously never
+  // sent). The status enum is bounded; tracking is sanitized; a known carrier yields a real tracking deep-link.
+  const setOrderStatus = async (c: Context) => {
+    if (!c.get("isAdmin")) return c.json({ error: "Admin only." }, 403);
+    const dz = dbFor(c);
+    const id = Number(c.req.param("id"));
+    const b = (await c.req.json().catch(() => ({}))) as { status?: string; carrier?: string; trackingNumber?: string };
+    const status = String(b.status ?? "");
+    if (!["paid", "shipped", "cancelled"].includes(status)) return c.json({ error: "status must be paid, shipped or cancelled." }, 422);
+    const o = await dz.select().from(order).where(eq(order.id, id)).get();
+    if (!o) return c.json({ error: "not found" }, 404);
+    const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
+    const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
+    await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(eq(order.id, id)).run();
+    if ((status === "shipped" || status === "cancelled") && o.customerEmail) {
+      const origin = new URL(c.req.url).origin;
+      const trackUrl = status === "shipped" ? (carrierTrackingUrl(carrier, trackingNumber) ?? `${origin}/dashboard/s/orders`) : undefined;
+      const m = orderStatusEmail({ orderNumber: String(id), status, ...(trackUrl ? { trackingUrl: trackUrl } : {}) }, { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } });
+      sendEmailAsync({ to: o.customerEmail, subject: m.subject, html: m.html }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
+    }
+    const row = await dz.select().from(order).where(eq(order.id, id)).get();
+    return c.json(row);
   };
 
   const analyticsSummary = async (c: Context) => {
@@ -694,6 +728,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.get("/search", search);
   app.post("/review/:id/helpful", markReviewHelpful);
   app.post("/review/submit", submitReview);
+  app.post("/order/:id/status", setOrderStatus);
   app.get("/analytics/summary", analyticsSummary);
   app.get("/analytics/revenue", analyticsRevenue);
   app.get("/analytics/top-products", analyticsTopProducts);
