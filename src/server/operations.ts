@@ -437,7 +437,7 @@ function jsonOp(
 export const OPERATION_COSTS: Record<string, CostModel> = {
   checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25), setOrderStatus: write(30),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
-  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), submitContact: write(20), subscribeStock: write(20), generateAvatar: read(2),
+  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), submitContact: write(20), subscribeStock: write(20), orderInvoice: read(12), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
   connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40), exportAccount: read(20),
@@ -467,6 +467,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
   "contact/submit": { requests: { submitContact: jsonOp("post", "Submit the contact form (persists + notifies the store owner)", { body: obj({ name: v.line(120), email: v.email(), subject: v.line(160), message: v.line(4000) }, ["name", "email", "subject", "message"]), status: 201 }) } },
   "product/{id}/notify-stock": { requests: { subscribeStock: jsonOp("post", "Join a sold-out product's back-in-stock waitlist", { params: idParam, body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
+  "order/{id}/invoice": { requests: { orderInvoice: jsonOp("get", "Printable HTML invoice for an order (owner or admin)", { params: idParam, contentType: "text/html", response: { type: "string" } }) } },
   "newsletter/unsubscribe": { requests: { unsubscribeNewsletter: jsonOp("get", "Unsubscribe from the newsletter via a tokenized one-click link", { params: { query: obj({ t: v.line(400) }) }, contentType: "text/html", response: { type: "string" } }) } },
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
@@ -874,6 +875,37 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     return c.json({ subscribed: true }, 201);
   };
 
+  // Printable invoice for an order — owner-scoped (the buyer who placed it, or an admin). Returns a self-contained,
+  // print-styled HTML page (no PDF dependency; the buyer prints / saves-as-PDF from the browser). All user data escaped.
+  const orderInvoice = async (c: Context) => {
+    const who = principal(c);
+    const page = (title: string, body: string, status: 200 | 401 | 403 | 404 = 200) =>
+      c.html(`<!doctype html><meta charset=utf-8><title>${title}</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;text-align:center;padding:0 20px">${body}</body>`, status);
+    if (!who) return page("Sign in", "<h1>Sign in to view your invoice</h1><p><a href=\"/login\">Sign in →</a></p>", 401);
+    const dz = dbFor(c);
+    const id = Number(c.req.param("id"));
+    const o = (await dz.select().from(order).where(eq(order.id, id)).get()) as Record<string, unknown> | undefined;
+    if (!o) return page("Not found", "<h1>Invoice not found</h1>", 404);
+    if (String(o.customerId) !== String(who) && !c.get("isAdmin")) return page("Forbidden", "<h1>This isn't your invoice</h1>", 403);
+    const m = (cents: unknown) => "$" + (Number(cents) / 100 || 0).toFixed(2);
+    let items: { name?: string; qty?: number; priceCents?: number; variantLabel?: string }[] = [];
+    try { items = JSON.parse(String(o.items ?? "[]")); } catch { /* */ }
+    const sub = items.reduce((s, i) => s + (Number(i.priceCents) || 0) * (Number(i.qty) || 1), 0);
+    const shipC = Number(o.shippingCents) || 0, taxC = Number(o.taxCents) || 0, disc = sub - ((Number(o.totalCents) || 0) - shipC - taxC);
+    let addr = ""; try { const a = o.shippingAddress ? JSON.parse(String(o.shippingAddress)) : null; if (a) addr = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter((x: unknown) => x && String(x).trim()).map((x: unknown) => escHtml(String(x))).join("<br>"); } catch { /* */ }
+    const date = o.createdAt ? new Date(Number(o.createdAt)).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+    const rows = items.map((it) => "<tr><td>" + escHtml(String(it.name ?? "Item")) + (it.variantLabel ? " <span style=\"color:#888\">(" + escHtml(String(it.variantLabel)) + ")</span>" : "") + "</td><td style=\"text-align:center\">" + (Number(it.qty) || 1) + "</td><td style=\"text-align:right\">" + m(it.priceCents) + "</td><td style=\"text-align:right\">" + m((Number(it.priceCents) || 0) * (Number(it.qty) || 1)) + "</td></tr>").join("");
+    const line = (label: string, val: string) => "<tr class=tl><td colspan=2></td><td style=\"text-align:right;color:#666\">" + label + "</td><td style=\"text-align:right\">" + val + "</td></tr>";
+    const html = `<!doctype html><html lang=en><head><meta charset=utf-8><title>Invoice #${o.id} — saasuluk</title><meta name=viewport content="width=device-width,initial-scale=1">
+<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:32px auto;padding:0 24px;color:#1a1a1a}.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a1a1a;padding-bottom:16px}h1{margin:0;font-size:26px}.muted{color:#666;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}th{text-align:left;border-bottom:1px solid #ddd;padding:8px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#666}td{padding:8px 6px;border-bottom:1px solid #f0f0f0}.tl td{border:0;padding:4px 6px}.g td{font-weight:700;font-size:16px;border-top:2px solid #1a1a1a;padding-top:10px}.print{margin-top:28px;padding:10px 18px;border:1px solid #1a1a1a;border-radius:8px;background:#1a1a1a;color:#fff;cursor:pointer;font:inherit}@media print{.print{display:none}body{margin:0}}</style></head>
+<body><div class=hd><div><h1>Invoice</h1><div class=muted>saasuluk</div></div><div style="text-align:right"><div><b>#${o.id}</b></div><div class=muted>${escHtml(date)}</div><div class=muted>${escHtml(String(o.status ?? ""))}</div></div></div>
+${o.customerEmail || addr ? `<div style="margin-top:18px;font-size:13px">${o.customerEmail ? "<div class=muted>Billed to</div><div>" + escHtml(String(o.customerEmail)) + "</div>" : ""}${addr ? "<div class=muted style=\"margin-top:8px\">Ship to</div><div>" + addr + "</div>" : ""}</div>` : ""}
+<table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody><tbody>
+${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discountCode)) + ")" : ""), "−" + m(disc)) : ""}${shipC > 0 ? line("Shipping", m(shipC)) : ""}${taxC > 0 ? line("Tax", m(taxC)) : ""}<tr class=g><td colspan=2></td><td style="text-align:right">Total</td><td style="text-align:right">${m(o.totalCents)}</td></tr></tbody></table>
+<button class=print onclick="window.print()">Print / Save as PDF</button></body></html>`;
+    return c.html(html);
+  };
+
   // One-click unsubscribe — the token obscures the email (base64url) so it isn't a bare address in the URL. Public; a
   // failed/forged token just 400s. (For high-security lists, sign the token with a secret; this is the starter default.)
   const unsubscribeNewsletter = async (c: Context) => {
@@ -1109,6 +1141,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.post("/newsletter/subscribe", subscribeNewsletter);
   app.post("/contact/submit", submitContact);
   app.post("/product/:id/notify-stock", subscribeStock);
+  app.get("/order/:id/invoice", orderInvoice);
   app.get("/newsletter/unsubscribe", unsubscribeNewsletter);
   app.get("/avatar", generateAvatar);
   app.post("/tokens/create", createToken);

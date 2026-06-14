@@ -25,6 +25,7 @@ const OP_ACCESS: Record<string, AccessFacet> = {
   setOrderStatus: { requires: "admin" }, // admin fulfillment — admin enforced on the WIRE + projected, not just the in-handler gate
   subscribeNewsletter: { requires: "anyone" }, unsubscribeNewsletter: { requires: "anyone" }, submitContact: { requires: "anyone" }, subscribeStock: { requires: "anyone" }, generateAvatar: { requires: "anyone" },
   markReviewHelpful: { requires: "authenticated" },
+  orderInvoice: { requires: "authenticated" }, // the wire requires sign-in; the handler additionally scopes to the order's owner (or admin)
   createToken: { requires: "authenticated" }, revokeToken: { requires: "authenticated", scope: "owner" },
   connectBilling: { requires: "authenticated" }, reportUsage: { requires: "authenticated", scope: "owner" },
   openBillingPortal: { requires: "authenticated" },

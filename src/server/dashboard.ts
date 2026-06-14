@@ -307,7 +307,7 @@ const ORDERS = `
           (shipC>0?'<div class="od-tot-row"><span>Shipping</span><span>'+money(shipC)+'</span></div>':"")+
           (taxC>0?'<div class="od-tot-row"><span>Sales tax</span><span>'+money(taxC)+'</span></div>':"")+
           '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+downloadsBlock(o,items)+trackBlock(o)+addrBlock(o)+
-          '<div class="od-actions"><button class="btn sm" type="button" data-buy="'+esc(o.id)+'">Buy again</button></div>'+
+          '<div class="od-actions">'+((o.status==="paid"||o.status==="shipped")?'<a class="btn ghost sm" href="/order/'+esc(o.id)+'/invoice" target="_blank" rel="noopener">Invoice</a>':"")+'<button class="btn sm" type="button" data-buy="'+esc(o.id)+'">Buy again</button></div>'+
         '</div></div>';}).join("");
     box.querySelectorAll(".od-head").forEach(function(h){h.addEventListener("click",function(){h.closest(".od-card").classList.toggle("open");});});
     box.querySelectorAll("[data-buy]").forEach(function(b){b.addEventListener("click",function(e){e.stopPropagation();var o=os.find(function(x){return String(x.id)===b.dataset.buy;});if(o)buyAgain(parse(o.items));});});
