@@ -14,7 +14,7 @@
         "@suluk/better-auth": "^0.1.3",
         "@suluk/builder": "^0.1.11",
         "@suluk/chat": "^0.2.1",
-        "@suluk/cloudflare": "^0.1.1",
+        "@suluk/cloudflare": "^0.1.2",
         "@suluk/core": "^0.1.10",
         "@suluk/cost": "^0.1.2",
         "@suluk/deploy": "^0.1.3",
@@ -376,7 +376,7 @@
 
     "@suluk/chat": ["@suluk/chat@0.2.1", "", { "dependencies": { "@suluk/core": "^0.1.9", "@suluk/mcp": "^0.1.1", "@suluk/models": "^0.1.3" }, "peerDependencies": { "hono": "*" } }, "sha512-JL1F6vo4OwBhMLvgoGtDlBkL/gNaA+cIpopUbIz6PCSpG8F9iH89Dl8eXl0kI/rKIgQic7UfDLSeAD5JD3Cf8w=="],
 
-    "@suluk/cloudflare": ["@suluk/cloudflare@0.1.1", "", {}, "sha512-K/xiYSsp9uT8QoxB3tPWDQgdWb0WF9uxG19dInGeEP4f+y6zdmwzCnZQqHiomQUqRPnGzKPzd7RIJy4RpIT1tw=="],
+    "@suluk/cloudflare": ["@suluk/cloudflare@0.1.2", "", {}, "sha512-e9c72xTAgSH9SDmkXa48MMFr9NdWLj0LUMYcXvH5bKQ6FEItJKfk/GPnPFNOOfnLhv4nz+wRTjmBTPEswlz+0w=="],
 
     "@suluk/cockpit": ["@suluk/cockpit@0.1.15", "", { "dependencies": { "@suluk/builder": "^0.1.11", "@suluk/core": "^0.1.7", "@suluk/cost": "^0.1.2", "@suluk/deploy": "^0.1.3", "@suluk/hono": "^0.1.2", "@suluk/scalar": "^0.1.2", "@suluk/shadcn": "^0.1.2", "@suluk/swagger": "^0.1.2", "@suluk/visual": "^0.1.3" } }, "sha512-ij9+es6DdiRaF214hmAv4MqEOSy9YdO/iVm4jTOzGXx4QwYApuvVz2MMB+L7tvyq6A9Do4E9i1Be8mVuI3swBA=="],
 

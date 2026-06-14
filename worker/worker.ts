@@ -12,7 +12,8 @@ import { Hono, type Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { and, eq, asc, desc, getTableName, type SQL } from "drizzle-orm";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
-import { mount, enforceAccess, enforceRateLimit, MemoryRateLimitStore, type RateLimitStore, type RouteContract } from "@suluk/hono";
+import { mount, enforceAccess, enforceRateLimit, MemoryRateLimitStore, type RouteContract } from "@suluk/hono";
+import { kvRateLimitStore } from "@suluk/cloudflare";
 import { RATE_LIMITS } from "../src/server/ratelimits";
 import { buildApp } from "@suluk/builder";
 import { parseListQuery, tableComponents } from "@suluk/drizzle";
@@ -104,21 +105,8 @@ app.use("*", enforceAccess({
 // at config time, so we capture the binding into RL_KV on the first request. Fails OPEN to a per-isolate memory store
 // when KV is unbound or hiccups (a rate-limit outage must never take checkout down).
 let RL_KV: KvLike | undefined;
-const memRL = new MemoryRateLimitStore();
-const rlStore: RateLimitStore = {
-  async consume(key, opts) {
-    if (!RL_KV) return memRL.consume(key, opts);
-    try {
-      const raw = await RL_KV.get(key);
-      let e = raw ? (JSON.parse(raw) as { count: number; resetAt: number }) : null;
-      if (!e || opts.now > e.resetAt) e = { count: 1, resetAt: opts.now + opts.windowMs };
-      else e.count++;
-      const limited = e.count > opts.maxRequests;
-      await RL_KV.put(key, JSON.stringify(e), { expirationTtl: Math.max(60, Math.ceil(opts.windowMs / 1000) + 5) });
-      return { limited, remaining: Math.max(0, opts.maxRequests - e.count), retryAfterMs: limited ? opts.windowMs : 0 };
-    } catch { return memRL.consume(key, opts); } // KV blip → fail open
-  },
-};
+// KV-backed fixed-window store (from @suluk/cloudflare), lazy KV getter + fail-open to a per-isolate memory store.
+const rlStore = kvRateLimitStore(() => RL_KV, { fallback: new MemoryRateLimitStore() });
 app.use("*", async (c, next) => { if (!RL_KV && (c.env as Env).RATE_LIMIT_KV) RL_KV = (c.env as Env).RATE_LIMIT_KV; return next(); });
 app.use("*", enforceRateLimit({
   operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
