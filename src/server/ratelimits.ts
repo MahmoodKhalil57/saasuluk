@@ -12,8 +12,8 @@ export const RATE_LIMITS: Record<string, RateBudget> = {
   validateDiscount: { windowMs: 60000, maxRequests: 60, key: "ip" },
   submitReview: { windowMs: 60000, maxRequests: 20, key: "ip" },
   createReview: { windowMs: 60000, maxRequests: 20, key: "ip" },
-  createContactSubmission: { windowMs: 60000, maxRequests: 20, key: "ip" },
-  subscribeNewsletter: { windowMs: 60000, maxRequests: 20, key: "ip" },
+  createContactSubmission: { windowMs: 60000, maxRequests: 40, key: "ip" }, // a shared office NAT shouldn't false-429 a contact form
+  subscribeNewsletter: { windowMs: 60000, maxRequests: 40, key: "ip" },
   setOrderStatus: { windowMs: 60000, maxRequests: 60, key: "ip" }, // admin, but cheap to bound
   exportAccount: { windowMs: 60000, maxRequests: 10, key: "ip" },
   createToken: { windowMs: 60000, maxRequests: 20, key: "ip" },

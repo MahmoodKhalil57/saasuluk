@@ -199,10 +199,12 @@ function resendAudienceSync(c: Context, email: string, unsubscribed: boolean): v
   if (!key || !audience) return;
   const h = { authorization: `Bearer ${key}`, "content-type": "application/json" };
   const base = `https://api.resend.com/audiences/${audience}/contacts`;
-  const p = unsubscribed
+  const p = (unsubscribed
     ? fetch(`${base}/${encodeURIComponent(email)}`, { method: "PATCH", headers: h, body: JSON.stringify({ unsubscribed: true }) })
-    : fetch(base, { method: "POST", headers: h, body: JSON.stringify({ email, unsubscribed: false }) });
-  p.catch(() => {});
+    : fetch(base, { method: "POST", headers: h, body: JSON.stringify({ email, unsubscribed: false }) })
+  ).catch(() => {});
+  // keep the fire-and-forget alive past the Worker response (an un-awaited fetch can otherwise be cancelled).
+  try { (c.executionCtx as { waitUntil?: (x: Promise<unknown>) => void } | undefined)?.waitUntil?.(p); } catch { /* dev/Node: no executionCtx — the promise runs inline */ }
 }
 
 /**

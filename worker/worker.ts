@@ -123,6 +123,10 @@ app.use("*", enforceRateLimit({
   operationOf: (c) => matchRequest(ada, c.req.method, new URL(c.req.url).pathname)?.operation.name,
   rateLimitOf: (op) => RATE_LIMITS[op],
   store: rlStore,
+  // KEY off Cloudflare's cf-connecting-ip — the REAL client IP, set by CF and NOT client-forgeable. The library default
+  // keys off x-forwarded-for, which on Workers is a client-supplied passthrough: an attacker rotates it to bypass the
+  // budget, while honest clients (who send no XFF) collapse into one shared "unknown" bucket and DoS each other.
+  keyOf: (c, facet) => facet.key === "global" ? "global" : (c.req.header("cf-connecting-ip") || c.req.header("x-real-ip") || "unknown"),
   defaultFacet: { windowMs: 60000, maxRequests: 300, key: "ip" }, // generous blanket so every op has basic protection
 }));
 
@@ -413,6 +417,7 @@ app.post("/api/stripe/webhook", async (c) => {
     if (evt.data?.object?.status === "lost") {
       const did = oid || await orderIdFromPI(evt.data?.object?.payment_intent ?? "", c.env.STRIPE_SECRET_KEY ?? "");
       if (did) await refundOrder(drizzle(c.env.DB), did);
+      else return c.json({ error: "could not resolve the order for a lost dispute — retry" }, 500); // 5xx → Stripe re-delivers (a transient PI-lookup failure recovers; never silently leave a lost-dispute order paid)
     }
   }
   // charge.dispute.created is intentionally NOT acted on — a dispute can still be WON; Stripe emails the merchant to
