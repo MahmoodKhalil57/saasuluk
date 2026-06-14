@@ -413,8 +413,9 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (!q) return c.json({ products: [], posts: [] });
     const dz = dbFor(c);
     const term = `%${q}%`;
-    const products = await dz.select().from(product).where(and(eq(product.status, "published"), like(product.name, term))).limit(10).all();
-    const posts = await dz.select().from(post).where(and(eq(post.status, "published"), like(post.title, term))).limit(10).all();
+    // match the product NAME or DESCRIPTION (was name-only), and posts on title or excerpt — a real store search.
+    const products = await dz.select().from(product).where(and(eq(product.status, "published"), or(like(product.name, term), like(product.description, term)))).limit(10).all();
+    const posts = await dz.select().from(post).where(and(eq(post.status, "published"), or(like(post.title, term), like(post.excerpt, term)))).limit(10).all();
     return c.json({ products, posts });
   };
 

@@ -7,18 +7,32 @@ import Layout from "../layouts/Layout.astro";
     <h1>The <span class="gradient">store</span>.</h1>
     <p class="tag center">Every product is a <b>Product</b> entity in the contract — and a real slice of this starter. The store sells the code that renders it.</p>
   </section>
-  <form id="search" style="display:flex; gap:8px; max-width:440px; margin:18px auto 6px">
-    <input name="q" placeholder="Search the store…" aria-label="Search the store" style="flex:1" />
-    <button class="btn ghost" type="submit" data-i18n="search">Search</button>
-  </form>
+  <style>
+    .store-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; max-width:760px; margin:18px auto 8px; }
+    .store-controls input, .store-controls select { padding:9px 12px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--fg); font:inherit; font-size:14px; }
+    .store-controls #q { flex:1; min-width:200px; }
+    .store-count { max-width:760px; margin:0 auto 4px; color:var(--muted); font-size:12.5px; }
+  </style>
+  <div class="store-controls">
+    <input id="q" type="search" placeholder="Search products…" aria-label="Search products" />
+    <select id="cat" aria-label="Filter by category"><option value="">All categories</option></select>
+    <select id="sort" aria-label="Sort products">
+      <option value="featured">Featured first</option>
+      <option value="price-asc">Price: low to high</option>
+      <option value="price-desc">Price: high to low</option>
+      <option value="name">Name: A–Z</option>
+    </select>
+  </div>
+  <p class="store-count" id="count" aria-live="polite"></p>
   <div class="grid" id="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>
   <script is:inline>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
     const setCart = (c) => localStorage.setItem("cart", JSON.stringify(c));
     const esc = (s) => String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+    let ALL = [];
+    const state = { q: "", cat: "", sort: "featured" };
     function card(p) {
-      // a real product image fills the card media (object-fit cover); without one, fall back to the gradient + identicon.
       const media = p.imageUrl
         ? `<a href="/products/${p.slug}" style="display:block;aspect-ratio:16/10;overflow:hidden"><img src="${p.imageUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" /></a>`
         : `<a href="/products/${p.slug}" style="display:block;aspect-ratio:16/10;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 14%,var(--panel)),var(--panel));display:grid;place-items:center"><img src="/avatar?seed=${encodeURIComponent(p.slug || p.name)}" alt="" style="width:72px;height:72px;border-radius:14px" loading="lazy" /></a>`;
@@ -33,15 +47,41 @@ import Layout from "../layouts/Layout.astro";
           </div>
         </div></div>`;
     }
-    function render(products) {
-      const g = document.getElementById("grid");
-      g.innerHTML = products.length ? products.map(card).join("") : `<p style="color:var(--muted);grid-column:1/-1">No products yet — seed some at <a href="/superadmin">/superadmin</a> or POST /product.</p>`;
+    function bindCards(g) {
       g.querySelectorAll("[data-id]").forEach((b) => b.addEventListener("click", () => {
         const c = cart(), id = Number(b.dataset.id), ex = c.find((i) => i.productId === id && i.variantId == null);
         if (ex) ex.qty++; else c.push({ productId: id, qty: 1, priceCents: Number(b.dataset.price), name: b.dataset.name, image: b.dataset.img || undefined });
         setCart(c); window.dispatchEvent(new Event("cart-changed")); if (window.toast) window.toast((b.dataset.name || "Item") + " added to cart", { type: "success" }); b.textContent = "Added ✓"; setTimeout(() => (b.textContent = "Add to cart"), 900);
       }));
     }
+    function render(products) {
+      const g = document.getElementById("grid"), count = document.getElementById("count");
+      if (!products.length) {
+        g.innerHTML = ALL.length
+          ? `<div class="card" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted)">No products match your filters. <button class="btn ghost sm" id="clearF" type="button">Clear filters</button></div>`
+          : `<p style="color:var(--muted);grid-column:1/-1">No products yet — seed some at <a href="/superadmin">/superadmin</a> or POST /product.</p>`;
+        const cf = g.querySelector("#clearF"); if (cf) cf.addEventListener("click", clearFilters);
+        count.textContent = "";
+        return;
+      }
+      g.innerHTML = products.map(card).join("");
+      bindCards(g);
+      const total = ALL.filter((p) => p.status === "published").length;
+      count.textContent = products.length === total ? `${total} product${total === 1 ? "" : "s"}` : `${products.length} of ${total} products`;
+    }
+    function apply() {
+      let list = ALL.filter((p) => p.status === "published");
+      if (state.cat) list = list.filter((p) => String(p.categoryId) === state.cat);
+      if (state.q) { const q = state.q.toLowerCase(); list = list.filter((p) => (p.name || "").toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q)); }
+      const s = state.sort;
+      list = list.slice().sort((a, b) =>
+        s === "price-desc" ? b.priceCents - a.priceCents :
+        s === "name" ? (a.name || "").localeCompare(b.name || "") :
+        s === "featured" ? (Number(!!b.featured) - Number(!!a.featured)) || (a.priceCents - b.priceCents) :
+        a.priceCents - b.priceCents);
+      render(list);
+    }
+    function clearFilters() { state.q = ""; state.cat = ""; document.getElementById("q").value = ""; document.getElementById("cat").value = ""; apply(); }
     function skeleton(n) {
       document.getElementById("grid").innerHTML = Array.from({ length: n }, () => `<div class="card" style="padding:0;overflow:hidden">
         <div class="skel" style="aspect-ratio:16/10;border-radius:0"></div>
@@ -57,19 +97,26 @@ import Layout from "../layouts/Layout.astro";
       g.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:34px 18px"><p style="margin:0 0 13px;color:var(--muted)">${esc(msg)}</p><button class="btn ghost" id="gridRetry">Retry</button></div>`;
       g.querySelector("#gridRetry").addEventListener("click", retry);
     }
-    async function load(q) {
-      skeleton(6); // perceived-perf: shimmer placeholders until the fetch resolves
+    async function load() {
+      skeleton(6);
       try {
-        const res = await fetch(q ? `/search?q=${encodeURIComponent(q)}` : "/product");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
-        render((q ? data.products : data).filter((p) => p.status === "published").sort((a, b) => a.priceCents - b.priceCents));
-      } catch (e) { // never leave the shimmer up forever — show a retryable error
-        errorState("We couldn't load the store. Check your connection and try again.", () => load(q));
+        const [prods, cats] = await Promise.all([
+          fetch("/product").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
+          fetch("/category").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        ]);
+        ALL = Array.isArray(prods) ? prods : [];
+        const catSel = document.getElementById("cat");
+        const used = new Set(ALL.filter((p) => p.status === "published").map((p) => String(p.categoryId)));
+        (cats || []).filter((c) => used.has(String(c.id))).forEach((c) => { const o = document.createElement("option"); o.value = String(c.id); o.textContent = c.name; catSel.appendChild(o); });
+        apply();
+      } catch (e) {
+        errorState("We couldn't load the store. Check your connection and try again.", load);
         if (window.toast) window.toast("Couldn't load products.", { type: "error" });
       }
     }
-    document.getElementById("search").addEventListener("submit", (e) => { e.preventDefault(); load(e.target.q.value.trim()); });
+    document.getElementById("q").addEventListener("input", (e) => { state.q = e.target.value.trim(); apply(); });
+    document.getElementById("cat").addEventListener("change", (e) => { state.cat = e.target.value; apply(); });
+    document.getElementById("sort").addEventListener("change", (e) => { state.sort = e.target.value; apply(); });
     load();
   </script>
 </Layout>

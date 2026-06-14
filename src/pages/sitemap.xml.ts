@@ -17,6 +17,7 @@ const PAGES: { path: string; priority?: number; changefreq?: SitemapUrl["changef
   { path: "about", priority: 0.5 }, { path: "contact", priority: 0.5 }, { path: "faqs", priority: 0.6 },
   { path: "metrics", priority: 0.3 }, { path: "reference", priority: 0.4 },
   { path: "terms", priority: 0.2 }, { path: "privacy", priority: 0.2 }, { path: "license", priority: 0.2 },
+  { path: "returns", priority: 0.4 }, { path: "shipping", priority: 0.4 },
 ];
 
 export const GET: APIRoute = ({ site }) => {
