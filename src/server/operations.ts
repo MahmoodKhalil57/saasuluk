@@ -106,6 +106,22 @@ export async function markOrderPaid(dz: Dz, orderId: number): Promise<boolean> {
   return changed;
 }
 
+/** Cancel a still-PENDING order (Stripe session expired, or the abandoned-order reaper). Pending orders never
+ *  decremented inventory (only markOrderPaid does), so there is nothing to restock — the once-only guard keeps it idempotent. */
+export async function cancelPendingOrder(dz: Dz, orderId: number): Promise<boolean> {
+  const res = (await dz.update(order).set({ status: "cancelled" }).where(and(eq(order.id, orderId), eq(order.status, "pending"))).run()) as { meta?: { changes?: number }; changes?: number; rowsAffected?: number };
+  return Number(res?.meta?.changes ?? res?.changes ?? res?.rowsAffected ?? 0) > 0;
+}
+
+/** Reaper — cancel PENDING orders older than `olderThanMs` (default 24h) so abandoned Stripe checkouts don't linger in
+ *  the fulfillment queue forever. Returns the count cancelled. Run from the Worker's scheduled() cron. */
+export async function reapAbandonedOrders(dz: Dz, olderThanMs = 86_400_000): Promise<number> {
+  const cutoff = Date.now() - olderThanMs;
+  const stale = (await dz.select().from(order).where(and(eq(order.status, "pending"), lt(order.createdAt, cutoff))).all()) as { id: number }[];
+  for (const o of stale) await cancelPendingOrder(dz, o.id);
+  return stale.length;
+}
+
 /** The buyer's email for the receipt — the verified session email the auth middleware stashed (null for guests). */
 const buyerEmail = (c: Context): string | null => (c.get("sessionEmail") as string | undefined) ?? null;
 
@@ -136,6 +152,8 @@ const cleanEmail = (x: unknown): string | null => {
   const s = String(x ?? "").trim().toLowerCase();
   return s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
 };
+/** base64url(email) — obscures the address in the unsubscribe URL (not a bare email in the query string). */
+const unsubToken = (email: string) => btoa(email).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
 /**
  * Fire the order-confirmation receipt via @suluk/email's rich, locale-aware template (icon + line table + CTA) —
@@ -243,7 +261,7 @@ function jsonOp(
 export const OPERATION_COSTS: Record<string, CostModel> = {
   checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25), setOrderStatus: write(30),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
-  recommendRelated: read(16), subscribeNewsletter: write(20), generateAvatar: read(2),
+  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
   connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40), exportAccount: read(20),
@@ -271,6 +289,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "analytics/top-products": { requests: { analyticsTopProducts: jsonOp("get", "Best-selling products") } },
   "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string", maxLength: 16, pattern: "^[0-9]+$" } }, required: ["productId"] } } }) } },
   "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
+  "newsletter/unsubscribe": { requests: { unsubscribeNewsletter: jsonOp("get", "Unsubscribe from the newsletter via a tokenized one-click link", { params: { query: obj({ t: v.line(400) }) }, contentType: "text/html", response: { type: "string" } }) } },
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
@@ -596,8 +615,20 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const existing = await dz.select().from(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).get();
     if (existing) return c.json({ subscribed: true, already: true });
     await dz.insert(newsletterSubscriber).values({ email, subscribedAt: Date.now() }).run();
-    sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", "<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p>") }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
+    const unsubUrl = `${new URL(c.req.url).origin}/newsletter/unsubscribe?t=${unsubToken(email)}`;
+    sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", `<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p><p style="font-size:12px;color:#8a8a8a;margin-top:24px">Not interested? <a href="${unsubUrl}" style="color:#8a8a8a">Unsubscribe</a> any time.</p>`) }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
     return c.json({ subscribed: true, already: false }, 201);
+  };
+
+  // One-click unsubscribe — the token obscures the email (base64url) so it isn't a bare address in the URL. Public; a
+  // failed/forged token just 400s. (For high-security lists, sign the token with a secret; this is the starter default.)
+  const unsubscribeNewsletter = async (c: Context) => {
+    let email = "";
+    try { email = atob((c.req.query("t") ?? "").replace(/-/g, "+").replace(/_/g, "/")).trim().toLowerCase(); } catch { email = ""; }
+    if (!email || !email.includes("@")) return c.html("<!doctype html><meta charset=utf-8><title>Invalid link</title><body style=\"font-family:system-ui;max-width:520px;margin:80px auto;text-align:center\"><h1>Invalid unsubscribe link</h1><p><a href=\"/\">Back to saasuluk</a></p></body>", 400);
+    await dbFor(c).delete(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).run();
+    const safe = email.replace(/[<>&"]/g, "");
+    return c.html(`<!doctype html><meta charset=utf-8><title>Unsubscribed</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:0 20px;text-align:center"><h1>You're unsubscribed</h1><p style="color:#666"><b>${safe}</b> won't receive the saasuluk newsletter anymore. Changed your mind? Re-subscribe from the footer on <a href="/">saasuluk</a>.</p></body>`);
   };
 
   const createToken = async (c: Context) => {
@@ -816,6 +847,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.get("/analytics/top-products", analyticsTopProducts);
   app.get("/recommendations/:productId", recommendRelated);
   app.post("/newsletter/subscribe", subscribeNewsletter);
+  app.get("/newsletter/unsubscribe", unsubscribeNewsletter);
   app.get("/avatar", generateAvatar);
   app.post("/tokens/create", createToken);
   app.post("/tokens/:id/revoke", revokeToken);

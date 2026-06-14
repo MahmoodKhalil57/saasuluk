@@ -36,7 +36,7 @@ import { chatApp, chatWidget } from "@suluk/chat";
 import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "../src/server/dashboard";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders } from "../src/server/operations";
 import { policyFor, gate, isAdmin, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -358,9 +358,11 @@ app.post("/api/stripe/webhook", async (c) => {
   const raw = await c.req.text();
   if (!(await verifyStripe(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
   const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string } } } };
+  const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
   if (evt.type === "checkout.session.completed") {
-    const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
     if (oid) await markOrderPaid(drizzle(c.env.DB), oid); // pending-only + once (a re-delivery is a no-op)
+  } else if (evt.type === "checkout.session.expired") {
+    if (oid) await cancelPendingOrder(drizzle(c.env.DB), oid); // the buyer abandoned the hosted checkout → release the pending order
   }
   return c.json({ received: true, type: evt.type });
 });
@@ -379,6 +381,8 @@ app.notFound(async (c) => {
 export default {
   fetch: app.fetch,
   async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<unknown>) => void }) {
+    // reap abandoned pending orders (>24h) every run so the fulfillment queue stays clean — independent of Stripe config.
+    ctx.waitUntil(reapAbandonedOrders(drizzle(env.DB)).catch(() => 0));
     if (!env.STRIPE_SECRET_KEY) return;
     ctx.waitUntil(sweepBillingUsage(drizzle(env.DB), env.STRIPE_SECRET_KEY, env.STRIPE_METER_EVENT_NAME ?? METER_EVENT_DEFAULT).catch(() => ({ swept: 0, reported: 0 })));
   },
