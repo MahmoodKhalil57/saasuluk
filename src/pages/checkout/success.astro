@@ -3,10 +3,43 @@ export const prerender = true;
 import Layout from "../../layouts/Layout.astro";
 ---
 <Layout title="Order confirmed — saasuluk">
-  <section class="hero" style="padding:60px 0">
+  <!-- is:global so the runtime-injected summary (innerHTML) is styled (scoped styles only match build-time markup). -->
+  <style is:global>
+    .sx-wrap { max-width:560px; margin:0 auto; }
+    .sx-card { padding:18px 20px; margin-top:18px; text-align:start; }
+    .sx-line { display:flex; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+    .sx-line:last-of-type { border-bottom:0; }
+    .sx-img { width:48px; height:48px; border-radius:9px; object-fit:cover; border:1px solid var(--line); background:var(--bg-soft); flex:none; }
+    .sx-bd { flex:1; min-width:0; } .sx-nm { font-weight:600; font-size:14px; } .sx-sub { font-size:12.5px; color:var(--muted); }
+    .sx-amt { font-family:ui-monospace,monospace; font-size:13.5px; white-space:nowrap; }
+    .sx-tot { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
+    .sx-tot.g { font-weight:800; font-size:17px; border-top:1px solid var(--line); margin-top:6px; padding-top:10px; }
+    .sx-tot.g span:last-child { color:var(--accent); }
+    .sx-tot.disc span { color:var(--accent); }
+    .sx-ship { margin-top:14px; font-size:13px; line-height:1.55; }
+    .sx-ship b { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:2px; }
+  </style>
+  <section class="hero" style="padding:50px 0 8px">
     <div id="state"><p style="color:var(--muted)">Confirming your payment with Stripe…</p></div>
   </section>
+  <div class="sx-wrap"><div id="summary"></div></div>
   <script is:inline>
+    const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
+    const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+    function summaryHtml(o) {
+      let items = []; try { items = JSON.parse(o.items || "[]"); } catch (e) {}
+      const sub = items.reduce((s, i) => s + (i.priceCents || 0) * (i.qty || 1), 0);
+      const disc = sub - (o.totalCents || 0);
+      let ship = "";
+      try { const a = o.shippingAddress ? JSON.parse(o.shippingAddress) : null;
+        if (a) { const L = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter((x) => x && String(x).trim());
+          if (L.length) ship = '<div class="sx-ship"><b>Shipping to</b>' + L.map(esc).join("<br>") + '</div>'; } } catch (e) {}
+      return '<div class="card sx-card"><h2 style="margin-top:0;font-size:16px">Order summary</h2>' +
+        items.map((it) => '<div class="sx-line">' + (it.image ? '<img class="sx-img" src="' + esc(it.image) + '" alt="" loading="lazy"/>' : '<span class="sx-img"></span>') +
+          '<div class="sx-bd"><div class="sx-nm">' + esc(it.name || ("#" + it.productId)) + '</div><div class="sx-sub">' + (it.variantLabel ? esc(it.variantLabel) + " · " : "") + 'Qty ' + (it.qty || 1) + ' × ' + money(it.priceCents) + '</div></div><div class="sx-amt">' + money((it.priceCents || 0) * (it.qty || 1)) + '</div></div>').join("") +
+        '<div style="margin-top:8px">' + (disc > 0 ? '<div class="sx-tot disc"><span>Discount' + (o.discountCode ? " (" + esc(o.discountCode) + ")" : "") + '</span><span>−' + money(disc) + '</span></div>' : "") +
+        '<div class="sx-tot g"><span>Total paid</span><span>' + money(o.totalCents) + '</span></div></div>' + ship + '</div>';
+    }
     const params = new URLSearchParams(location.search);
     const orderId = params.get("order"), sessionId = params.get("session_id");
     (async () => {
@@ -16,9 +49,10 @@ import Layout from "../../layouts/Layout.astro";
         const r = await (await fetch("/checkout/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orderId: Number(orderId), sessionId }) })).json();
         if (r.paid) {
           localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed"));
-          state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${orderId} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and the order is marked paid — every step metered. See it in your <a href="/dashboard">account</a> and the live <a href="/metrics">metrics</a>.</p><div class="cta"><a class="btn" href="/dashboard">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
+          state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${esc(orderId)} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and a receipt is on its way to your inbox. Track it any time in <a href="/dashboard/s/orders">your orders</a>.</p><div class="cta"><a class="btn" href="/dashboard/s/orders">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
+          if (r.order) document.getElementById("summary").innerHTML = summaryHtml(r.order);
         } else {
-          state.innerHTML = `<h1>Payment not confirmed yet</h1><p class="tag center">We couldn't confirm order #${orderId}. If you just paid, give it a moment and refresh — or <a href="/checkout">return to checkout</a>.</p>`;
+          state.innerHTML = `<h1>Payment not confirmed yet</h1><p class="tag center">We couldn't confirm order #${esc(orderId)}. If you just paid, give it a moment and refresh — or <a href="/checkout">return to checkout</a>.</p>`;
         }
       } catch (e) { state.innerHTML = '<h1>Something went wrong</h1><p class="tag center"><a href="/checkout">Back to checkout</a></p>'; }
     })();

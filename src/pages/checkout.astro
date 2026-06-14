@@ -38,10 +38,15 @@ import Layout from "../layouts/Layout.astro";
     .co-contact input { width:100%; }
     .co-contact input[readonly] { opacity:.7; cursor:not-allowed; }
     .co-contact .co-contact-hint { font-size:12px; color:var(--accent); margin-top:4px; display:inline-block; }
+    .co-banner { padding:11px 14px; border-radius:10px; margin:14px 0 2px; font-size:13.5px; max-width:620px; }
+    .co-banner.info { background:color-mix(in srgb, var(--accent) 8%, var(--panel)); border:1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); }
+    .co-banner.signin { background:var(--bg-soft); border:1px solid var(--line); color:var(--muted); }
+    .co-banner a { font-weight:600; }
   </style>
 
   <h1>Checkout</h1>
   <p class="tag">Your cart becomes an <b>Order</b> — server re-prices every line from the catalog, applies your discount, and (when the total is $0) completes for free without Stripe.</p>
+  <div id="coBanner" class="co-banner" hidden></div>
 
   <div class="co-grid">
     <div class="co-card card">
@@ -108,15 +113,37 @@ import Layout from "../layouts/Layout.astro";
     }
     function persistAddr() { try { localStorage.setItem("ship_addr", JSON.stringify(readAddr())); } catch (e) {} }
 
-    // ── Receipt email — prefilled + locked for a signed-in user (the su_user hint), required for guests. ──
+    // ── Receipt email + the contextual checkout banner — COOKIE-authoritative. ──
+    // su_user is an optimistic hint only (can be stale → wrong locked email, or not-yet-set after a fresh sign-in →
+    // false guest), so the email lock + the guest nudge are reconciled against the REAL session via get-session. The
+    // Stripe-cancel banner (?cancelled=1) always wins the banner slot over the guest nudge.
     let signedInEmail = null;
     try { const su = JSON.parse(localStorage.getItem("su_user") || "null"); if (su && su.email) signedInEmail = String(su.email); } catch (e) {}
+    const cancelledCheckout = !!new URLSearchParams(location.search).get("cancelled");
     const emailValid = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
     function emailValue() { return (document.getElementById("email").value || "").trim(); }
+    let guestListener = false;
+    function applyAuthEmail(verified) {
+      signedInEmail = verified || null;
+      const el = document.getElementById("email"), lock = document.getElementById("emailLock"), banner = document.getElementById("coBanner");
+      if (signedInEmail) { el.value = signedInEmail; el.readOnly = true; lock.hidden = false; }
+      else {
+        el.readOnly = false; lock.hidden = true;
+        if (!guestListener) { guestListener = true; try { const last = localStorage.getItem("guest_email"); if (last && !el.value) el.value = last; } catch (e) {} el.addEventListener("input", () => { try { localStorage.setItem("guest_email", emailValue()); } catch (e) {} }); }
+      }
+      if (cancelledCheckout) return; // the cancel banner owns the slot
+      if (signedInEmail) banner.hidden = true;
+      else { banner.className = "co-banner signin"; banner.hidden = false; banner.innerHTML = '👋 Checking out as a guest. <a href="/login?next=/checkout">Sign in</a> to track your order and save your details.'; }
+    }
     function setupEmail() {
-      const el = document.getElementById("email");
-      if (signedInEmail) { el.value = signedInEmail; el.readOnly = true; document.getElementById("emailLock").hidden = false; }
-      else { try { const last = localStorage.getItem("guest_email"); if (last) el.value = last; } catch (e) {} el.addEventListener("input", () => { try { localStorage.setItem("guest_email", emailValue()); } catch (e) {} }); }
+      if (cancelledCheckout) {
+        const banner = document.getElementById("coBanner");
+        banner.className = "co-banner info"; banner.hidden = false;
+        banner.innerHTML = "↩︎ Payment cancelled — <b>no charge was made</b> and your cart is still here. Review it and try again whenever you're ready.";
+        history.replaceState(null, "", location.pathname); // drop the ?cancelled flag
+      }
+      applyAuthEmail(signedInEmail); // optimistic (su_user hint), then reconcile with the verified session
+      fetch("/api/auth/get-session", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((s) => applyAuthEmail(s && s.user && s.user.email ? String(s.user.email) : null)).catch(() => {});
     }
 
     async function postJson(url, body, action) {
@@ -227,7 +254,7 @@ import Layout from "../layouts/Layout.astro";
     // address: restore the last-used one + persist on edit (kept across orders — most buyers ship to the same place)
     Object.values(ADDR_IDS).forEach((id) => { const el = document.getElementById(id); if (el) el.addEventListener("input", persistAddr); });
     restoreAddr();
-    setupEmail();
+    setupEmail(); // sets the receipt-email lock + the cancel/guest banner (cookie-authoritative)
     render();
   </script>
 </Layout>

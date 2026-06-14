@@ -525,7 +525,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const form = new URLSearchParams();
     form.set("mode", "payment");
     form.set("success_url", `${origin}/checkout/success?order=${orderId}&session_id={CHECKOUT_SESSION_ID}`);
-    form.set("cancel_url", `${origin}/checkout`);
+    form.set("cancel_url", `${origin}/checkout?cancelled=1`);
     form.set("client_reference_id", String(orderId));
     form.set("metadata[orderId]", String(orderId));
     // CARD-SAVING: for a signed-in shopper, attach their Stripe customer + save the payment method for future

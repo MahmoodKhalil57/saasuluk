@@ -49,8 +49,8 @@ import Layout from "../layouts/Layout.astro";
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.tab)));
     $("forgotlink").addEventListener("click", (e) => { e.preventDefault(); setMode("forgot"); });
     $("backlink").addEventListener("click", (e) => { e.preventDefault(); setMode("signin"); });
-    // preserve where the user came from (?redirectTo=…), open-redirect-guarded (same-origin relative only).
-    const redirectTo = (function () { try { const p = new URLSearchParams(location.search).get("redirectTo"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/dashboard"; } catch (e) { return "/dashboard"; } })();
+    // preserve where the user came from (?redirectTo=… or ?next=…), open-redirect-guarded (same-origin relative only).
+    const redirectTo = (function () { try { const q = new URLSearchParams(location.search); const p = q.get("redirectTo") || q.get("next"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/dashboard"; } catch (e) { return "/dashboard"; } })();
     // field-error feedback (mirrors @suluk/nano-stores markInvalid + clearInvalidOnInput): the base CSS rings
     // [aria-invalid] red + .shake animates; editing a field clears it.
     const invalid = (el) => { if (!el) return; el.setAttribute("aria-invalid", "true"); el.classList.add("shake"); setTimeout(() => el.classList.remove("shake"), 450); };

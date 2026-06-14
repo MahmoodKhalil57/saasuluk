@@ -85,6 +85,7 @@ const productNodes = [
       )}
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px">
         <button class="btn" id="add">{hasVariants ? "Select options" : "Add to cart"}</button>
+        <button class="btn ghost" id="wish" type="button" aria-pressed="false" title="Save to wishlist" disabled><span id="wishheart">♡</span> <span id="wishlabel">Save</span></button>
         <a class="btn ghost" href="/checkout">Go to checkout →</a>
       </div>
       <p id="cartmsg" style="color:var(--accent); font-size:14px; margin-top:10px"></p>
@@ -216,6 +217,37 @@ const productNodes = [
     (async () => {
       const rel = await (await fetch(`/recommendations/${product.id}`)).json();
       document.getElementById("related").innerHTML = (rel.related || []).map((p) => `<a href="/products/${p.slug}" class="card" style="display:block"><b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`).join("") || `<p style="color:var(--muted)">—</p>`;
+    })();
+    // Wishlist heart — COOKIE-authoritative (a 200 from /wishlistItem means signed-in, 401 means guest): the
+    // localStorage su_user hint is only a paint optimization elsewhere and is unreliable for an auth decision (it can
+    // be stale → dead button, or not-yet-set after a fresh sign-in → false guest). The button stays disabled until the
+    // initial GET settles (so a click can't race it into duplicate rows), and a 401 on write takes the sign-in path.
+    (function () {
+      const btn = document.getElementById("wish"), heart = document.getElementById("wishheart"), label = document.getElementById("wishlabel");
+      if (!btn) return;
+      let itemId = null, guest = false, ready = false;
+      const paint = (saved) => { btn.setAttribute("aria-pressed", saved ? "true" : "false"); heart.textContent = saved ? "♥" : "♡"; label.textContent = saved ? "Saved" : "Save"; btn.style.color = saved ? "var(--accent)" : ""; btn.style.borderColor = saved ? "var(--accent)" : ""; };
+      const toLogin = () => { if (window.toast) window.toast("Sign in to save items to your wishlist.", { type: "info" }); setTimeout(() => (location.href = "/login?next=" + encodeURIComponent(location.pathname)), 750); };
+      fetch("/wishlistItem", { credentials: "same-origin" })
+        .then((r) => { if (r.status === 401) { guest = true; return null; } return r.ok ? r.json() : null; })
+        .then((items) => { if (items) { const hit = items.find((w) => Number(w.productId) === Number(product.id)); if (hit) { itemId = hit.id; paint(true); } } })
+        .catch(() => {})
+        .finally(() => { ready = true; btn.disabled = false; });
+      btn.addEventListener("click", async () => {
+        if (!ready) return;
+        if (guest) { toLogin(); return; }
+        btn.disabled = true;
+        try {
+          const r = itemId
+            ? await fetch("/wishlistItem/" + encodeURIComponent(itemId), { method: "DELETE", credentials: "same-origin" })
+            : await fetch("/wishlistItem", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ productId: product.id }) });
+          if (r.status === 401) { guest = true; toLogin(); return; } // session expired mid-visit → sign-in path, not a generic error
+          if (!r.ok) throw new Error("wishlist");
+          if (itemId) { itemId = null; paint(false); if (window.toast) window.toast("Removed from wishlist", { type: "success" }); }
+          else { const row = await r.json().catch(() => ({})); itemId = row && row.id; paint(true); if (window.toast) window.toast("Saved to wishlist ♥", { type: "success" }); }
+        } catch (e) { if (window.toast) window.toast("Couldn't update your wishlist.", { type: "error" }); }
+        finally { btn.disabled = false; }
+      });
     })();
     update();
     loadReviews();

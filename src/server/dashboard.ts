@@ -27,7 +27,7 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
     return [
       { label: "Orders", value: orders.length, href: "/dashboard/s/orders" },
       { label: "Total spent", value: "$" + (spent / 100).toFixed(2), hint: "all time" },
-      { label: "Wishlist", value: wl.length, href: "/dashboard/WishlistItem" },
+      { label: "Wishlist", value: wl.length, href: "/dashboard/s/wishlist" },
       { label: "API keys", value: toks.length, href: "/dashboard/s/developer" },
     ];
   } catch { return []; }
@@ -36,7 +36,7 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
 /** The sidebar grouping for the user dashboard (entities + sections). */
 export const dashboardGroups = [
   { title: "Account", sections: ["profile", "security", "sessions"] },
-  { title: "Commerce", entities: ["WishlistItem", "Review", "Cart"], sections: ["orders"] },
+  { title: "Commerce", entities: ["Review", "Cart"], sections: ["orders", "wishlist"] },
   { title: "Developer", entities: ["Project"], sections: ["developer"] },
   { title: "Billing", sections: ["billing"] },
   { title: "Danger zone", sections: ["danger"] },
@@ -44,7 +44,7 @@ export const dashboardGroups = [
 
 /** Entities the custom sections replace (so the panel doesn't also auto-list them). Order is hidden in favour of the
  *  bespoke `orders` section (the generic list rendered items/shippingAddress as raw JSON and had no openable detail). */
-export const dashboardHiddenEntities = ["ApiToken", "BillingAccount", "Order"];
+export const dashboardHiddenEntities = ["ApiToken", "BillingAccount", "Order", "WishlistItem"];
 
 const PROFILE = `
 <div class="pf-section">
@@ -204,7 +204,7 @@ export function dashboardHome(opts: { admin: boolean }): string {
 <div class="dh-quick">
   <a class="dh-qa" href="/products"><span>🛍️</span> Browse products</a>
   <a class="dh-qa" href="/dashboard/s/orders"><span>📦</span> Your orders</a>
-  <a class="dh-qa" href="/dashboard/WishlistItem"><span>❤️</span> Wishlist</a>
+  <a class="dh-qa" href="/dashboard/s/wishlist"><span>❤️</span> Wishlist</a>
   <a class="dh-qa" href="/dashboard/s/billing"><span>💳</span> Billing</a>
   <a class="dh-qa" href="/dashboard/s/developer"><span>🔑</span> API keys</a>
   ${adminTile}
@@ -302,11 +302,53 @@ const ORDERS = `
   }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your orders. <a href="/dashboard/s/orders">Retry</a></div>';});
 })();</script>`;
 
+// A shoppable WISHLIST — the @suluk/panel auto-list showed raw numeric productId/variantId with no name/image/price.
+// This hydrates each saved item against /product and renders product cards (thumbnail, name, price) with View + Remove.
+const WISHLIST = `
+<div class="pf-section">
+  <h2 style="margin-top:0">Wishlist</h2>
+  <p class="pf-sub">Products you've saved for later.</p>
+  <div id="wl-list" class="pf-muted">Loading…</div>
+</div>
+<style>
+  .wl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:6px}
+  .wl-card{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel);display:flex;flex-direction:column}
+  .wl-media{display:block;aspect-ratio:16/11;overflow:hidden;background:var(--bg-soft)}
+  .wl-media img{width:100%;height:100%;object-fit:cover;display:block}
+  .wl-bd{padding:11px 13px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .wl-nm{font-weight:600;font-size:14px;line-height:1.3}.wl-nm a{color:inherit;text-decoration:none}
+  .wl-pr{font-family:ui-monospace,monospace;font-weight:700}
+  .wl-act{display:flex;gap:7px;margin-top:auto;padding-top:4px}.wl-act .btn{flex:1;justify-content:center}
+</style>
+<script>(function(){
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function money(c){return window.fmtMoney?window.fmtMoney(c):"$"+(Number(c||0)/100).toFixed(2);}
+  var box=document.getElementById("wl-list");
+  var EMPTY='<div class="pf-empty">Your wishlist is empty — <a href="/products">find something to save &rarr;</a></div>';
+  Promise.all([
+    fetch("/wishlistItem",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json();}),
+    fetch("/product",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():[];})
+  ]).then(function(res){
+    var items=res[0]||[],byId={};(res[1]||[]).forEach(function(p){byId[p.id]=p;});box.className="";
+    var cards=items.map(function(w){var p=byId[w.productId];
+      if(!p)return '<div class="wl-card" data-w="'+esc(w.id)+'"><div class="wl-bd"><div class="wl-nm" style="color:var(--muted)">Product no longer available</div><div class="wl-pr" style="color:var(--muted)">—</div><div class="wl-act"><button class="btn ghost sm" type="button" data-rm="'+esc(w.id)+'">Remove</button></div></div></div>';
+      return '<div class="wl-card" data-w="'+esc(w.id)+'"><a class="wl-media" href="/products/'+esc(p.slug)+'">'+(p.imageUrl?'<img src="'+esc(p.imageUrl)+'" alt="" loading="lazy"/>':'')+'</a>'+
+        '<div class="wl-bd"><div class="wl-nm"><a href="/products/'+esc(p.slug)+'">'+esc(p.name)+'</a></div><div class="wl-pr">'+money(p.priceCents)+'</div>'+
+        '<div class="wl-act"><a class="btn sm" href="/products/'+esc(p.slug)+'">View</a><button class="btn ghost sm" type="button" data-rm="'+esc(w.id)+'">Remove</button></div></div></div>';}).filter(Boolean).join("");
+    box.innerHTML=cards?'<div class="wl-grid">'+cards+'</div>':EMPTY;
+    box.querySelectorAll("[data-rm]").forEach(function(b){b.addEventListener("click",function(){b.disabled=true;
+      fetch("/wishlistItem/"+encodeURIComponent(b.dataset.rm),{method:"DELETE",credentials:"same-origin"}).then(function(r){
+        if(r.ok){var card=b.closest(".wl-card");if(card)card.remove();if(window.toast)window.toast("Removed",{type:"success"});if(!box.querySelectorAll(".wl-card").length)box.innerHTML=EMPTY;}
+        else{b.disabled=false;if(window.toast)window.toast("Could not remove.",{type:"error"});}});});});
+  }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your wishlist. <a href="/dashboard/s/wishlist">Retry</a></div>';});
+})();</script>`;
+
 export const dashboardSections: PanelSection[] = [
   { id: "profile", label: "Profile", summary: "Your name, email and avatar", render: () => PROFILE },
   { id: "security", label: "Security", summary: "Change your password", render: () => SECURITY },
   { id: "sessions", label: "Sessions", summary: "Devices signed in", render: () => SESSIONS },
   { id: "orders", label: "Orders", summary: "Your purchase history", render: () => ORDERS },
+  { id: "wishlist", label: "Wishlist", summary: "Saved products", render: () => WISHLIST },
   { id: "billing", label: "Billing", summary: "Cards, invoices & plan", render: () => BILLING },
   { id: "developer", label: "API keys", summary: "Tokens for the API", render: () => DEVELOPER },
   { id: "danger", label: "Danger zone", summary: "Delete your account", render: () => DANGER },
