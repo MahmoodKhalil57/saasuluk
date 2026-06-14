@@ -34,7 +34,7 @@ import Layout from "../layouts/Layout.astro";
     const state = { q: "", cat: "", sort: "featured" };
     function card(p) {
       const media = p.imageUrl
-        ? `<a href="/products/${p.slug}" style="display:block;aspect-ratio:16/10;overflow:hidden"><img src="${p.imageUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" /></a>`
+        ? `<a href="/products/${p.slug}" style="display:block;aspect-ratio:16/10;overflow:hidden"><img src="${esc(p.imageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" /></a>`
         : `<a href="/products/${p.slug}" style="display:block;aspect-ratio:16/10;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 14%,var(--panel)),var(--panel));display:grid;place-items:center"><img src="/avatar?seed=${encodeURIComponent(p.slug || p.name)}" alt="" style="width:72px;height:72px;border-radius:14px" loading="lazy" /></a>`;
       return `<div class="card" style="display:flex;flex-direction:column;padding:0;overflow:hidden">
         ${media}

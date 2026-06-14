@@ -22,6 +22,7 @@ const OP_ACCESS: Record<string, AccessFacet> = {
   validateDiscount: { requires: "anyone" }, search: { requires: "anyone" }, recommendRelated: { requires: "anyone" },
   // store analytics expose revenue / customer counts / order data — admin-only (was public; enforced via the gate now).
   analyticsSummary: { requires: "admin" }, analyticsRevenue: { requires: "admin" }, analyticsTopProducts: { requires: "admin" },
+  setOrderStatus: { requires: "admin" }, // admin fulfillment — admin enforced on the WIRE + projected, not just the in-handler gate
   subscribeNewsletter: { requires: "anyone" }, generateAvatar: { requires: "anyone" },
   markReviewHelpful: { requires: "authenticated" },
   createToken: { requires: "authenticated" }, revokeToken: { requires: "authenticated", scope: "owner" },

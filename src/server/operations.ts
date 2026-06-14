@@ -467,9 +467,14 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const id = Number(c.req.param("id"));
     const b = (await c.req.json().catch(() => ({}))) as { status?: string; carrier?: string; trackingNumber?: string };
     const status = String(b.status ?? "");
-    if (!["paid", "shipped", "cancelled"].includes(status)) return c.json({ error: "status must be paid, shipped or cancelled." }, 422);
+    // ONLY fulfillment transitions — pending→paid stays exclusive to markOrderPaid (inventory + discount + receipt).
+    if (!["shipped", "cancelled"].includes(status)) return c.json({ error: "status must be shipped or cancelled." }, 422);
     const o = await dz.select().from(order).where(eq(order.id, id)).get();
     if (!o) return c.json({ error: "not found" }, 404);
+    if (o.status === status) return c.json(o); // idempotent no-op — never re-email the buyer on a replayed call (email-bomb guard)
+    // legal transitions: ship only a paid order; cancel only a still-open (pending/paid) order.
+    if (status === "shipped" && o.status !== "paid") return c.json({ error: "Only a paid order can be shipped." }, 409);
+    if (status === "cancelled" && !["pending", "paid"].includes(o.status)) return c.json({ error: `A ${o.status} order can't be cancelled.` }, 409);
     const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
     const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
     await dz.update(order).set({ status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }).where(eq(order.id, id)).run();
