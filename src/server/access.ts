@@ -7,31 +7,16 @@
  * SUPERADMIN_EMAILS (resolved in the auth middleware → c.set("isAdmin", …)). Never a spoofable header.
  */
 import type { Context } from "hono";
+import { gate as gateEngine, policyFor as policyForEngine, type AccessMode, type Rule, type Policy } from "@suluk/hono";
 
-export type AccessMode = "public" | "admin" | "submit" | "owned" | "ownedAppend" | "ownedReadonly" | "review";
-type Rule = "any" | "owner" | "admin" | "none";
-interface Policy { list: Rule; get: Rule; create: Rule; update: Rule; delete: Rule }
+// the access ENGINE (gate/policyFor/Rule/Policy/AccessMode + the 7-mode DEFAULT preset) now lives in @suluk/hono;
+// saasuluk adopts the default preset by reference. Re-exported so the CRUD twins' imports stay unchanged.
+export type { AccessMode, Rule, Policy } from "@suluk/hono";
 
-const POLICIES: Record<AccessMode, Policy> = {
-  // catalog + content: world-readable, admin-writable
-  public: { list: "any", get: "any", create: "admin", update: "admin", delete: "admin" },
-  // sensitive (discount codes): admin-only — even reads (listing all codes is a discount leak)
-  admin: { list: "admin", get: "admin", create: "admin", update: "admin", delete: "admin" },
-  // public submissions (contact, newsletter): anyone may create; only admins read/modify
-  submit: { list: "admin", get: "admin", create: "any", update: "admin", delete: "admin" },
-  // user-owned: each caller only ever sees/mutates their own rows (admin sees all)
-  owned: { list: "owner", get: "owner", create: "owner", update: "owner", delete: "owner" },
-  // owned + append-only to the user — you can place an order + read your own, but only the system/admin
-  // mutates it (a user can't PATCH their own order to status:"paid").
-  ownedAppend: { list: "owner", get: "owner", create: "owner", update: "admin", delete: "admin" },
-  // owned but READ-ONLY to the user — the system/admin even creates it (billing: the connect op inserts it).
-  ownedReadonly: { list: "owner", get: "owner", create: "admin", update: "admin", delete: "admin" },
-  // public-read, owner-write (product reviews): everyone reads; you only edit your own
-  review: { list: "any", get: "any", create: "owner", update: "owner", delete: "owner" },
-};
-
+/** The policy for an access mode — saasuluk uses @suluk/hono's DEFAULT_POLICIES preset (public catalog, owned
+ *  orders, admin discounts, …); pass a custom matrix to policyForEngine to diverge. */
 export function policyFor(access: AccessMode | undefined, ownerCol?: string): Policy {
-  return POLICIES[access ?? (ownerCol ? "owned" : "public")];
+  return policyForEngine(access, ownerCol);
 }
 
 export const isAdmin = (c: Context): boolean => c.get("isAdmin") === true;
@@ -59,25 +44,10 @@ export function redactRow<T extends Record<string, unknown> | undefined>(tableNa
   return out as T;
 }
 
-/**
- * Decide whether a caller may run an op (per the rule), whether to scope the query to their own rows, and — when
- * denied — the honest status. The `owner` rule REQUIRES a verified caller: an anonymous caller (no principal) is
- * denied 401, because the op declares `x-suluk-access: authenticated` and the WIRE must enforce what the contract
- * claims (C022 inv.3) — a null-scoped empty 200 would let the facet lie. A signed-in caller is scoped to their own
- * rows (admin sees all). `admin`/`none` rules hard-deny 403. Verified by @suluk/testgen's wire-conformance suite.
- */
+/** Thin Context wrapper over @suluk/hono's gate engine — resolves isAdmin from the request, then the pure engine
+ *  decides {ok, scopeOwner, status}. (Same signature the CRUD twins already call; the logic moved to the package.) */
 export function gate(c: Context, rule: Rule, principal: string | null): { ok: boolean; scopeOwner: boolean; status?: 401 | 403 } {
-  switch (rule) {
-    case "any": return { ok: true, scopeOwner: false };
-    case "owner":
-      if (isAdmin(c)) return { ok: true, scopeOwner: false };                  // admin sees all
-      if (!principal) return { ok: false, scopeOwner: false, status: 401 };    // owner op needs a verified caller (anon → 401)
-      return { ok: true, scopeOwner: true };                                   // signed-in: scoped to their own rows
-    case "admin":
-      if (!principal) return { ok: false, scopeOwner: false, status: 401 };    // authenticate first (RFC 7235: 401 no-auth)
-      return { ok: isAdmin(c), scopeOwner: false, status: 403 };                // signed-in but not admin → forbidden
-    default: return { ok: false, scopeOwner: false, status: 403 };
-  }
+  return gateEngine(rule, { isAdmin: isAdmin(c), principal });
 }
 
 /** Parse SUPERADMIN_EMAILS (a JSON array string, or a comma list) → lowercased emails. */

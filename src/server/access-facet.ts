@@ -8,12 +8,11 @@
  * `authenticated` (owner-scoped — your own rows), `admin` (catalog/discount writes, etc.).
  */
 import type { OpenAPIv4Document } from "@suluk/core";
+import { ruleToRequires } from "@suluk/hono";
 import { policyFor } from "./access";
 import { tableByEntity } from "./domain";
 
 export interface AccessFacet { requires: "anyone" | "authenticated" | "admin"; scope?: "owner" }
-
-const RULE_TO_REQUIRES = { any: "anyone", owner: "authenticated", admin: "admin", none: "admin" } as const;
 
 /** Custom (non-CRUD) operations. The declared access is ENFORCED on the wire by @suluk/hono's enforceAccess
  *  (api.ts / worker.ts) — so these facets are load-bearing, not decorative. */
@@ -42,7 +41,7 @@ export function annotateAccess(doc: OpenAPIv4Document): OpenAPIv4Document {
       let facet: AccessFacet | undefined;
       if (m && def) {
         const rule = policyFor(def.access, def.ownerCol)[m[1] as "list" | "get" | "create" | "update" | "delete"];
-        facet = { requires: RULE_TO_REQUIRES[rule], ...(rule === "owner" ? { scope: "owner" as const } : {}) };
+        facet = { requires: ruleToRequires(rule), ...(rule === "owner" ? { scope: "owner" as const } : {}) };
       } else if (OP_ACCESS[name]) { // custom ops, incl. those whose name matches the CRUD shape (createToken → Token has no table)
         facet = OP_ACCESS[name];
       }
