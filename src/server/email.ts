@@ -1,31 +1,24 @@
 /**
- * Email — Resend over fetch (no SDK, so it is Worker-safe and dependency-free). Graceful like Stripe: if
- * RESEND_API_KEY is unset it logs to the console (dev) and reports `sent:false` instead of throwing, so the
- * flows that send mail (newsletter welcome, contact ack, order confirmation, magic link) work end-to-end with
- * zero config and light up for real once a key is present. saastarter wires @payloadcms/email-resend + a custom
- * template; here it is one small function.
+ * Email — a thin shim over @suluk/email's swappable EmailProvider (consoleProvider in dev, Workers-safe
+ * resendProvider in prod). The package owns the SEND mechanism (the Resend-over-fetch binding, dev/prod selection);
+ * saasuluk keeps only its branded HTML shell + the {sent,dev} contract its call sites use. Graceful: with no
+ * RESEND_API_KEY, pickProvider returns the console provider (logs, never throws), so flows work with zero config.
  */
+import { pickProvider } from "@suluk/email";
+
 export interface SendEmail { to: string; subject: string; html: string }
 /** On Cloudflare the secret comes from the Worker env, not process.env — callers pass it through explicitly. */
 export interface EmailOpts { apiKey?: string; from?: string }
 
 export async function sendEmail({ to, subject, html }: SendEmail, opts: EmailOpts = {}): Promise<{ sent: boolean; dev?: boolean }> {
-  const key = opts.apiKey || process.env.RESEND_API_KEY;
+  const apiKey = opts.apiKey || process.env.RESEND_API_KEY;
   const from = opts.from || process.env.EMAIL_FROM || "saasuluk <onboarding@resend.dev>";
-  if (!key) { console.log(`[email:dev] → ${to} · ${subject}`); return { sent: false, dev: true }; }
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-      body: JSON.stringify({ from, to, subject, html }),
-    });
-    return { sent: res.ok };
-  } catch {
-    return { sent: false };
-  }
+  const dev = !apiKey;
+  const r = await pickProvider({ dev, apiKey, from }).send({ to, subject, html });
+  return { sent: r.ok, dev: dev || undefined };
 }
 
-/** A branded HTML shell (dark, matching the app) for transactional mail. */
+/** A branded HTML shell (dark, matching the app) for transactional mail. App-owned branding/copy — stays in the app. */
 export function brandedEmail(title: string, bodyHtml: string): string {
   return `<div style="background:#0b0e14;color:#cdd6f4;font-family:-apple-system,Segoe UI,sans-serif;padding:28px">
   <div style="max-width:520px;margin:0 auto;background:#11141c;border:1px solid #1e2433;border-radius:12px;padding:26px">
