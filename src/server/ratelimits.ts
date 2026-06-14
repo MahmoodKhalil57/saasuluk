@@ -15,6 +15,7 @@ export const RATE_LIMITS: Record<string, RateBudget> = {
   createContactSubmission: { windowMs: 60000, maxRequests: 40, key: "ip" }, // legacy generic-CRUD route (still mounted)
   submitContact: { windowMs: 60000, maxRequests: 40, key: "ip" }, // bespoke notifying op — the form now posts here; shared NAT shouldn't false-429
   subscribeNewsletter: { windowMs: 60000, maxRequests: 40, key: "ip" },
+  subscribeStock: { windowMs: 60000, maxRequests: 40, key: "ip" },
   setOrderStatus: { windowMs: 60000, maxRequests: 60, key: "ip" }, // admin, but cheap to bound
   exportAccount: { windowMs: 60000, maxRequests: 10, key: "ip" },
   createToken: { windowMs: 60000, maxRequests: 20, key: "ip" },

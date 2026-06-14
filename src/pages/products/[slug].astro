@@ -93,6 +93,14 @@ const productNodes = [
         <a class="btn ghost" href="/checkout">Go to checkout →</a>
       </div>
       <p id="cartmsg" style="color:var(--accent); font-size:14px; margin-top:10px"></p>
+      <form id="bis-form" hidden style="margin-top:12px; max-width:360px">
+        <p style="font-size:13px; color:var(--muted); margin:0 0 6px">Out of stock — get an email when it's back.</p>
+        <div style="display:flex; gap:8px">
+          <input id="bis-email" type="email" required placeholder="you@example.com" aria-label="Email for back-in-stock alert" style="flex:1; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--bg-soft); color:var(--fg); font:inherit; font-size:14px" />
+          <button class="btn" type="submit">Notify me</button>
+        </div>
+        <p id="bis-msg" style="font-size:13px; margin:8px 0 0"></p>
+      </form>
     </div>
   </div>
 
@@ -163,10 +171,39 @@ const productNodes = [
         else priceEl.textContent = rangeLabel();
         setGallery(v && v.images && v.images.length ? v.images : baseImages);
         const addBtn = document.getElementById("add"), stockEl = document.getElementById("variant-stock");
-        if (!v) { addBtn.disabled = true; addBtn.textContent = "Select options"; if (stockEl) stockEl.textContent = ""; }
-        else if (Number(v.inventory) <= 0) { addBtn.disabled = true; addBtn.textContent = "Sold out"; if (stockEl) stockEl.textContent = "Out of stock"; }
-        else { addBtn.disabled = false; addBtn.textContent = "Add to cart"; if (stockEl) stockEl.textContent = Number(v.inventory) < 10 ? `Only ${v.inventory} left` : "In stock"; }
+        if (!v) { addBtn.disabled = true; addBtn.textContent = "Select options"; if (stockEl) stockEl.textContent = ""; showBis(false); }
+        else if (Number(v.inventory) <= 0) { addBtn.disabled = true; addBtn.textContent = "Sold out"; if (stockEl) stockEl.textContent = "Out of stock"; showBis(true); }
+        else { addBtn.disabled = false; addBtn.textContent = "Add to cart"; if (stockEl) stockEl.textContent = Number(v.inventory) < 10 ? `Only ${v.inventory} left` : "In stock"; showBis(false); }
       }
+    }
+
+    // ── Back-in-stock waitlist (shown when sold out). The page is static (build-time inventory), so for a
+    //    non-variant product confirm the LIVE level; variant sold-out is driven from update() above. ──
+    function showBis(show) { const f = document.getElementById("bis-form"); if (f) f.hidden = !show; }
+    if (!variants.length) {
+      fetch(`/product/${product.id}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => { if (p && Number(p.inventory) <= 0) { const a = document.getElementById("add"); if (a) { a.disabled = true; a.textContent = "Sold out"; } showBis(true); } })
+        .catch(() => {});
+    }
+    {
+      const bisForm = document.getElementById("bis-form");
+      if (bisForm) bisForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = (document.getElementById("bis-email").value || "").trim();
+        const msg = document.getElementById("bis-msg"), btn = bisForm.querySelector("button[type=submit]");
+        btn.disabled = true;
+        try {
+          const r = await fetch(`/product/${product.id}/notify-stock`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
+          if (!r.ok) throw new Error(((await r.json().catch(() => ({}))).error) || "Could not subscribe.");
+          msg.style.color = "var(--accent)"; msg.textContent = "✓ We'll email you the moment it's back.";
+          if (window.toast) window.toast("You're on the list ✓", { type: "success" });
+          bisForm.querySelector("input").value = "";
+        } catch (err) {
+          msg.style.color = "var(--accent)"; msg.textContent = err.message || "Could not subscribe.";
+          if (window.toast) window.toast(err.message || "Could not subscribe.", { type: "error" });
+        } finally { btn.disabled = false; }
+      });
     }
 
     document.querySelectorAll(".vopt").forEach((b) => b.addEventListener("click", () => {

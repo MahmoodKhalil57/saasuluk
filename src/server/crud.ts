@@ -15,7 +15,7 @@ import type { Context } from "hono";
 import type { SQLiteColumn, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { parseListQuery } from "@suluk/drizzle";
 import { db } from "./db";
-import { principal } from "./operations";
+import { principal, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "./operations";
 import { policyFor, gate, isAdmin, redactRow, type AccessMode } from "./access";
 
 type AnyRow = Record<string, unknown>;
@@ -83,8 +83,11 @@ export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: Acc
       const body = (await c.req.json().catch(() => ({}))) as AnyRow;
       delete body.id; if (ownerCol) delete body[ownerCol]; // never let the client move a row's id or its owner
       const w = scoped(c, g.scopeOwner, true)!;
+      const hooked = CRUD_AFTER_UPDATE_TABLES.has(tname); // pre-read the before-row only when a hook needs it
+      const before = hooked ? (db.select().from(table).where(w).get() as AnyRow | undefined) : undefined;
       db.update(table).set(body as never).where(w).run();
       const r = db.select().from(table).where(w).get();
+      if (hooked && before && r) await crudAfterUpdate(tname, c, db as never, before, r as AnyRow); // e.g. back-in-stock on a restock
       return r ? c.json(r) : c.json({ error: "not found" }, 404);
     },
     delete: (c) => {

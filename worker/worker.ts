@@ -37,7 +37,7 @@ import { chatApp, chatWidget } from "@suluk/chat";
 import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "../src/server/dashboard";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder, sendOrderReceipt } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder, sendOrderReceipt, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "../src/server/operations";
 import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -189,7 +189,13 @@ function d1Crud(table: SQLiteTable, ownerCol?: string, access?: AccessMode) {
     update: async (c: Context<{ Bindings: Env }>) => {
       const g = gate(c, policy.update, principal(c)); if (!g.ok) return forbidden(c, g);
       const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>; delete b.id; if (ownerCol) delete b[ownerCol];
-      const w = scoped(c, g.scopeOwner, true)!; await dz(c).update(table).set(b as never).where(w); const r = await dz(c).select().from(table).where(w); return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404);
+      const w = scoped(c, g.scopeOwner, true)!;
+      const hooked = CRUD_AFTER_UPDATE_TABLES.has(tname); // pre-read the before-row only when a hook needs it (mirrors crud.ts)
+      const before = hooked ? (await dz(c).select().from(table).where(w))[0] as Record<string, unknown> | undefined : undefined;
+      await dz(c).update(table).set(b as never).where(w);
+      const r = await dz(c).select().from(table).where(w);
+      if (hooked && before && r[0]) await crudAfterUpdate(tname, c as never, dz(c) as never, before, r[0] as Record<string, unknown>); // e.g. back-in-stock on a restock
+      return r[0] ? c.json(r[0]) : c.json({ error: "not found" }, 404);
     },
     delete: async (c: Context<{ Bindings: Env }>) => {
       const g = gate(c, policy.delete, principal(c)); if (!g.ok) return forbidden(c, g);

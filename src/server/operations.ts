@@ -6,10 +6,10 @@
  * call is awaited, so it works whether the driver is synchronous (bun) or asynchronous (D1). saastarter
  * hand-writes each of these as a Next.js route + an Effect program; here they project from the same single source.
  */
-import { and, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, variant, post, order, cart, review, reviewHelpfulVote, contactSubmission, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
+import { product, variant, post, order, cart, review, reviewHelpfulVote, contactSubmission, stockNotification, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
 import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, type Discount } from "@suluk/stripe";
@@ -344,6 +344,37 @@ type Dz = {
 };
 export type DbFor = (c: Context) => Dz;
 
+/** Email everyone on a product's back-in-stock waitlist (un-notified rows), then stamp them notified so the same
+ *  subscription never fires twice. Best-effort sends; fired when a restock raises inventory back above 0. */
+export async function notifyBackInStock(c: Context, dz: Dz, productId: number): Promise<void> {
+  const waiting = (await dz.select().from(stockNotification).where(and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))).all()) as { email?: string }[];
+  if (!waiting.length) return;
+  const p = (await dz.select().from(product).where(eq(product.id, productId)).get()) as { name?: string; slug?: string } | undefined;
+  if (!p) return;
+  const url = new URL(c.req.url).origin + "/products/" + String(p.slug ?? "");
+  const apiKey = secret(c, "RESEND_API_KEY"), from = secret(c, "EMAIL_FROM");
+  for (const s of waiting) {
+    if (!s.email) continue;
+    sendEmailAsync({ to: String(s.email), subject: ("Back in stock: " + (p.name ?? "your item")).slice(0, 180), html: brandedEmail("Back in stock 🎉", "<p><b>" + escHtml(String(p.name ?? "Your item")) + "</b> is available again — but it may not last.</p><p><a href=\"" + url + "\">Get it now →</a></p>") }, { apiKey, from });
+  }
+  await dz.update(stockNotification).set({ notifiedAt: Date.now() }).where(and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))).run();
+}
+
+/** afterUpdate hooks for the generic CRUD, keyed by table name (mirrors PRIVATE_READ_COLS). When inventory crosses
+ *  from sold-out (<=0) back to positive — a merchant restock via the admin CRUD — fire the back-in-stock waitlist.
+ *  A variant restock notifies its parent product's waitlist. */
+const CRUD_AFTER_UPDATE: Record<string, (c: Context, dz: Dz, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>> = {
+  product: async (c, dz, before, after) => { if (Number(before.inventory) <= 0 && Number(after.inventory) > 0) await notifyBackInStock(c, dz, Number(after.id)); },
+  variant: async (c, dz, before, after) => { if (Number(before.inventory) <= 0 && Number(after.inventory) > 0) await notifyBackInStock(c, dz, Number(after.productId)); },
+};
+/** Tables with an afterUpdate hook — the CRUD factories pre-read the before-row only for these (mirrors redactRow). */
+export const CRUD_AFTER_UPDATE_TABLES = new Set(Object.keys(CRUD_AFTER_UPDATE));
+/** Run a table's afterUpdate hook (no-op when none). Called by BOTH CRUD twins (dev crud.ts + worker d1Crud). */
+export async function crudAfterUpdate(tableName: string, c: Context, dz: Dz, before: Record<string, unknown>, after: Record<string, unknown>): Promise<void> {
+  const h = CRUD_AFTER_UPDATE[tableName];
+  if (h) await h(c, dz, before, after);
+}
+
 const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
 const write = (m: number): CostModel => ({ components: [{ source: "compute", basis: "per-call", microUsd: 100 }, { source: "db-write", basis: "per-call", microUsd: m }], estimateMicroUsd: 100 + m });
 
@@ -380,7 +411,7 @@ function jsonOp(
 export const OPERATION_COSTS: Record<string, CostModel> = {
   checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25), setOrderStatus: write(30),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
-  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), submitContact: write(20), generateAvatar: read(2),
+  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), submitContact: write(20), subscribeStock: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
   connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40), exportAccount: read(20),
@@ -409,6 +440,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string", maxLength: 16, pattern: "^[0-9]+$" } }, required: ["productId"] } } }) } },
   "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
   "contact/submit": { requests: { submitContact: jsonOp("post", "Submit the contact form (persists + notifies the store owner)", { body: obj({ name: v.line(120), email: v.email(), subject: v.line(160), message: v.line(4000) }, ["name", "email", "subject", "message"]), status: 201 }) } },
+  "product/{id}/notify-stock": { requests: { subscribeStock: jsonOp("post", "Join a sold-out product's back-in-stock waitlist", { params: idParam, body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
   "newsletter/unsubscribe": { requests: { unsubscribeNewsletter: jsonOp("get", "Unsubscribe from the newsletter via a tokenized one-click link", { params: { query: obj({ t: v.line(400) }) }, contentType: "text/html", response: { type: "string" } }) } },
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
@@ -800,6 +832,22 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     return c.json(row[0] ?? { ok: true }, 201);
   };
 
+  // Back-in-stock subscribe: a shopper on a SOLD-OUT product asks to be emailed when it's restocked. Public + idempotent
+  // (one open waitlist row per email+product). The notification fires from the product CRUD afterUpdate hook on restock.
+  const subscribeStock = async (c: Context) => {
+    const dz = dbFor(c);
+    const productId = Number(c.req.param("id"));
+    const body = (await c.req.json().catch(() => ({}))) as { email?: string };
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (!productId) return c.json({ error: "unknown product" }, 422);
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ error: "a valid email is required" }, 422);
+    const p = await dz.select().from(product).where(eq(product.id, productId)).get();
+    if (!p) return c.json({ error: "unknown product" }, 404);
+    const existing = await dz.select().from(stockNotification).where(and(eq(stockNotification.productId, productId), eq(stockNotification.email, email), isNull(stockNotification.notifiedAt))).get();
+    if (!existing) await dz.insert(stockNotification).values({ productId, email, createdAt: Date.now() }).run();
+    return c.json({ subscribed: true }, 201);
+  };
+
   // One-click unsubscribe — the token obscures the email (base64url) so it isn't a bare address in the URL. Public; a
   // failed/forged token just 400s. (For high-security lists, sign the token with a secret; this is the starter default.)
   const unsubscribeNewsletter = async (c: Context) => {
@@ -1034,6 +1082,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.get("/recommendations/:productId", recommendRelated);
   app.post("/newsletter/subscribe", subscribeNewsletter);
   app.post("/contact/submit", submitContact);
+  app.post("/product/:id/notify-stock", subscribeStock);
   app.get("/newsletter/unsubscribe", unsubscribeNewsletter);
   app.get("/avatar", generateAvatar);
   app.post("/tokens/create", createToken);
