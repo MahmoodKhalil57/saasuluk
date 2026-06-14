@@ -122,6 +122,11 @@ const productNodes = [
   <h2>You might also like</h2>
   <div class="grid" id="related"></div>
 
+  <section id="recent-sec" hidden style="margin-top:34px">
+    <h2>Recently viewed</h2>
+    <div class="grid" id="recent"></div>
+  </section>
+
   <script is:inline define:vars={{ product, variants, baseImages: images }}>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const moneyOrFree = (c) => (Number(c) === 0 ? "Free" : money(c));
@@ -258,6 +263,22 @@ const productNodes = [
     (async () => {
       const rel = await (await fetch(`/recommendations/${product.id}`)).json();
       document.getElementById("related").innerHTML = (rel.related || []).map((p) => `<a href="/products/${p.slug}" class="card" style="display:block"><b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`).join("") || `<p style="color:var(--muted)">—</p>`;
+    })();
+
+    // Recently viewed — a localStorage MRU strip. Render the OTHERS first (what you saw BEFORE this page), then record
+    // this product at the front. Image src is scheme-guarded; all text goes through esc() (matches the related strip).
+    (function () {
+      const KEY = "recent_products", MAX = 8;
+      const safe = (u) => (/^(https?:\/\/|\/)/i.test(String(u || "")) ? u : "");
+      let list = [];
+      try { list = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) {}
+      const others = list.filter((p) => Number(p.id) !== Number(product.id)).slice(0, MAX);
+      if (others.length) {
+        document.getElementById("recent").innerHTML = others.map((p) => `<a href="/products/${esc(p.slug)}" class="card" style="display:block">${safe(p.image) ? `<img src="${esc(safe(p.image))}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;margin-bottom:8px"/>` : ""}<b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`).join("");
+        document.getElementById("recent-sec").hidden = false;
+      }
+      const entry = { id: product.id, name: product.name, slug: product.slug, image: (baseImages[0] && baseImages[0].url) || "", priceCents: product.priceCents };
+      try { localStorage.setItem(KEY, JSON.stringify([entry, ...list.filter((p) => Number(p.id) !== Number(product.id))].slice(0, MAX + 1))); } catch (e) {}
     })();
     // Wishlist heart — COOKIE-authoritative (a 200 from /wishlistItem means signed-in, 401 means guest): the
     // localStorage su_user hint is only a paint optimization elsewhere and is unreliable for an auth decision (it can
