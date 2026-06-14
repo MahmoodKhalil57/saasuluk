@@ -1,0 +1,30 @@
+# Cloudflare Workers Static-Assets Cache-Control rules. @suluk/cloudflare (≥0.1.1) lifts this file OUT of the upload
+# manifest and passes its raw text in the worker metadata's assets.config._headers, which Cloudflare parses into the
+# header rules the asset runtime applies — so GET /_headers itself returns 404, and these rules attach to assets.
+# The platform default is `public, max-age=0, must-revalidate`, leaving content-hashed bundles needlessly revalidating.
+
+# Content-hashed bundles (filename = content hash) → safe to cache forever, never revalidate.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Versioned vendor bundles (filename carries the version, e.g. standalone-1.59.0.js / standalone-suluk.js?v=hash).
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Images copied verbatim from public/img — long-lived but NOT immutable (a filename can be reused on update).
+/img/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# HTML must always revalidate so a deploy is reflected immediately (deployment-skew protection relies on this).
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# schemes.css is regenerated each build at a STABLE path (not fingerprinted) → must not be long-cached.
+/schemes.css
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The service worker must update on every deploy, else clients get stuck on stale SW bytes.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
