@@ -11,7 +11,11 @@ import { emailVerificationConfig, beforeDeleteCascade } from "@suluk/better-auth
 import { sqlite, db } from "./db";
 import { buildErasureSteps } from "./erasure-steps";
 import { sendEmailAsync, brandedEmail } from "./email";
+import { verifyEmail, resetPasswordEmail } from "@suluk/email";
 import { superadminEmails } from "./access";
+
+/** Brand context for the rich @suluk/email lifecycle templates (peach gradient, wordmark, CTA). */
+const EMAIL_CTX = () => ({ brand: { brandName: "saasuluk", baseUrl: process.env.BASE_URL ?? "https://saasuluk.saastemly.com", accentFrom: "#ef8e5f", accentTo: "#f5a97f" } });
 
 export const auth = betterAuth({
   database: sqlite,
@@ -19,14 +23,16 @@ export const auth = betterAuth({
     enabled: true,
     // password reset (the /login "Forgot password?" flow): email a branded link to /reset-password?token=…
     sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
-      sendEmailAsync({ to: user.email, subject: "Reset your saasuluk password", html: brandedEmail("Reset your password", `<p>Click to choose a new password — this link expires shortly. If you didn't request it, ignore this email.</p><p><a href="${url}" style="color:#f5a97f">Reset password</a></p>`) });
+      const m = resetPasswordEmail({ resetUrl: url }, EMAIL_CTX());
+      sendEmailAsync({ to: user.email, subject: m.subject, html: m.html });
     },
   },
   // frictionless activation (@suluk/better-auth): verify-on-sign-up + auto-sign-in after the user clicks the link.
   // Not REQUIRED (sign-up still works immediately), so this adds a verified email without blocking the flow.
   emailVerification: emailVerificationConfig({
     sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
-      sendEmailAsync({ to: user.email, subject: "Verify your saasuluk email", html: brandedEmail("Verify your email", `<p>Confirm your address to activate your account.</p><p><a href="${url}" style="color:#f5a97f">Verify email</a></p>`) });
+      const m = verifyEmail({ verifyUrl: url }, EMAIL_CTX());
+      sendEmailAsync({ to: user.email, subject: m.subject, html: m.html });
     },
   }),
   // GDPR account deletion (@suluk/better-auth beforeDeleteCascade): erase every row the user owns before the user
