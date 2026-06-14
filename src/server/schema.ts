@@ -93,6 +93,7 @@ export const order = sqliteTable("order", {
   shippingCents: integer("shipping_cents").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),
   shippingMethod: text("shipping_method"),
+  recoveryEmailedAt: integer("recovery_emailed_at"), // stamped when the abandoned-cart recovery email is sent (once)
   createdAt: integer("created_at"),
 });
 
@@ -245,7 +246,7 @@ CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name T
 CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, options TEXT, images TEXT, price_cents INTEGER NOT NULL DEFAULT 0, price_cents_enabled INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0, low_stock_alerted INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, description TEXT, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, min_subtotal_cents INTEGER, max_discount_cents INTEGER, max_uses INTEGER, max_uses_per_customer INTEGER, applies_to_product_ids TEXT, starts_at INTEGER, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER);
 CREATE TABLE IF NOT EXISTS cart (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', discount_code TEXT, status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, customer_email TEXT, items TEXT NOT NULL DEFAULT '[]', shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, carrier TEXT, tracking_number TEXT, shipping_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, shipping_method TEXT, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, customer_email TEXT, items TEXT NOT NULL DEFAULT '[]', shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, carrier TEXT, tracking_number TEXT, shipping_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, shipping_method TEXT, recovery_emailed_at INTEGER, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS review (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, customer_id TEXT, rating INTEGER NOT NULL DEFAULT 5, title TEXT NOT NULL, body TEXT, verified_purchase INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', helpful_count INTEGER NOT NULL DEFAULT 0, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS review_helpful_vote (id INTEGER PRIMARY KEY AUTOINCREMENT, review_id INTEGER NOT NULL, principal TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS review_helpful_vote_uniq ON review_helpful_vote (review_id, principal);

@@ -37,7 +37,7 @@ import { chatApp, chatWidget } from "@suluk/chat";
 import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "../src/server/dashboard";
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
-import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, refundOrder, sendOrderReceipt, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "../src/server/operations";
+import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, sweepAbandonedCartEmails, refundOrder, sendOrderReceipt, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "../src/server/operations";
 import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -61,7 +61,7 @@ const access = accessIndex(document); // op → x-suluk-access, for the wire enf
 type R2Object = { body: ReadableStream; httpMetadata?: { contentType?: string } };
 type MediaBucket = { put(key: string, value: ReadableStream | ArrayBuffer | string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>; get(key: string): Promise<R2Object | null> };
 type KvLike = { get: (k: string) => Promise<string | null>; put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<void> };
-type Env = { DB: D1Database; MEDIA?: MediaBucket; RATE_LIMIT_KV?: KvLike; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; RESEND_AUDIENCE_ID?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string; OPENROUTER_API_KEY?: string };
+type Env = { DB: D1Database; MEDIA?: MediaBucket; RATE_LIMIT_KV?: KvLike; BETTER_AUTH_SECRET?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; STRIPE_SECRET_KEY?: string; STRIPE_WEBHOOK_SECRET?: string; RESEND_API_KEY?: string; RESEND_AUDIENCE_ID?: string; EMAIL_FROM?: string; BASE_URL?: string; STRIPE_METER_EVENT_NAME?: string; STRIPE_METERED_PRICE_ID?: string; SUPERADMIN_EMAILS?: string; OPENROUTER_API_KEY?: string };
 const app = new Hono<{ Bindings: Env; Variables: { tokenUser?: string; sessionUser?: string; sessionEmail?: string; isAdmin?: boolean } }>();
 
 // Better Auth (email/password + bearer + admin) on D1 — guarded so it can never take down the rest.
@@ -452,6 +452,8 @@ export default {
   async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<unknown>) => void }) {
     // reap abandoned pending orders (>24h) every run so the fulfillment queue stays clean — independent of Stripe config.
     ctx.waitUntil(reapAbandonedOrders(drizzle(env.DB)).catch(() => 0));
+    // abandoned-cart recovery: one "complete your order" email for pending orders idle ≥1h (before the 24h reap).
+    ctx.waitUntil(sweepAbandonedCartEmails(drizzle(env.DB), { apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM, origin: env.BASE_URL ?? "https://saasuluk.saastemly.com" }).catch(() => 0));
     if (!env.STRIPE_SECRET_KEY) return;
     ctx.waitUntil(sweepBillingUsage(drizzle(env.DB), env.STRIPE_SECRET_KEY, env.STRIPE_METER_EVENT_NAME ?? METER_EVENT_DEFAULT).catch(() => ({ swept: 0, reported: 0 })));
   },

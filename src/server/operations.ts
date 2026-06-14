@@ -6,7 +6,7 @@
  * call is awaited, so it works whether the driver is synchronous (bun) or asynchronous (D1). saastarter
  * hand-writes each of these as a Next.js route + an Effect program; here they project from the same single source.
  */
-import { and, eq, gte, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, isNull, like, lt, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
 import { product, variant, post, order, cart, review, reviewHelpfulVote, contactSubmission, stockNotification, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
@@ -164,6 +164,30 @@ export async function reapAbandonedOrders(dz: Dz, olderThanMs = 86_400_000): Pro
   const stale = (await dz.select().from(order).where(and(eq(order.status, "pending"), lt(order.createdAt, cutoff))).all()) as { id: number }[];
   for (const o of stale) await cancelPendingOrder(dz, o.id);
   return stale.length;
+}
+
+/** Abandoned-cart recovery: email the buyer of a PENDING order that has sat idle a while (default ≥1h) but isn't yet
+ *  reaped (younger than the 24h reap), ONE "complete your order" nudge, then stamp recoveryEmailedAt so it never
+ *  re-sends. Atomic CLAIM (UPDATE ... RETURNING) then send, so an overlapping cron can't double-email (the lesson from
+ *  the back-in-stock review). Takes mail config + site origin explicitly — scheduled() has no request Context. */
+export async function sweepAbandonedCartEmails(dz: Dz, opts: { apiKey?: string; from?: string; origin: string; idleMs?: number; reapMs?: number }): Promise<number> {
+  const now = Date.now();
+  const idleCutoff = now - (opts.idleMs ?? 3_600_000);  // idle ≥ 1h before we nudge
+  const reapCutoff = now - (opts.reapMs ?? 86_400_000); // younger than the reap window (don't nudge about-to-be-cancelled orders)
+  const claimed = (await dz.update(order).set({ recoveryEmailedAt: now }).where(and(
+    eq(order.status, "pending"), isNull(order.recoveryEmailedAt), isNotNull(order.customerEmail),
+    lt(order.createdAt, idleCutoff), gt(order.createdAt, reapCutoff),
+  )).returning()) as { customerEmail?: string; items?: string | null }[];
+  let sent = 0;
+  for (const o of claimed) {
+    if (!o.customerEmail) continue;
+    let lines: { name?: string; qty?: number }[] = [];
+    try { lines = JSON.parse(o.items || "[]"); } catch { /* ignore a malformed snapshot */ }
+    const list = lines.slice(0, 6).map((l) => "<li>" + escHtml(String(l.name ?? "item")) + " × " + (Number(l.qty) || 1) + "</li>").join("");
+    sendEmailAsync({ to: String(o.customerEmail), subject: "You left something in your cart", html: brandedEmail("Still thinking it over?", "<p>Your cart is still waiting — finish checking out before these sell out.</p>" + (list ? "<ul>" + list + "</ul>" : "") + "<p><a href=\"" + opts.origin + "/checkout\">Complete your order →</a></p>") }, { apiKey: opts.apiKey, from: opts.from });
+    sent++;
+  }
+  return sent;
 }
 
 /** Reverse the inventory + discount-usage effects of a PAID sale (markOrderPaid did the decrement/increment) — used when
