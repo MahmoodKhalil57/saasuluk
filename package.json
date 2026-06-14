@@ -40,7 +40,7 @@
     "@suluk/drizzle": "^0.1.2",
     "@suluk/email": "^0.1.2",
     "@suluk/env": "^0.1.0",
-    "@suluk/harden": "^0.1.0",
+    "@suluk/harden": "^0.1.1",
     "@suluk/hono": "^0.1.2",
     "@suluk/i18n": "^0.1.0",
     "@suluk/mcp": "^0.1.1",

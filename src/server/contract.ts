@@ -14,7 +14,7 @@ import { entitySchemas, costs as domainCosts, allTables } from "./domain";
 import { OPERATION_PATHS, OPERATION_COSTS } from "./operations";
 import { annotateAccess } from "./access-facet";
 import { annotateSource } from "./source-facet";
-import { hardenDocument } from "./harden-schema";
+import { hardenDocument } from "@suluk/harden";
 import { auth } from "./auth";
 
 // the cost meter (api.ts) and the docs share ONE model: CRUD costs (domain) + the custom-operation costs.

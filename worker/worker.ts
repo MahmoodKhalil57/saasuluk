@@ -43,7 +43,7 @@ import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode 
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
 import { annotateSource } from "../src/server/source-facet";
-import { hardenDocument } from "../src/server/harden-schema";
+import { hardenDocument } from "@suluk/harden";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "../src/server/project";
 
 const costs = { ...domainCosts, ...OPERATION_COSTS };

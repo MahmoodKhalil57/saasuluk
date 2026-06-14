@@ -15,7 +15,7 @@ import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
 import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, restStripe, retrievePaymentIntent, type Discount } from "@suluk/stripe";
 import { shippingProvider, taxProvider } from "./commerce";
 import { METER_EVENT_DEFAULT } from "./env";
-import { hardenSchema } from "./harden-schema";
+import { hardenSchema } from "@suluk/harden";
 import { redactRow, superadminEmails } from "./access";
 import { v } from "./validations";
 

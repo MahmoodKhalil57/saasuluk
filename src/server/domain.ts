@@ -9,7 +9,7 @@ import { tableToV4 } from "@suluk/drizzle";
 import type { CostModel } from "@suluk/cost";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { AccessMode } from "./access";
-import { hardenSchema } from "./harden-schema";
+import { hardenSchema } from "@suluk/harden";
 import { applyValidations } from "./validations";
 import * as s from "./schema";
 
