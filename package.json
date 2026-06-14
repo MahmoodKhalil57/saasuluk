@@ -52,7 +52,7 @@
     "@suluk/sdk": "^0.1.0",
     "@suluk/seo": "^0.1.2",
     "@suluk/shadcn": "^0.1.2",
-    "@suluk/stripe": "^0.1.6",
+    "@suluk/stripe": "^0.1.7",
     "@suluk/swagger": "^0.1.2",
     "@suluk/testgen": "^0.1.0",
     "@suluk/theme": "^0.1.1",

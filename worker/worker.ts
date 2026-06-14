@@ -39,7 +39,7 @@ import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardH
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, sweepAbandonedCartEmails, refundOrder, sendOrderReceipt, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "../src/server/operations";
-import { verifyStripeSignature, retrievePaymentIntent } from "@suluk/stripe";
+import { verifyStripeSignature, retrievePaymentIntent, webhookRouter, STRIPE_EVENTS, type WebhookEvent } from "@suluk/stripe";
 import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -376,29 +376,29 @@ app.post("/api/stripe/webhook", async (c) => {
   if (!secret) return c.json({ error: "stripe webhook not configured" }, 503);
   const raw = await c.req.text();
   if (!(await verifyStripeSignature(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
-  const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean; status?: string; payment_intent?: string } } };
-  const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
-  if (evt.type === "checkout.session.completed") {
+  const evt = JSON.parse(raw) as WebhookEvent;
+  const obj = (evt.data as { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean; status?: string; payment_intent?: string } } | undefined)?.object;
+  const oid = Number(obj?.client_reference_id ?? obj?.metadata?.orderId);
+  const dz = drizzle(c.env.DB);
+  let disputeUnresolved = false;
+  // structured dispatch via @suluk/stripe's webhookRouter (typo-safe STRIPE_EVENTS keys) — replaces a hand-rolled switch.
+  await webhookRouter()
     // mark paid AND send the receipt — gated on the once-only transition so a buyer who closed the tab (never hit the
     // success page → confirmCheckout) still gets their receipt, and a tab-returner + this webhook can't double-send.
-    const dz = drizzle(c.env.DB);
-    if (oid && await markOrderPaid(c as unknown as Parameters<typeof markOrderPaid>[0], dz, oid)) await sendOrderReceipt(c as unknown as Parameters<typeof sendOrderReceipt>[0], dz, oid);
-  } else if (evt.type === "checkout.session.expired") {
-    if (oid) await cancelPendingOrder(drizzle(c.env.DB), oid); // the buyer abandoned the hosted checkout → release the pending order
-  } else if (evt.type === "charge.refunded") {
+    .on(STRIPE_EVENTS.checkoutCompleted, async () => { if (oid && await markOrderPaid(c as unknown as Parameters<typeof markOrderPaid>[0], dz, oid)) await sendOrderReceipt(c as unknown as Parameters<typeof sendOrderReceipt>[0], dz, oid); })
+    .on(STRIPE_EVENTS.checkoutExpired, async () => { if (oid) await cancelPendingOrder(dz, oid); }) // buyer abandoned the hosted checkout → release the pending order
     // charge.refunded also fires on PARTIAL refunds (refunded=false); only a FULL refund cancels + restocks the order.
-    if (oid && evt.data?.object?.refunded === true) await refundOrder(drizzle(c.env.DB), oid);
-  } else if (evt.type === "charge.dispute.closed") {
-    // best practice: a WON dispute keeps the order paid; a LOST dispute means the funds are reversed → reverse the order
-    // (cancel + restock, same as a refund). The dispute object carries no order metadata, so resolve via its PaymentIntent.
-    if (evt.data?.object?.status === "lost") {
-      const did = oid || await orderIdFromPI(evt.data?.object?.payment_intent ?? "", c.env.STRIPE_SECRET_KEY ?? "");
-      if (did) await refundOrder(drizzle(c.env.DB), did);
-      else return c.json({ error: "could not resolve the order for a lost dispute — retry" }, 500); // 5xx → Stripe re-delivers (a transient PI-lookup failure recovers; never silently leave a lost-dispute order paid)
-    }
-  }
-  // charge.dispute.created is intentionally NOT acted on — a dispute can still be WON; Stripe emails the merchant to
-  // submit evidence, and pre-emptively cancelling/restocking would be wrong. The order reverses only on a LOST close.
+    .on(STRIPE_EVENTS.chargeRefunded, async () => { if (oid && obj?.refunded === true) await refundOrder(dz, oid); })
+    // best practice: a WON dispute keeps the order paid; a LOST dispute reverses the funds → reverse the order (cancel +
+    // restock, like a refund). The dispute object carries no order metadata, so resolve via its PaymentIntent.
+    .on(STRIPE_EVENTS.disputeClosed, async () => {
+      if (obj?.status !== "lost") return;
+      const did = oid || await orderIdFromPI(obj?.payment_intent ?? "", c.env.STRIPE_SECRET_KEY ?? "");
+      if (did) await refundOrder(dz, did); else disputeUnresolved = true; // can't resolve → 5xx below so Stripe re-delivers
+    })
+    .handle(evt);
+  // charge.dispute.created is intentionally NOT handled — a dispute can still be WON; pre-emptively reversing would be wrong.
+  if (disputeUnresolved) return c.json({ error: "could not resolve the order for a lost dispute — retry" }, 500);
   return c.json({ received: true, type: evt.type });
 });
 
