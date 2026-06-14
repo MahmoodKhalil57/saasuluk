@@ -38,6 +38,7 @@ import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardH
 import { getAuth } from "./auth-d1";
 import { entitySchemas, costs as domainCosts, tableByEntity, allTables } from "../src/server/domain";
 import { OPERATION_PATHS, OPERATION_COSTS, mountOperations, verifyApiToken, principal, sweepBillingUsage, markOrderPaid, cancelPendingOrder, reapAbandonedOrders, sweepAbandonedCartEmails, refundOrder, sendOrderReceipt, crudAfterUpdate, CRUD_AFTER_UPDATE_TABLES } from "../src/server/operations";
+import { verifyStripeSignature, retrievePaymentIntent } from "@suluk/stripe";
 import { policyFor, gate, isAdmin, redactRow, superadminEmails, type AccessMode } from "../src/server/access";
 import { configHealth, renderConfigHealth, loadConfig, METER_EVENT_DEFAULT } from "../src/server/env";
 import { annotateAccess, accessIndex } from "../src/server/access-facet";
@@ -376,40 +377,17 @@ app.get("/og.svg", (c) => c.body(ogImageSvg({ title: c.req.query("title") || "sa
 // Stripe webhook — verifies the signature with Web Crypto (no SDK) and marks the order paid on completion.
 // Secondary to the success-page confirm (which retrieves the session directly); add an endpoint in Stripe
 // (https://saasuluk.saastemly.com/api/stripe/webhook) and put its signing secret in STRIPE_WEBHOOK_SECRET.
-/** constant-time hex compare — no early-out, so it doesn't leak the MAC byte-by-byte via timing. */
-function timingSafeHexEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-async function verifyStripe(raw: string, sig: string, secret: string, toleranceSec = 300): Promise<boolean> {
-  const parts: Record<string, string> = {};
-  for (const p of sig.split(",")) { const i = p.indexOf("="); if (i > 0 && !(p.slice(0, i) in parts)) parts[p.slice(0, i)] = p.slice(i + 1); } // split on the FIRST '=' only
-  const ts = Number(parts.t);
-  if (!parts.t || !parts.v1 || !Number.isFinite(ts)) return false;
-  if (Math.abs(Date.now() / 1000 - ts) > toleranceSec) return false; // reject stale/replayed events (Stripe's 5-min window)
-  const keyData = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", keyData, new TextEncoder().encode(`${ts}.${raw}`));
-  const expected = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return timingSafeHexEqual(expected, parts.v1);
-}
 /** Resolve an order id from a Stripe PaymentIntent (its metadata.orderId, stamped at checkout) — for dispute events
  *  whose object carries the PI but not the order metadata directly. One read-only Stripe call; 0 if unresolvable. */
 async function orderIdFromPI(piId: string, key: string): Promise<number> {
-  if (!piId || !key) return 0;
-  try {
-    const r = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(piId)}`, { headers: { authorization: `Bearer ${key}` } });
-    if (!r.ok) return 0;
-    const pi = (await r.json()) as { metadata?: { orderId?: string } };
-    return Number(pi.metadata?.orderId) || 0;
-  } catch { return 0; }
+  const pi = await retrievePaymentIntent<{ metadata?: { orderId?: string } }>(key, piId);
+  return Number(pi?.metadata?.orderId) || 0;
 }
 app.post("/api/stripe/webhook", async (c) => {
   const secret = c.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) return c.json({ error: "stripe webhook not configured" }, 503);
   const raw = await c.req.text();
-  if (!(await verifyStripe(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
+  if (!(await verifyStripeSignature(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
   const evt = JSON.parse(raw) as { type?: string; data?: { object?: { client_reference_id?: string; metadata?: { orderId?: string }; refunded?: boolean; status?: string; payment_intent?: string } } };
   const oid = Number(evt.data?.object?.client_reference_id ?? evt.data?.object?.metadata?.orderId);
   if (evt.type === "checkout.session.completed") {

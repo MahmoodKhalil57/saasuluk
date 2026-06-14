@@ -27,7 +27,7 @@ import { mcpApp, appExec } from "@suluk/mcp";
 import { chatApp } from "@suluk/chat";
 import { dashboardSections, dashboardGroups, dashboardHiddenEntities, dashboardHome, userStats, adminStats, adminGroups, adminSections } from "./dashboard";
 import { costMeter, MemoryCostSink, summarize } from "@suluk/cost";
-import { stripeProvider, type StripeLike } from "@suluk/stripe";
+import { verifyStripeSignature } from "@suluk/stripe";
 import { auth, ensureAuthTables } from "./auth";
 import { buildContract, costs } from "./contract";
 import { tableByEntity } from "./domain";
@@ -143,12 +143,14 @@ export async function createApp() {
     return (c.req.header("accept") ?? "").includes("text/html") ? c.html(renderConfigHealth(h)) : c.json(h);
   });
   app.post("/api/stripe/webhook", async (c) => {                                                 // Stripe billing
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) return c.json({ error: "stripe not configured (set STRIPE_SECRET_KEY)" }, 503);
-    const Stripe = (await import("stripe")).default;
-    const provider = stripeProvider(new Stripe(key) as unknown as StripeLike, { webhookSecret: process.env.STRIPE_WEBHOOK_SECRET });
-    try { const evt = provider.verifyWebhook(await c.req.text(), c.req.header("stripe-signature") ?? ""); return c.json({ received: true, type: evt.type }); }
-    catch (e) { return c.json({ error: (e as Error).message }, 400); }
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!secret) return c.json({ error: "stripe webhook not configured (set STRIPE_WEBHOOK_SECRET)" }, 503);
+    const raw = await c.req.text();
+    // SAME verifier as the Worker (verifyStripeSignature) — dev + prod no longer diverge on webhook auth. Dev acks;
+    // the Worker's scheduled/runtime handler runs the real event processing (markOrderPaid / refund / dispute).
+    if (!(await verifyStripeSignature(raw, c.req.header("stripe-signature") ?? "", secret))) return c.json({ error: "bad signature" }, 400);
+    const evt = JSON.parse(raw) as { type?: string };
+    return c.json({ received: true, type: evt.type });
   });
   app.get("/api/health", (c) => c.json({ ok: true, name: "saasuluk", build: BUILD_ID }, 200, { [DEPLOYMENT_HEADER]: BUILD_ID }));
   app.get("/og.svg", (c) => c.body(ogImageSvg({ title: c.req.query("title") || "saasuluk", subtitle: c.req.query("subtitle") || undefined, brand: "saasuluk", eyebrow: "saasuluk" }), 200, { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=86400" }));

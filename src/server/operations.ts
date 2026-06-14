@@ -12,9 +12,8 @@ import type { CostModel } from "@suluk/cost";
 import { product, variant, post, order, cart, review, reviewHelpfulVote, contactSubmission, stockNotification, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
-import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, type Discount } from "@suluk/stripe";
+import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, restStripe, retrievePaymentIntent, type Discount } from "@suluk/stripe";
 import { shippingProvider, taxProvider } from "./commerce";
-import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
 import { redactRow, superadminEmails } from "./access";
@@ -262,11 +261,9 @@ async function stripeRefund(key: string, sessionId: string, idemKey: string): Pr
     const pi = sess.payment_intent;
     // ALREADY fully refunded (out-of-band in the dashboard, or a retry after a lost HTTP response)? Treat as success so
     // the cancel completes instead of looping on 502. Check the PI's latest charge's refunded state.
-    const piRes = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(pi)}?expand[]=latest_charge`, { headers: { authorization: `Bearer ${key}` } });
-    if (piRes.ok) {
-      const ch = ((await piRes.json()) as { latest_charge?: { amount?: number; amount_refunded?: number; refunded?: boolean } }).latest_charge;
-      if (ch && (ch.refunded === true || (typeof ch.amount === "number" && typeof ch.amount_refunded === "number" && ch.amount_refunded >= ch.amount))) return true;
-    }
+    const piObj = await retrievePaymentIntent<{ latest_charge?: { amount?: number; amount_refunded?: number; refunded?: boolean } }>(key, pi, { expand: ["latest_charge"] });
+    const ch = piObj?.latest_charge;
+    if (ch && (ch.refunded === true || (typeof ch.amount === "number" && typeof ch.amount_refunded === "number" && ch.amount_refunded >= ch.amount))) return true;
     // Idempotency-Key so a retried request (after a lost response) returns the SAME refund, never a duplicate.
     const r = await fetch("https://api.stripe.com/v1/refunds", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": idemKey }, body: `payment_intent=${encodeURIComponent(pi)}` });
     if (r.ok) return true;
