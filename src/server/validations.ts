@@ -34,6 +34,7 @@ export const VALIDATIONS: Record<string, Record<string, unknown>> = {
   Order: { customerId: uid(), items: jsonBlob(100_000), totalCents: cents(100_000_000_000), discountCode: code(40), stripePaymentIntentId: line(255), createdAt: ts() },
   Review: { productId: int(1, ID_MAX), customerId: uid(), rating: int(1, 5), title: line(160), body: rich(5000), helpfulCount: int(0, 1_000_000_000), createdAt: ts() },
   WishlistItem: { customerId: uid(), productId: int(1, ID_MAX), variantId: int(1, ID_MAX), addedAt: ts() },
+  Address: { customerId: uid(), name: line(120), line1: line(200), line2: line(200), city: line(120), state: line(120), postalCode: line(20), country: line(2, "^[A-Za-z]{2}$"), isDefault: { type: "boolean" } },
   Post: { title: line(200), slug: slug(120), excerpt: rich(500), body: rich(50_000), publishedAt: ts(), authorId: uid(), coverImageUrl: url() },
   Faq: { question: line(300), answer: rich(2000), sortOrder: int(0, 100_000) },
   NewsletterSubscriber: { email: email(), subscribedAt: ts() },

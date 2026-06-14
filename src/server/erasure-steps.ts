@@ -21,6 +21,7 @@ const OWNED: [name: string, table: Record<string, unknown>, ownerCol: string][] 
   ["carts", s.cart as unknown as Record<string, unknown>, "customerId"],
   ["reviews", s.review as unknown as Record<string, unknown>, "customerId"],
   ["wishlist", s.wishlistItem as unknown as Record<string, unknown>, "customerId"],
+  ["addresses", s.address as unknown as Record<string, unknown>, "customerId"], // saved address book is owned PII
   ["projects", s.project as unknown as Record<string, unknown>, "ownerId"],
   ["apiTokens", s.apiToken as unknown as Record<string, unknown>, "userId"],
   ["billingAccount", s.billingAccount as unknown as Record<string, unknown>, "principal"],

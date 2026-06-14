@@ -45,6 +45,7 @@ export const ENTITIES: EntityDef[] = [
   { name: "Order", table: s.order, ownerCol: "customerId", access: "ownedAppend", r: 12, w: 60 }, // can't self-mark paid
   { name: "Review", table: s.review, ownerCol: "customerId", access: "review", r: 8, w: 40 }, // public-read, owner-write
   { name: "WishlistItem", table: s.wishlistItem, ownerCol: "customerId", access: "owned", r: 8, w: 25 },
+  { name: "Address", table: s.address, ownerCol: "customerId", access: "owned", r: 8, w: 25 }, // the checkout saved-address book — owner-scoped
   // content / marketing — posts/faqs are admin-published; contact/newsletter are public submissions
   { name: "Post", table: s.post, ownerCol: "authorId", access: "public", r: 8, w: 45 },
   { name: "Faq", table: s.faq, access: "public", r: 6, w: 25 },

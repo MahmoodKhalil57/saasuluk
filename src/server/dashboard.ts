@@ -36,7 +36,7 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
 /** The sidebar grouping for the user dashboard (entities + sections). */
 export const dashboardGroups = [
   { title: "Account", sections: ["profile", "security", "sessions"] },
-  { title: "Commerce", entities: ["Review", "Cart"], sections: ["orders", "wishlist"] },
+  { title: "Commerce", entities: ["Review", "Cart", "Address"], sections: ["orders", "wishlist"] },
   { title: "Developer", entities: ["Project"], sections: ["developer"] },
   { title: "Billing", sections: ["billing"] },
   { title: "Danger zone", sections: ["danger"] },
@@ -397,8 +397,18 @@ export const adminGroups = [
 // buyer (orderStatusEmail). Admin sees ALL orders (gate: owner-rule + isAdmin → unscoped).
 const FULFILL = `
 <div class="pf-section">
-  <h2 style="margin-top:0">Fulfillment</h2>
-  <p class="pf-sub">Paid orders waiting to ship, and recent shipments. Marking an order shipped emails the buyer with tracking.</p>
+  <h2 style="margin-top:0">Orders</h2>
+  <p class="pf-sub">Search, inspect, fulfill + refund every order. Click a row for line items, address, payment + tracking. Shipping or cancelling emails the buyer.</p>
+  <div class="ff-controls">
+    <input id="ff-q" type="search" placeholder="Search by #id or email" aria-label="Search orders" autocomplete="off" />
+    <select id="ff-status" aria-label="Filter by status">
+      <option value="all">All statuses</option>
+      <option value="pending">Pending</option>
+      <option value="paid">Paid</option>
+      <option value="shipped">Shipped</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+  </div>
   <div id="ff-list" class="pf-muted">Loading…</div>
 </div>
 <style>
@@ -412,43 +422,88 @@ const FULFILL = `
   .ff-ship{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
   .ff-ship input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg-soft);color:var(--fg);font:inherit;font-size:13px}
   .ff-ship .ff-carrier{width:170px}.ff-ship .ff-track{flex:1;min-width:140px}
+  .ff-controls{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+  .ff-controls input,.ff-controls select{padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg-soft);color:var(--fg);font:inherit;font-size:13.5px}
+  .ff-controls #ff-q{flex:1;min-width:200px}
+  .ff-head{cursor:pointer}
+  .ff-head .ff-caret{transition:transform .15s;color:var(--muted);margin-inline-start:6px}
+  .ff-card.open .ff-caret{transform:rotate(90deg)}
+  .ff-detail{display:none;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  .ff-card.open .ff-detail{display:block}
+  .ff-l{display:flex;gap:10px;align-items:center;padding:6px 0}
+  .ff-li{width:38px;height:38px;border-radius:7px;object-fit:cover;border:1px solid var(--line);background:var(--bg-soft);flex:none}
+  .ff-ln{font-size:13px;font-weight:600}.ff-lq{font-size:12px;color:var(--muted)}
+  .ff-la{margin-inline-start:auto;font-family:ui-monospace,monospace;font-size:12.5px}
+  .ff-pay{margin-top:9px;font-size:13px}
+  .ff-pr{display:flex;justify-content:space-between;padding:3px 0}.ff-pr.g{font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:7px}
+  .ff-blk{margin-top:10px;font-size:12.5px;line-height:1.5}.ff-blk b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px}
 </style>
 <script>(function(){
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
   function money(c){return window.fmtMoney?window.fmtMoney(c):"$"+(Number(c||0)/100).toFixed(2);}
   function when(t){return t?(window.fmtDate?window.fmtDate(Number(t)):new Date(Number(t)).toLocaleDateString()):"";}
   function nItems(o){try{return JSON.parse(o.items||"[]").reduce(function(s,i){return s+(i.qty||1);},0);}catch(e){return 0;}}
-  var box=document.getElementById("ff-list");
+  function safeUrl(u){u=String(u==null?"":u);return /^(https?:\\/\\/|\\/)/i.test(u)?u:"#";}
+  function items(o){try{return JSON.parse(o.items||"[]");}catch(e){return [];}}
+  var box=document.getElementById("ff-list"),qEl=document.getElementById("ff-q"),stEl=document.getElementById("ff-status"),all=[];
   function post(id,body,btn){
     fetch("/order/"+encodeURIComponent(id)+"/status",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(body)}).then(function(r){
       if(r.ok){if(window.toast)window.toast("Order #"+id+" → "+body.status,{type:"success"});load();}
       else{if(btn)btn.disabled=false;if(window.toast)window.toast("Update failed ("+r.status+").",{type:"error"});}
     }).catch(function(){if(btn)btn.disabled=false;});
   }
+  function lineHtml(it){return '<div class="ff-l">'+(it.image?'<img class="ff-li" src="'+esc(safeUrl(it.image))+'" alt="" loading="lazy"/>':'<span class="ff-li"></span>')+'<div><div class="ff-ln">'+esc(it.name||("#"+it.productId))+'</div><div class="ff-lq">'+(it.variantLabel?esc(it.variantLabel)+' · ':'')+'Qty '+(it.qty||1)+' × '+money(it.priceCents)+'</div></div><div class="ff-la">'+money((it.priceCents||0)*(it.qty||1))+'</div></div>';}
+  function addrBlk(o){var a=null;try{a=o.shippingAddress?JSON.parse(o.shippingAddress):null;}catch(e){}if(!a)return "";var L=[a.name,a.line1,a.line2,[a.city,a.state,a.postalCode].filter(Boolean).join(", "),a.country].filter(function(x){return x&&String(x).trim();});return L.length?'<div class="ff-blk"><b>Ship to</b>'+L.map(esc).join("<br>")+'</div>':"";}
+  function trackBlk(o){if(o.status!=="shipped"||!o.trackingNumber)return "";return '<div class="ff-blk"><b>Tracking</b>'+esc(o.carrier||"Carrier")+' · '+esc(o.trackingNumber)+'</div>';}
+  function actions(o){
+    if(o.status==="paid")return '<div class="ff-ship"><input class="ff-carrier" placeholder="Carrier (ups/usps/fedex/dhl)" data-c="'+esc(o.id)+'"/><input class="ff-track" placeholder="Tracking number (optional)" data-t="'+esc(o.id)+'"/><button class="btn sm" type="button" data-ship="'+esc(o.id)+'">Mark shipped</button><button class="btn ghost sm" type="button" data-cancel="'+esc(o.id)+'" data-refund="1">Cancel + refund</button></div>';
+    if(o.status==="pending")return '<div class="ff-ship"><button class="btn ghost sm" type="button" data-cancel="'+esc(o.id)+'">Cancel order</button></div>';
+    return "";
+  }
+  function detail(o){var its=items(o),sub=its.reduce(function(s,i){return s+(i.priceCents||0)*(i.qty||1);},0);
+    return '<div class="ff-detail">'+(its.length?its.map(lineHtml).join(""):'<p class="ff-sub">No line items recorded.</p>')+
+      '<div class="ff-pay">'+
+        '<div class="ff-pr"><span>Subtotal</span><span>'+money(sub)+'</span></div>'+
+        (o.discountCode?'<div class="ff-pr"><span>Discount</span><span>'+esc(o.discountCode)+'</span></div>':'')+
+        (o.shippingCents?'<div class="ff-pr"><span>Shipping</span><span>'+money(o.shippingCents)+'</span></div>':'')+
+        (o.taxCents?'<div class="ff-pr"><span>Tax</span><span>'+money(o.taxCents)+'</span></div>':'')+
+        '<div class="ff-pr g"><span>Total</span><span>'+money(o.totalCents)+'</span></div>'+
+        '<div class="ff-pr"><span>Payment</span><span>'+(o.stripePaymentIntentId?esc(o.stripePaymentIntentId):'free / $0')+'</span></div>'+
+      '</div>'+addrBlk(o)+trackBlk(o)+actions(o)+'</div>';
+  }
+  function card(o){return '<div class="ff-card" data-id="'+esc(o.id)+'"><div class="ff-head"><span class="ff-id">#'+esc(o.id)+'</span><span class="ff-pill '+esc(o.status)+'">'+esc(o.status)+'</span><span class="ff-meta">'+money(o.totalCents)+' · '+nItems(o)+' item(s) · '+esc(when(o.createdAt))+'</span><span class="ff-caret">&#9656;</span></div>'+
+    '<p class="ff-sub">'+(o.customerEmail?esc(o.customerEmail):"(guest — no email on file)")+'</p>'+detail(o)+'</div>';}
+  function render(){
+    var q=(qEl.value||"").trim().toLowerCase(),st=stEl.value;
+    var list=all.filter(function(o){
+      if(st!=="all"&&o.status!==st)return false;
+      if(q)return String(o.id).indexOf(q)===0||(o.customerEmail||"").toLowerCase().indexOf(q)>=0;
+      return true;});
+    box.className="";
+    if(!list.length){box.innerHTML='<div class="pf-empty">'+(all.length?"No orders match your search.":"No orders yet.")+'</div>';return;}
+    box.innerHTML=list.map(card).join("");
+  }
   function load(){
     fetch("/order",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(os){
-      os=(os||[]).filter(function(o){return o.status==="paid"||o.status==="shipped";}).sort(function(a,b){
-        var rank={paid:0,shipped:1};return (rank[a.status]-rank[b.status])||((b.createdAt||0)-(a.createdAt||0));});
-      box.className="";
-      if(!os.length){box.innerHTML='<div class="pf-empty">No paid orders to fulfill yet.</div>';return;}
-      box.innerHTML=os.map(function(o){
-        var ship=o.status==="paid"
-          ? '<div class="ff-ship"><input class="ff-carrier" placeholder="Carrier (ups/usps/fedex/dhl)" data-c="'+esc(o.id)+'"/><input class="ff-track" placeholder="Tracking number (optional)" data-t="'+esc(o.id)+'"/><button class="btn sm" type="button" data-ship="'+esc(o.id)+'">Mark shipped</button><button class="btn ghost sm" type="button" data-cancel="'+esc(o.id)+'">Cancel</button></div>'
-          : (o.trackingNumber?'<p class="ff-sub">Shipped via '+esc(o.carrier||"carrier")+' · tracking '+esc(o.trackingNumber)+'</p>':'<p class="ff-sub">Shipped.</p>');
-        return '<div class="ff-card" data-id="'+esc(o.id)+'"><div class="ff-head"><span class="ff-id">#'+esc(o.id)+'</span><span class="ff-pill '+esc(o.status)+'">'+esc(o.status)+'</span><span class="ff-meta">'+money(o.totalCents)+' · '+nItems(o)+' item(s) · '+esc(when(o.createdAt))+'</span></div>'+
-          '<p class="ff-sub">'+(o.customerEmail?esc(o.customerEmail):"(guest — no email on file)")+'</p>'+ship+'</div>';
-      }).join("");
-      box.querySelectorAll("[data-ship]").forEach(function(b){b.addEventListener("click",function(){
-        var id=b.dataset.ship,carrier=(document.querySelector('[data-c="'+id+'"]')||{}).value||"",track=(document.querySelector('[data-t="'+id+'"]')||{}).value||"";
-        b.disabled=true;post(id,{status:"shipped",carrier:carrier.trim(),trackingNumber:track.trim()},b);});});
-      box.querySelectorAll("[data-cancel]").forEach(function(b){b.addEventListener("click",function(){
-        if(!confirm("Cancel order #"+b.dataset.cancel+"? The buyer will be emailed."))return;b.disabled=true;post(b.dataset.cancel,{status:"cancelled"},b);});});
+      all=(os||[]).sort(function(a,b){var rank={paid:0,pending:1,shipped:2,cancelled:3};return ((rank[a.status]==null?9:rank[a.status])-(rank[b.status]==null?9:rank[b.status]))||((b.createdAt||0)-(a.createdAt||0));});
+      render();
     }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load orders.</div>';});
   }
+  box.addEventListener("click",function(ev){
+    var ship=ev.target.closest("[data-ship]");
+    if(ship){var id=ship.getAttribute("data-ship"),c=(box.querySelector('[data-c="'+id+'"]')||{}).value||"",t=(box.querySelector('[data-t="'+id+'"]')||{}).value||"";ship.disabled=true;post(id,{status:"shipped",carrier:c.trim(),trackingNumber:t.trim()},ship);return;}
+    var cancel=ev.target.closest("[data-cancel]");
+    if(cancel){var rid=cancel.getAttribute("data-cancel");if(!confirm("Cancel order #"+rid+"? The buyer will be emailed"+(cancel.getAttribute("data-refund")==="1"?" and refunded via Stripe":"")+"."))return;cancel.disabled=true;post(rid,{status:"cancelled"},cancel);return;}
+    if(ev.target.closest("input"))return;
+    var head=ev.target.closest(".ff-head");
+    if(head)head.parentNode.classList.toggle("open");
+  });
+  qEl.addEventListener("input",render);
+  stEl.addEventListener("change",render);
   load();
 })();</script>`;
 
 export const adminSections: PanelSection[] = [
-  { id: "fulfillment", label: "Fulfillment", summary: "Ship orders + tracking", render: () => FULFILL },
+  { id: "fulfillment", label: "Orders", summary: "Search, inspect, fulfill + refund", render: () => FULFILL },
   { id: "cost", label: "Cost ledger", summary: "Per-request spend, metered", render: () => '<div class="pf-section" style="padding:0;overflow:hidden;border-radius:16px"><iframe src="/cost" title="Cost ledger" style="width:100%;height:72vh;border:0;display:block"></iframe></div>' },
 ];

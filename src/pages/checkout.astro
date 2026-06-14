@@ -31,6 +31,10 @@ import Layout from "../layouts/Layout.astro";
     .co-note { color:var(--muted); font-size:12.5px; margin-top:9px; text-align:center; }
     .addr-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:4px; }
     .addr-grid input { width:100%; }
+    .addr-saved { margin:4px 0 12px; }
+    .addr-saved-lbl { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+    .addr-saved select { width:100%; }
+    .addr-save { display:flex; gap:7px; align-items:center; margin-top:10px; font-size:13px; color:var(--muted); cursor:pointer; }
     .addr-grid .addr-full { grid-column:1 / -1; }
     .addr-hint { color:var(--muted); font-size:12.5px; margin:0 0 12px; }
     .co-contact { margin:15px 0 4px; }
@@ -74,6 +78,10 @@ import Layout from "../layouts/Layout.astro";
     <div class="co-card card">
       <h2 style="margin-top:0">Shipping address</h2>
       <p class="addr-hint">For physical items (like the Founder Tee). Skip it if your order is digital only.</p>
+      <div id="savedAddrWrap" class="addr-saved" hidden>
+        <label for="savedAddr" class="addr-saved-lbl">Saved addresses</label>
+        <select id="savedAddr" aria-label="Choose a saved address"><option value="">Enter a new address…</option></select>
+      </div>
       <div class="addr-grid">
         <input id="ad-name" class="addr-full" placeholder="Full name" autocomplete="name" aria-label="Full name" />
         <input id="ad-line1" class="addr-full" placeholder="Address line 1" autocomplete="address-line1" aria-label="Address line 1" />
@@ -83,6 +91,7 @@ import Layout from "../layouts/Layout.astro";
         <input id="ad-postal" placeholder="Postal code" autocomplete="postal-code" aria-label="Postal code" />
         <input id="ad-country" placeholder="Country (e.g. US)" autocomplete="country-name" aria-label="Country" />
       </div>
+      <label id="saveAddrWrap" class="addr-save" hidden><input type="checkbox" id="saveAddr" /> Save this address to my account</label>
     </div>
     <div class="co-card card">
       <button class="btn" id="placeOrder">Place order</button>
@@ -115,6 +124,31 @@ import Layout from "../layouts/Layout.astro";
     }
     function persistAddr() { try { localStorage.setItem("ship_addr", JSON.stringify(readAddr())); } catch (e) {} }
 
+    // ── Saved-address book (signed-in only). GET /address is owner-scoped; pick one to fill the form, or opt to save
+    //    the entered address back to the account. Guests keep the localStorage fallback above. ──
+    let savedAddrs = [];
+    function fillAddr(a) { for (const k in ADDR_IDS) { const el = document.getElementById(ADDR_IDS[k]); if (el) el.value = (a && a[k]) ? a[k] : ""; } persistAddr(); }
+    async function loadSavedAddresses() {
+      if (!signedInEmail) return;
+      const wrap = document.getElementById("savedAddrWrap"), sel = document.getElementById("savedAddr"), save = document.getElementById("saveAddrWrap");
+      if (save) save.hidden = false; // a signed-in buyer can always opt to save what they type
+      try {
+        const r = await fetch("/address", { credentials: "same-origin" });
+        if (!r.ok) return;
+        savedAddrs = await r.json();
+        if (!Array.isArray(savedAddrs) || !savedAddrs.length || !sel) return;
+        for (let i = 0; i < savedAddrs.length; i++) { const a = savedAddrs[i]; const o = document.createElement("option"); o.value = String(i); o.textContent = [a.name, a.line1, a.city].filter(Boolean).join(", "); sel.appendChild(o); }
+        wrap.hidden = false;
+        sel.addEventListener("change", () => { if (sel.value === "") return; const a = savedAddrs[Number(sel.value)]; if (a) fillAddr(a); });
+      } catch (e) {}
+    }
+    async function saveAddrIfRequested() { // best-effort; a save failure never blocks checkout
+      const cb = document.getElementById("saveAddr");
+      if (!cb || !cb.checked || !signedInEmail) return;
+      const a = shipAddr(); if (!a) return; // only a complete address
+      try { await fetch("/address", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(a) }); } catch (e) {}
+    }
+
     // ── Receipt email + the contextual checkout banner — COOKIE-authoritative. ──
     // su_user is an optimistic hint only (can be stale → wrong locked email, or not-yet-set after a fresh sign-in →
     // false guest), so the email lock + the guest nudge are reconciled against the REAL session via get-session. The
@@ -145,7 +179,7 @@ import Layout from "../layouts/Layout.astro";
         history.replaceState(null, "", location.pathname); // drop the ?cancelled flag
       }
       applyAuthEmail(signedInEmail); // optimistic (su_user hint), then reconcile with the verified session
-      fetch("/api/auth/get-session", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((s) => applyAuthEmail(s && s.user && s.user.email ? String(s.user.email) : null)).catch(() => {});
+      fetch("/api/auth/get-session", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((s) => { applyAuthEmail(s && s.user && s.user.email ? String(s.user.email) : null); loadSavedAddresses(); }).catch(() => {});
     }
 
     async function postJson(url, body, action) {
@@ -266,6 +300,7 @@ import Layout from "../layouts/Layout.astro";
       const btn = document.getElementById("placeOrder"); const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Processing…";
       try {
         const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code, email, shippingAddress: shipAddr(), shippingMethod: quote && quote.shippingMethod }, "checkout");
+        await saveAddrIfRequested(); // persist to the address book BEFORE a Stripe redirect leaves the page
         if (r.url) { location.href = r.url; return; } // chargeable → Stripe Checkout (leave the page)
         if (r.free || r.paid || r.order) { // free/$0 order completed server-side
           localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); if (window.discount) window.discount.clear(); disc = null;
