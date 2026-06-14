@@ -10,6 +10,7 @@
  * (`customerId`, `ownerId`, `authorId`, `userId`) reference Better Auth's user id by convention.
  */
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { schemaDDL } from "@suluk/drizzle";
 
 // ── ecommerce ──────────────────────────────────────────────────────────────────────────────────────────────
 export const category = sqliteTable("category", {
@@ -240,26 +241,13 @@ export const project = sqliteTable("project", {
  * (`migrations/0000_domain.sql`). Kept beside the table defs so the two representations stay in lockstep.
  * (`cost_event` — the durable cost ledger — is appended by the migration; it is infra, not a domain entity.)
  */
-export const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS category (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL, description TEXT, long_description TEXT, price_cents INTEGER NOT NULL DEFAULT 0, compare_at_cents INTEGER, download_url TEXT, category_id INTEGER, inventory INTEGER NOT NULL DEFAULT 0, image_url TEXT, images TEXT, featured INTEGER NOT NULL DEFAULT 0, requires_shipping INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', stripe_price_id TEXT, low_stock_alerted INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS variant (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, title TEXT NOT NULL, options TEXT, images TEXT, price_cents INTEGER NOT NULL DEFAULT 0, price_cents_enabled INTEGER NOT NULL DEFAULT 0, inventory INTEGER NOT NULL DEFAULT 0, low_stock_alerted INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS discount_code (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, description TEXT, discount_type TEXT NOT NULL DEFAULT 'percent', discount_value INTEGER NOT NULL DEFAULT 0, min_subtotal_cents INTEGER, max_discount_cents INTEGER, max_uses INTEGER, max_uses_per_customer INTEGER, applies_to_product_ids TEXT, starts_at INTEGER, is_active INTEGER NOT NULL DEFAULT 1, current_uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER);
-CREATE TABLE IF NOT EXISTS cart (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, items TEXT NOT NULL DEFAULT '[]', discount_code TEXT, status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE IF NOT EXISTS "order" (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, customer_email TEXT, items TEXT NOT NULL DEFAULT '[]', shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', discount_code TEXT, stripe_payment_intent_id TEXT, carrier TEXT, tracking_number TEXT, shipping_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, shipping_method TEXT, recovery_emailed_at INTEGER, created_at INTEGER);
-CREATE TABLE IF NOT EXISTS review (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, customer_id TEXT, rating INTEGER NOT NULL DEFAULT 5, title TEXT NOT NULL, body TEXT, verified_purchase INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', helpful_count INTEGER NOT NULL DEFAULT 0, created_at INTEGER);
-CREATE TABLE IF NOT EXISTS review_helpful_vote (id INTEGER PRIMARY KEY AUTOINCREMENT, review_id INTEGER NOT NULL, principal TEXT NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS review_helpful_vote_uniq ON review_helpful_vote (review_id, principal);
-CREATE TABLE IF NOT EXISTS address (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, name TEXT, line1 TEXT NOT NULL, line2 TEXT, city TEXT NOT NULL, state TEXT, postal_code TEXT, country TEXT NOT NULL DEFAULT 'US', is_default INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS wishlist_item (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, product_id INTEGER NOT NULL, variant_id INTEGER, added_at INTEGER);
-CREATE TABLE IF NOT EXISTS post (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT, body TEXT, status TEXT NOT NULL DEFAULT 'draft', published_at INTEGER, author_id TEXT, cover_image_url TEXT);
-CREATE TABLE IF NOT EXISTS faq (id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL, answer TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1);
-CREATE TABLE IF NOT EXISTS newsletter_subscriber (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, subscribed_at INTEGER);
-CREATE TABLE IF NOT EXISTS contact_submission (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL, subject TEXT NOT NULL, message TEXT NOT NULL, created_at INTEGER);
-CREATE TABLE IF NOT EXISTS stock_notification (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, email TEXT NOT NULL, created_at INTEGER, notified_at INTEGER);
-CREATE TABLE IF NOT EXISTS media (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, alt TEXT NOT NULL, width INTEGER, height INTEGER);
-CREATE TABLE IF NOT EXISTS api_token (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, name TEXT NOT NULL, prefix TEXT NOT NULL, hashed_key TEXT NOT NULL, created_at INTEGER, last_used_at INTEGER, revoked_at INTEGER);
-CREATE TABLE IF NOT EXISTS project (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, owner_id TEXT, status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE IF NOT EXISTS billing_account (id INTEGER PRIMARY KEY AUTOINCREMENT, principal TEXT NOT NULL, stripe_customer_id TEXT, subscription_id TEXT, last_reported_micro_usd INTEGER, last_reported_at INTEGER, created_at INTEGER);
-CREATE TABLE IF NOT EXISTS cost_event (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, principal TEXT, operation TEXT NOT NULL, action TEXT, total_micro_usd INTEGER NOT NULL, breakdown TEXT NOT NULL);
-`.trim();
+// GENERATED from the Drizzle tables above via @suluk/drizzle schemaDDL — no hand-mirrored column list to drift out
+// of sync (a column added to a table flows into the dev DDL automatically). Only the table-INCLUSION list + the
+// standalone unique index are hand-maintained. Snapshot-verified structurally identical to the prior hand-written
+// SCHEMA_SQL (same columns/types/notnull/defaults/pk for all 20 tables). Prod stays migration-driven (migrations/).
+export const SCHEMA_SQL = (
+  schemaDDL([
+    category, product, variant, discountCode, cart, order, review, reviewHelpfulVote, address, wishlistItem,
+    post, faq, newsletterSubscriber, contactSubmission, stockNotification, media, apiToken, project, billingAccount, costEvent,
+  ]) + "\nCREATE UNIQUE INDEX IF NOT EXISTS review_helpful_vote_uniq ON review_helpful_vote (review_id, principal);"
+).trim();
