@@ -20,6 +20,7 @@
     "promote:admins": "bun run scripts/promote-admins.ts",
     "deploy": "bun run build && bun run build:worker && wrangler deploy",
     "deploy:cf": "bun run build && bun run build:worker && bun run scripts/deploy.ts",
+    "deploy:editor": "bun run scripts/deploy-editor.ts",
     "gen:schemes": "bun run scripts/gen-schemes.ts"
   },
   "dependencies": {
@@ -38,6 +39,7 @@
     "@suluk/deploy": "^0.1.3",
     "@suluk/docs": "^0.1.3",
     "@suluk/drizzle": "^0.1.6",
+    "@suluk/editor": "^0.1.0",
     "@suluk/email": "^0.1.2",
     "@suluk/env": "^0.1.0",
     "@suluk/harden": "^0.1.1",
