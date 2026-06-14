@@ -25,7 +25,7 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
     ]);
     const spent = orders.reduce((n, o) => n + (Number(o.totalCents) || 0), 0);
     return [
-      { label: "Orders", value: orders.length, href: "/dashboard/Order" },
+      { label: "Orders", value: orders.length, href: "/dashboard/s/orders" },
       { label: "Total spent", value: "$" + (spent / 100).toFixed(2), hint: "all time" },
       { label: "Wishlist", value: wl.length, href: "/dashboard/WishlistItem" },
       { label: "API keys", value: toks.length, href: "/dashboard/s/developer" },
@@ -36,14 +36,15 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
 /** The sidebar grouping for the user dashboard (entities + sections). */
 export const dashboardGroups = [
   { title: "Account", sections: ["profile", "security", "sessions"] },
-  { title: "Commerce", entities: ["Order", "WishlistItem", "Review", "Cart"] },
+  { title: "Commerce", entities: ["WishlistItem", "Review", "Cart"], sections: ["orders"] },
   { title: "Developer", entities: ["Project"], sections: ["developer"] },
   { title: "Billing", sections: ["billing"] },
   { title: "Danger zone", sections: ["danger"] },
 ];
 
-/** Entities the custom sections replace (so the panel doesn't also auto-list them). */
-export const dashboardHiddenEntities = ["ApiToken", "BillingAccount"];
+/** Entities the custom sections replace (so the panel doesn't also auto-list them). Order is hidden in favour of the
+ *  bespoke `orders` section (the generic list rendered items/shippingAddress as raw JSON and had no openable detail). */
+export const dashboardHiddenEntities = ["ApiToken", "BillingAccount", "Order"];
 
 const PROFILE = `
 <div class="pf-section">
@@ -202,14 +203,14 @@ export function dashboardHome(opts: { admin: boolean }): string {
 </div>
 <div class="dh-quick">
   <a class="dh-qa" href="/products"><span>🛍️</span> Browse products</a>
-  <a class="dh-qa" href="/dashboard/Order"><span>📦</span> Your orders</a>
+  <a class="dh-qa" href="/dashboard/s/orders"><span>📦</span> Your orders</a>
   <a class="dh-qa" href="/dashboard/WishlistItem"><span>❤️</span> Wishlist</a>
   <a class="dh-qa" href="/dashboard/s/billing"><span>💳</span> Billing</a>
   <a class="dh-qa" href="/dashboard/s/developer"><span>🔑</span> API keys</a>
   ${adminTile}
 </div>
 <div class="dh-grid">
-  <div class="pf-section"><h2>Recent orders</h2><p class="pf-sub">Your latest purchases.</p><div id="dh-orders" class="pf-muted">Loading…</div></div>
+  <div class="pf-section"><h2 style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">Recent orders <a href="/dashboard/s/orders" style="font-size:13px;font-weight:500;white-space:nowrap">View all →</a></h2><p class="pf-sub">Your latest purchases.</p><div id="dh-orders" class="pf-muted">Loading…</div></div>
   <div class="pf-section"><h2>Recommended for you</h2><p class="pf-sub">Fresh from the catalog.</p><div id="dh-recs" class="dh-recs"></div></div>
 </div>
 <script>(function(){
@@ -224,7 +225,7 @@ export function dashboardHome(opts: { admin: boolean }): string {
   fetch("/order",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(os){
     os=(os||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).slice(0,4);
     var box=document.getElementById("dh-orders");
-    box.innerHTML=os.length?os.map(function(o){return '<div class="pf-row"><span>#'+esc(o.id)+' <span class="pf-pill">'+esc(o.status)+'</span></span><span class="pf-muted">'+esc(money(o.totalCents))+' · '+esc(when(o.createdAt))+'</span></div>';}).join(""):'<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';
+    box.innerHTML=os.length?os.map(function(o){return '<a class="pf-row" href="/dashboard/s/orders" style="text-decoration:none;color:inherit"><span>#'+esc(o.id)+' <span class="pf-pill">'+esc(o.status)+'</span></span><span class="pf-muted">'+esc(money(o.totalCents))+' · '+esc(when(o.createdAt))+'</span></a>';}).join(""):'<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';
   }).catch(function(){document.getElementById("dh-orders").innerHTML='<div class="pf-empty">Could not load orders.</div>';});
   fetch("/product",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(ps){
     ps=(ps||[]).filter(function(p){return p.status==="published";}).slice(0,4);
@@ -233,10 +234,79 @@ export function dashboardHome(opts: { admin: boolean }): string {
 })();</script>`;
 }
 
+// A bespoke ORDER-HISTORY view — the @suluk/panel auto-list rendered Order's items/shippingAddress as raw JSON and
+// gave a normal user no openable detail (Order is update=admin → no edit link). This replaces it: each order is an
+// expandable card that itemizes the snapshot (thumbnail, variant label, qty × unit), the discount, the ship-to block,
+// the total, and a one-tap "Buy again". All from the /order rows the buyer already owns — no schema change.
+const ORDERS = `
+<div class="pf-section">
+  <h2 style="margin-top:0">Your orders</h2>
+  <p class="pf-sub">Everything you've purchased — open an order to see its items, shipping and total.</p>
+  <div id="od-list" class="pf-muted">Loading…</div>
+</div>
+<style>
+  .od-card{border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden;background:var(--panel)}
+  .od-head{display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:0;cursor:pointer;font:inherit;color:var(--fg);text-align:start}
+  .od-head:hover{background:var(--bg-soft)}
+  .od-id{font-weight:700}
+  .od-when{color:var(--muted);font-size:12.5px}
+  .od-tot{margin-inline-start:auto;font-family:ui-monospace,monospace;font-weight:700}
+  .od-caret{transition:transform .15s;color:var(--muted)}
+  .od-card.open .od-caret{transform:rotate(90deg)}
+  .od-pill{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:999px;background:var(--bg-soft);border:1px solid var(--line)}
+  .od-pill.paid{color:#16794a;border-color:#16794a55}.od-pill.shipped{color:#1d6fb8;border-color:#1d6fb855}.od-pill.pending{color:#b07b16;border-color:#b07b1655}.od-pill.cancelled{color:#b03636;border-color:#b0363655}
+  .od-body{display:none;padding:4px 15px 15px;border-top:1px solid var(--line)}
+  .od-card.open .od-body{display:block}
+  .od-line{display:flex;gap:11px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+  .od-line:last-child{border-bottom:0}
+  .od-img{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--line);background:var(--bg-soft);flex:none}
+  .od-ln-body{flex:1;min-width:0}.od-ln-name{font-size:14px;font-weight:600}.od-ln-sub{font-size:12px;color:var(--muted)}
+  .od-ln-amt{font-family:ui-monospace,monospace;font-size:13.5px;white-space:nowrap}
+  .od-tot-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}.od-tot-row.g{font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:9px}
+  .od-tot-row.disc span{color:var(--accent)}
+  .od-ship{margin-top:12px;font-size:13px;line-height:1.55}.od-ship b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px}
+  .od-actions{margin-top:13px;display:flex;gap:8px;flex-wrap:wrap}
+</style>
+<script>(function(){
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function money(c){return window.fmtMoney?window.fmtMoney(c):"$"+(Number(c||0)/100).toFixed(2);}
+  function when(t){return t?(window.fmtDate?window.fmtDate(Number(t)):new Date(Number(t)).toLocaleDateString()):"";}
+  function parse(j){try{return JSON.parse(j||"[]");}catch(e){return [];}}
+  function addrBlock(o){var a=null;try{a=o.shippingAddress?JSON.parse(o.shippingAddress):null;}catch(e){}if(!a)return "";
+    var L=[a.name,a.line1,a.line2,[a.city,a.state,a.postalCode].filter(Boolean).join(", "),a.country].filter(function(x){return x&&String(x).trim();});
+    return L.length?'<div class="od-ship"><b>Shipping to</b>'+L.map(esc).join("<br>")+'</div>':"";}
+  function lineHtml(it){var sub=it.variantLabel?esc(it.variantLabel):"";
+    return '<div class="od-line">'+(it.image?'<img class="od-img" src="'+esc(it.image)+'" alt="" loading="lazy"/>':'<span class="od-img"></span>')+
+      '<div class="od-ln-body"><div class="od-ln-name">'+esc(it.name||("#"+it.productId))+'</div><div class="od-ln-sub">'+(sub?sub+" · ":"")+'Qty '+(it.qty||1)+' × '+money(it.priceCents)+'</div></div>'+
+      '<div class="od-ln-amt">'+money((it.priceCents||0)*(it.qty||1))+'</div></div>';}
+  function buyAgain(items){var cart=[];try{cart=JSON.parse(localStorage.getItem("cart")||"[]");}catch(e){}
+    items.forEach(function(it){var ex=cart.find(function(x){return x.productId===it.productId&&x.variantId==it.variantId;});
+      if(ex)ex.qty+=(it.qty||1);else cart.push({productId:it.productId,variantId:it.variantId,qty:it.qty||1,priceCents:it.priceCents,name:it.name,image:it.image,variantLabel:it.variantLabel});});
+    localStorage.setItem("cart",JSON.stringify(cart));window.dispatchEvent(new Event("cart-changed"));
+    if(window.toast)window.toast("Added to cart ✓",{type:"success"});}
+  var box=document.getElementById("od-list");
+  fetch("/order",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(os){
+    os=(os||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});box.className="";
+    if(!os.length){box.innerHTML='<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';return;}
+    box.innerHTML=os.map(function(o){var items=parse(o.items);var n=items.reduce(function(s,i){return s+(i.qty||1);},0);
+      var sub=items.reduce(function(s,i){return s+(i.priceCents||0)*(i.qty||1);},0);var disc=sub-(o.totalCents||0);
+      return '<div class="od-card" data-id="'+esc(o.id)+'">'+
+        '<button class="od-head" type="button"><span class="od-id">#'+esc(o.id)+'</span><span class="od-pill '+esc(o.status)+'">'+esc(o.status)+'</span><span class="od-when">'+esc(when(o.createdAt))+' · '+n+' item'+(n===1?"":"s")+'</span><span class="od-tot">'+money(o.totalCents)+'</span><span class="od-caret">›</span></button>'+
+        '<div class="od-body">'+items.map(lineHtml).join("")+
+          '<div style="margin-top:10px">'+(disc>0?'<div class="od-tot-row disc"><span>Discount'+(o.discountCode?" ("+esc(o.discountCode)+")":"")+'</span><span>−'+money(disc)+'</span></div>':"")+
+          '<div class="od-tot-row g"><span>Total</span><span>'+money(o.totalCents)+'</span></div></div>'+addrBlock(o)+
+          '<div class="od-actions"><button class="btn sm" type="button" data-buy="'+esc(o.id)+'">Buy again</button></div>'+
+        '</div></div>';}).join("");
+    box.querySelectorAll(".od-head").forEach(function(h){h.addEventListener("click",function(){h.closest(".od-card").classList.toggle("open");});});
+    box.querySelectorAll("[data-buy]").forEach(function(b){b.addEventListener("click",function(e){e.stopPropagation();var o=os.find(function(x){return String(x.id)===b.dataset.buy;});if(o)buyAgain(parse(o.items));});});
+  }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your orders. <a href="/dashboard/s/orders">Retry</a></div>';});
+})();</script>`;
+
 export const dashboardSections: PanelSection[] = [
   { id: "profile", label: "Profile", summary: "Your name, email and avatar", render: () => PROFILE },
   { id: "security", label: "Security", summary: "Change your password", render: () => SECURITY },
   { id: "sessions", label: "Sessions", summary: "Devices signed in", render: () => SESSIONS },
+  { id: "orders", label: "Orders", summary: "Your purchase history", render: () => ORDERS },
   { id: "billing", label: "Billing", summary: "Cards, invoices & plan", render: () => BILLING },
   { id: "developer", label: "API keys", summary: "Tokens for the API", render: () => DEVELOPER },
   { id: "danger", label: "Danger zone", summary: "Delete your account", render: () => DANGER },

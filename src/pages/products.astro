@@ -2,7 +2,7 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
-<Layout title="Store — saasuluk">
+<Layout title="Store — saasuluk" description="Shop the saasuluk store — every product is a real slice of the starter, sold through the same contract-projected commerce engine that renders it.">
   <section class="hero" style="padding:40px 0 6px">
     <h1>The <span class="gradient">store</span>.</h1>
     <p class="tag center">Every product is a <b>Product</b> entity in the contract — and a real slice of this starter. The store sells the code that renders it.</p>
@@ -52,10 +52,22 @@ import Layout from "../layouts/Layout.astro";
           <div style="display:flex;justify-content:space-between;margin-top:16px"><div class="skel" style="height:24px;width:58px"></div><div class="skel" style="height:30px;width:92px;border-radius:9px"></div></div>
         </div></div>`).join("");
     }
+    function errorState(msg, retry) {
+      const g = document.getElementById("grid");
+      g.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:34px 18px"><p style="margin:0 0 13px;color:var(--muted)">${esc(msg)}</p><button class="btn ghost" id="gridRetry">Retry</button></div>`;
+      g.querySelector("#gridRetry").addEventListener("click", retry);
+    }
     async function load(q) {
       skeleton(6); // perceived-perf: shimmer placeholders until the fetch resolves
-      const data = await (await fetch(q ? `/search?q=${encodeURIComponent(q)}` : "/product")).json();
-      render((q ? data.products : data).filter((p) => p.status === "published").sort((a, b) => a.priceCents - b.priceCents));
+      try {
+        const res = await fetch(q ? `/search?q=${encodeURIComponent(q)}` : "/product");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        render((q ? data.products : data).filter((p) => p.status === "published").sort((a, b) => a.priceCents - b.priceCents));
+      } catch (e) { // never leave the shimmer up forever — show a retryable error
+        errorState("We couldn't load the store. Check your connection and try again.", () => load(q));
+        if (window.toast) window.toast("Couldn't load products.", { type: "error" });
+      }
     }
     document.getElementById("search").addEventListener("submit", (e) => { e.preventDefault(); load(e.target.q.value.trim()); });
     load();

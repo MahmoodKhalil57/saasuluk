@@ -33,6 +33,11 @@ import Layout from "../layouts/Layout.astro";
     .addr-grid input { width:100%; }
     .addr-grid .addr-full { grid-column:1 / -1; }
     .addr-hint { color:var(--muted); font-size:12.5px; margin:0 0 12px; }
+    .co-contact { margin:15px 0 4px; }
+    .co-contact label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+    .co-contact input { width:100%; }
+    .co-contact input[readonly] { opacity:.7; cursor:not-allowed; }
+    .co-contact .co-contact-hint { font-size:12px; color:var(--accent); margin-top:4px; display:inline-block; }
   </style>
 
   <h1>Checkout</h1>
@@ -42,6 +47,11 @@ import Layout from "../layouts/Layout.astro";
     <div class="co-card card">
       <h2 style="margin-top:0">Order summary</h2>
       <div id="lines"></div>
+      <div class="co-contact">
+        <label for="email">Email for your receipt</label>
+        <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" aria-label="Email for your receipt" />
+        <span id="emailLock" class="co-contact-hint" hidden>✓ Sending to your account email</span>
+      </div>
       <div class="co-disc">
         <input id="code" placeholder="Discount code (try FREEBIE, LAUNCH30)" aria-label="Discount code" />
         <button class="btn ghost" id="apply">Apply</button>
@@ -97,6 +107,17 @@ import Layout from "../layouts/Layout.astro";
       if (saved) for (const k in ADDR_IDS) { const el = document.getElementById(ADDR_IDS[k]); if (el && saved[k]) el.value = saved[k]; }
     }
     function persistAddr() { try { localStorage.setItem("ship_addr", JSON.stringify(readAddr())); } catch (e) {} }
+
+    // ── Receipt email — prefilled + locked for a signed-in user (the su_user hint), required for guests. ──
+    let signedInEmail = null;
+    try { const su = JSON.parse(localStorage.getItem("su_user") || "null"); if (su && su.email) signedInEmail = String(su.email); } catch (e) {}
+    const emailValid = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    function emailValue() { return (document.getElementById("email").value || "").trim(); }
+    function setupEmail() {
+      const el = document.getElementById("email");
+      if (signedInEmail) { el.value = signedInEmail; el.readOnly = true; document.getElementById("emailLock").hidden = false; }
+      else { try { const last = localStorage.getItem("guest_email"); if (last) el.value = last; } catch (e) {} el.addEventListener("input", () => { try { localStorage.setItem("guest_email", emailValue()); } catch (e) {} }); }
+    }
 
     async function postJson(url, body, action) {
       const res = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", ...(action ? { "x-suluk-action": action } : {}) }, body: JSON.stringify(body) });
@@ -171,9 +192,17 @@ import Layout from "../layouts/Layout.astro";
 
     document.getElementById("placeOrder").addEventListener("click", async () => {
       const c = cart(); if (!c.length) return;
+      const email = emailValue();
+      if (!emailValid(email)) { // a receipt needs a destination — block before creating the order
+        const el = document.getElementById("email"); el.focus(); el.setAttribute("aria-invalid", "true");
+        if (window.toast) window.toast("Enter your email so we can send your receipt.", { type: "error" });
+        document.getElementById("result").innerHTML = `<span class="card" style="display:block;color:var(--accent)">Please enter a valid email for your receipt.</span>`;
+        return;
+      }
+      document.getElementById("email").removeAttribute("aria-invalid");
       const btn = document.getElementById("placeOrder"); const lbl = btn.textContent; btn.disabled = true; btn.textContent = "Processing…";
       try {
-        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code, shippingAddress: shipAddr() }, "checkout");
+        const r = await postJson("/checkout/pay", { items: c, discountCode: disc && disc.code, email, shippingAddress: shipAddr() }, "checkout");
         if (r.url) { location.href = r.url; return; } // chargeable → Stripe Checkout (leave the page)
         if (r.free || r.paid || r.order) { // free/$0 order completed server-side
           localStorage.removeItem("cart"); window.dispatchEvent(new Event("cart-changed")); if (window.discount) window.discount.clear(); disc = null;
@@ -198,6 +227,7 @@ import Layout from "../layouts/Layout.astro";
     // address: restore the last-used one + persist on edit (kept across orders — most buyers ship to the same place)
     Object.values(ADDR_IDS).forEach((id) => { const el = document.getElementById(id); if (el) el.addEventListener("input", persistAddr); });
     restoreAddr();
+    setupEmail();
     render();
   </script>
 </Layout>

@@ -2,7 +2,7 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
-<Layout title="Metrics — saasuluk">
+<Layout title="Metrics — saasuluk" description="Live saasuluk metrics — orders, revenue, and API usage projected straight from the contract-metered ledger. Real numbers, not a mockup.">
   <h1>Metrics</h1>
   <p class="tag">Store analytics — derived from <b>Order</b> rows by the <code>/analytics/*</code> operations (declared <code>x-suluk-access: admin</code> and ENFORCED on the wire), plus the live <code>/cost</code> ledger. (saastarter wires Recharts + admin routes; here it is three contract operations.)</p>
   <div id="gate" class="card" style="display:none;margin-top:18px;border-color:var(--accent)"></div>
@@ -16,6 +16,7 @@ import Layout from "../layouts/Layout.astro";
   <script is:inline>
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     async function load() {
+      try {
       const r = await fetch("/analytics/summary");
       if (r.status === 401 || r.status === 403) { // analytics are admin-only — the wire enforces x-suluk-access
         const g = document.getElementById("gate");
@@ -33,6 +34,11 @@ import Layout from "../layouts/Layout.astro";
       const top = (await (await fetch("/analytics/top-products")).json()).topProducts || [];
       document.getElementById("top").innerHTML = top.length ? top.map((p) => `<tr><td>${p.name}</td><td>${p.qty}</td><td>${money(p.priceCents)}</td></tr>`).join("") : `<tr><td colspan="3" style="color:var(--muted)">No sales yet.</td></tr>`;
       document.getElementById("cost").textContent = JSON.stringify(await (await fetch("/cost")).json(), null, 2);
+      } catch (e) { // a network/5xx error must surface, not fail silent (only 401/403 was handled before)
+        const g = document.getElementById("gate"); g.style.display = "block";
+        g.innerHTML = `Couldn't load metrics — the analytics service didn't respond. <button class="btn ghost" id="mRetry" style="margin-inline-start:8px">Retry</button>`;
+        const b = document.getElementById("mRetry"); if (b) b.addEventListener("click", () => { g.style.display = "none"; load(); });
+      }
     }
     load();
   </script>

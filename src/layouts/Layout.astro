@@ -327,8 +327,8 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
             <div class="authpop card" id="authpop" role="menu" hidden>
               <div class="authpop-head"><img id="authpopavatar" alt="" /><div style="min-width:0"><strong id="authpopname"></strong><span id="authpopemail"></span></div></div>
               <a role="menuitem" href="/dashboard" data-i18n="dashboard">Dashboard</a>
-              <a role="menuitem" href="/dashboard">Orders</a>
-              <a role="menuitem" href="/dashboard">Wishlist</a>
+              <a role="menuitem" href="/dashboard/s/orders">Orders</a>
+              <a role="menuitem" href="/dashboard/WishlistItem">Wishlist</a>
               <button role="menuitem" id="authsignout" type="button">Sign out</button>
             </div>
           </div>
@@ -571,6 +571,16 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       })();
     </script>
     <script is:inline set:html={skewGuardScript()}></script>
+    <script is:inline>
+      /* Global client backstop — a silent fetch rejection or runtime error should never just vanish. Warn always; show
+         ONE debounced toast (every 8s max) so the user knows to retry. Guarded so it never throws or spams. */
+      (function () {
+        var last = 0;
+        function notify() { var now = Date.now(); if (now - last < 8000) return; last = now; if (window.toast) window.toast("Something went wrong. Please try again.", { type: "error" }); }
+        window.addEventListener("unhandledrejection", function (e) { try { console.warn("[saasuluk] unhandled rejection:", e && e.reason); } catch (_) {} notify(); });
+        window.addEventListener("error", function (e) { try { console.warn("[saasuluk] error:", e && (e.message || e.error)); } catch (_) {} });
+      })();
+    </script>
     <!-- Browser-executed CLIENT TOOLS the @suluk/chat agent can call: cart (works logged-out — the cart is local),
          theme/scheme, and same-site navigation. Only DEFINITIONS go to the model; run() executes here in the page. -->
     <script is:inline>

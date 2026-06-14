@@ -20,13 +20,15 @@ const PAGES: { path: string; priority?: number; changefreq?: SitemapUrl["changef
 ];
 
 export const GET: APIRoute = ({ site }) => {
-  const base = (site?.href ?? "https://saasuluk.dev/").replace(/\/$/, "");
+  const base = (site?.href ?? "https://saasuluk.saastemly.com/").replace(/\/$/, "");
   const urls: SitemapUrl[] = [
     ...PAGES.map((p) => ({ loc: `${base}/${p.path}`, changefreq: p.changefreq ?? "weekly", priority: p.priority })),
-    ...SEED_PRODUCTS.filter((p) => p.status === "published").map((p) => ({
-      loc: `${base}/products/${p.slug}`, changefreq: "weekly" as const, priority: 0.8,
-      images: [{ loc: `${base}/img/products/${p.slug}.jpg`, title: p.name }],
-    })),
+    ...SEED_PRODUCTS.filter((p) => p.status === "published").map((p) => {
+      // the product's REAL first image — the old `${slug}.jpg` guess 404'd for gallery products (e.g. founder-tee).
+      const img = p.images?.[0]?.url ?? `/img/products/${p.slug}.jpg`;
+      return { loc: `${base}/products/${p.slug}`, changefreq: "weekly" as const, priority: 0.8,
+        images: [{ loc: img.startsWith("http") ? img : `${base}${img}`, title: p.name }] };
+    }),
     ...SEED_POSTS.map((p) => ({
       loc: `${base}/blogs/${p.slug}`, changefreq: "monthly" as const, priority: 0.6,
       images: [{ loc: `${base}/img/blog/${p.slug}.jpg`, title: p.title }],

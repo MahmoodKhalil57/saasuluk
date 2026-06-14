@@ -190,9 +190,16 @@ const productNodes = [
     });
 
     async function loadReviews() {
-      const rs = (await (await fetch("/review")).json()).filter((r) => r.productId === product.id && r.status === "published");
-      document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}${r.verifiedPurchase ? ' <span class="pill" style="font-size:11px">✓ Verified</span>' : ""}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
-      document.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" }); loadReviews(); }));
+      try {
+        const res = await fetch("/review");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const rs = (await res.json()).filter((r) => r.productId === product.id && r.status === "published");
+        document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}${r.verifiedPurchase ? ' <span class="pill" style="font-size:11px">✓ Verified</span>' : ""}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
+        document.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", async () => { await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" }); loadReviews(); }));
+      } catch (e) { // don't strand the buyer on "Loading reviews…" forever
+        document.getElementById("reviews").innerHTML = `<p style="color:var(--muted)">Couldn't load reviews. <button class="pill" id="revRetry" style="cursor:pointer;border:0">Retry</button></p>`;
+        const rb = document.getElementById("revRetry"); if (rb) rb.addEventListener("click", loadReviews);
+      }
     }
     document.getElementById("review").addEventListener("submit", async (e) => {
       e.preventDefault();
