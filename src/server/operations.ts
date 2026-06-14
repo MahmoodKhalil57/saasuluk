@@ -9,7 +9,7 @@
 import { and, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, variant, post, order, cart, review, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
+import { product, variant, post, order, cart, review, reviewHelpfulVote, contactSubmission, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
 import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, type Discount } from "@suluk/stripe";
@@ -17,12 +17,16 @@ import { shippingProvider, taxProvider } from "./commerce";
 import { restStripe } from "./stripe-rest";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "./harden-schema";
-import { redactRow } from "./access";
+import { redactRow, superadminEmails } from "./access";
 import { v } from "./validations";
 
 /** Strip private columns (a digital good's downloadUrl) from product rows headed to a PUBLIC display surface
  *  (search, related). The delivery URL reaches a buyer only via their order snapshot, never the open catalog. */
 const publicProducts = <T extends Record<string, unknown>>(rows: T[]): T[] => rows.map((r) => redactRow("product", r, false));
+
+/** Escape untrusted text before embedding it in server-built HTML (e.g. the owner-notification email body). The
+ *  client-side analog of esc() — a contact form's name/subject/message are attacker-controlled and must not inject. */
+const escHtml = (s: string): string => s.replace(/[<>&"]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[m]!));
 
 /** Buyer-facing projection of an order row (the /checkout/confirm response + success page). Strips ops-only columns
  *  — the customerId principal and stripePaymentIntentId — so the session-capability holder sees only their receipt. */
@@ -355,7 +359,7 @@ function jsonOp(
 export const OPERATION_COSTS: Record<string, CostModel> = {
   checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25), setOrderStatus: write(30),
   analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
-  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), generateAvatar: read(2),
+  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), submitContact: write(20), generateAvatar: read(2),
   createToken: write(30), revokeToken: write(20),
   payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
   connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40), exportAccount: read(20),
@@ -383,6 +387,7 @@ export const OPERATION_PATHS: Record<string, unknown> = {
   "analytics/top-products": { requests: { analyticsTopProducts: jsonOp("get", "Best-selling products") } },
   "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string", maxLength: 16, pattern: "^[0-9]+$" } }, required: ["productId"] } } }) } },
   "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
+  "contact/submit": { requests: { submitContact: jsonOp("post", "Submit the contact form (persists + notifies the store owner)", { body: obj({ name: v.line(120), email: v.email(), subject: v.line(160), message: v.line(4000) }, ["name", "email", "subject", "message"]), status: 201 }) } },
   "newsletter/unsubscribe": { requests: { unsubscribeNewsletter: jsonOp("get", "Unsubscribe from the newsletter via a tokenized one-click link", { params: { query: obj({ t: v.line(400) }) }, contentType: "text/html", response: { type: "string" } }) } },
   "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
   "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
@@ -592,14 +597,27 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
 
   const markReviewHelpful = async (c: Context) => {
     const dz = dbFor(c);
-    // require an authenticated principal — so the +1 is attributable + cost-metered, not anonymous vote-stuffing.
-    // (Full one-vote-per-(review,principal) dedup would need a votes table; this closes the trivial anon replay.)
+    // require an authenticated principal — the vote is attributable + cost-metered, not anonymous stuffing.
     const who = principal(c);
     if (!who) return c.json({ error: "Sign in to mark a review helpful." }, 401);
     const id = Number(c.req.param("id"));
-    await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
+    if (!id) return c.json({ error: "bad review id" }, 422);
+    // ONE vote per (review, principal), TOGGLEABLE. The vote row is the source of truth; helpfulCount mirrors it.
+    // Read-then-write keeps it driver-agnostic (bun:sqlite sync + D1 async differ on .run() affected-row reporting);
+    // the (review_id, principal) UNIQUE index (migration 0003 / SCHEMA_SQL) is the race backstop via onConflictDoNothing.
+    const existing = await dz.select().from(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).get();
+    let voted: boolean;
+    if (!existing) {
+      await dz.insert(reviewHelpfulVote).values({ reviewId: id, principal: who }).onConflictDoNothing().run();
+      await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
+      voted = true;
+    } else {
+      await dz.delete(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).run();
+      await dz.update(review).set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` }).where(eq(review.id, id)).run();
+      voted = false;
+    }
     const r = await dz.select().from(review).where(eq(review.id, id)).get();
-    return r ? c.json(r) : c.json({ error: "not found" }, 404);
+    return r ? c.json({ ...r, voted }) : c.json({ error: "not found" }, 404);
   };
 
   // Submit a review AND stamp verified-purchase — review.verifiedPurchase was a dead column (never written). A review
@@ -730,6 +748,24 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const unsubUrl = `${new URL(c.req.url).origin}/newsletter/unsubscribe?t=${unsubToken(email)}`;
     sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", `<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p><p style="font-size:12px;color:#8a8a8a;margin-top:24px">Not interested? <a href="${unsubUrl}" style="color:#8a8a8a">Unsubscribe</a> any time.</p>`) }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
     return c.json({ subscribed: true, already: false }, 201);
+  };
+
+  // Contact form: persist the submission AND notify the store owner. A bespoke op (not the generic CRUD create) because
+  // the email side-effect belongs in operations.ts — the one seam that reaches BOTH dev + worker via mountOperations.
+  const submitContact = async (c: Context) => {
+    const dz = dbFor(c);
+    const body = (await c.req.json().catch(() => ({}))) as { name?: string; email?: string; subject?: string; message?: string };
+    const name = String(body.name ?? "").trim(), email = String(body.email ?? "").trim().toLowerCase();
+    const subject = String(body.subject ?? "").trim(), message = String(body.message ?? "").trim();
+    if (!name || !email.includes("@") || !subject || !message) return c.json({ error: "name, email, subject and message are required" }, 422);
+    const row = await dz.insert(contactSubmission).values({ name, email, subject, message, createdAt: Date.now() }).returning(); // persist FIRST — survives a mail outage
+    // BEST-EFFORT owner notification — to the first SUPERADMIN_EMAILS entry, else EMAIL_FROM. esc() the user fields
+    // (they land in the owner's inbox as HTML). sendEmailAsync is itself fire-and-forget; the try guards arg-building.
+    try {
+      const to = superadminEmails(secret(c, "SUPERADMIN_EMAILS"))[0] ?? secret(c, "EMAIL_FROM");
+      if (to) sendEmailAsync({ to, subject: `New contact: ${subject}`.slice(0, 180), html: brandedEmail("New contact submission", `<p><b>${escHtml(name)}</b> &lt;${escHtml(email)}&gt; wrote:</p><p><b>${escHtml(subject)}</b></p><p style="white-space:pre-wrap">${escHtml(message)}</p>`) }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
+    } catch { /* notification is best-effort; the submission already persisted */ }
+    return c.json(row[0] ?? { ok: true }, 201);
   };
 
   // One-click unsubscribe — the token obscures the email (base64url) so it isn't a bare address in the URL. Public; a
@@ -965,6 +1001,7 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   app.get("/analytics/top-products", analyticsTopProducts);
   app.get("/recommendations/:productId", recommendRelated);
   app.post("/newsletter/subscribe", subscribeNewsletter);
+  app.post("/contact/submit", submitContact);
   app.get("/newsletter/unsubscribe", unsubscribeNewsletter);
   app.get("/avatar", generateAvatar);
   app.post("/tokens/create", createToken);

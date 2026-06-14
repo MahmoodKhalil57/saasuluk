@@ -150,9 +150,9 @@ describe("saasuluk — the whole Suluk stack composes into a SaaS backend (one c
     expect((await post("/discountCode", { code: "ADMIN50", discountType: "percent", discountValue: 50, isActive: true }, adminH())).status).toBe(201);
     expect((await post("/product", { name: "Admin Product", slug: "admin-product", priceCents: 100, status: "published" }, adminH())).status).toBe(201);
     // public submissions: anyone may submit contact/newsletter, but only an admin reads them
-    expect((await post("/contactSubmission", { name: "Q", email: "q@x.com", subject: "Hello", message: "hi" }, {})).status).toBe(201);
+    expect((await post("/contact/submit", { name: "Q", email: "q@x.com", subject: "Hello", message: "hi" }, {})).status).toBe(201); // bespoke notifying op — the path the form posts to
     expect((await app.request("/contactSubmission")).status).toBe(401); // anon read of submissions → authenticate first
-    expect((await app.request("/contactSubmission", { headers: adminH() })).status).toBe(200);
+    expect((await app.request("/contactSubmission", { headers: adminH() })).status).toBe(200); // admin reads the persisted rows via the generic CRUD
     // reviews are public-read, owner-write — everyone sees them
     expect((await app.request("/review")).status).toBe(200);
     // marking a review helpful requires auth (no anonymous vote-stuffing — a custom op, but still principal-gated)

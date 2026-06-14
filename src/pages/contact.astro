@@ -50,7 +50,7 @@ import Layout from "../layouts/Layout.astro";
       const f = e.target, btn = f.querySelector("button[type=submit]");
       btn.disabled = true; // prevent a duplicate submission
       try {
-        const r = await fetch("/contactSubmission", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "contact-form" }, body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }) });
+        const r = await fetch("/contact/submit", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "contact-form" }, body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }) });
         if (!r.ok) throw new Error("Something went wrong.");
         document.getElementById("cmsg").innerHTML = `<span class="card" style="display:inline-block">✓ Thanks — we'll be in touch.</span>`;
         f.reset();
