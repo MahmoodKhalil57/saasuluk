@@ -42,7 +42,12 @@ export const isAdmin = (c: Context): boolean => c.get("isAdmin") === true;
  * from the world-readable catalog. Without this, an anonymous `GET /product` enumerates every product's delivery
  * URL. The data-admin editor (isAdmin) still reads the full row so it can edit the field.
  */
-export const PRIVATE_READ_COLS: Record<string, string[]> = { product: ["downloadUrl", "download_url"] };
+export const PRIVATE_READ_COLS: Record<string, string[]> = {
+  product: ["downloadUrl", "download_url"],
+  // The owned ApiToken CRUD (domain.ts) would otherwise serialize the stored SHA-256 credential hash to the token's
+  // owner — the bespoke token-list + GDPR export deliberately project metadata-only; the generic CRUD must match.
+  api_token: ["hashedKey", "hashed_key"],
+};
 
 /** Strip a table's private columns from a row unless the caller is an admin. Used by BOTH CRUD twins (dev + worker). */
 export function redactRow<T extends Record<string, unknown> | undefined>(tableName: string, row: T, admin: boolean): T {
