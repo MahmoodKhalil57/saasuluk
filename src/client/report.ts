@@ -182,7 +182,9 @@ function closeAll() {
 async function captureScreenshot(): Promise<string | null> {
   try {
     const html2canvas = (await import("html2canvas")).default;
-    const scale = Math.min(1, 1200 / Math.max(1, window.innerWidth));
+    // Downscale to ~820px wide so a full (often tall) page's JPEG comfortably fits the stored-size cap. useCORS lets
+    // same-origin + CORS-enabled images render; others are skipped (blanked) rather than tainting the canvas.
+    const scale = Math.min(1, 820 / Math.max(1, window.innerWidth));
     const canvas = await html2canvas(document.body, {
       useCORS: true,
       allowTaint: false,
@@ -191,7 +193,10 @@ async function captureScreenshot(): Promise<string | null> {
       backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--bg") || "#fff",
       ignoreElements: (el) => typeof el.id === "string" && el.id.startsWith(PFX),
     });
-    return canvas.toDataURL("image/jpeg", 0.6);
+    let q = 0.55;
+    let url = canvas.toDataURL("image/jpeg", q);
+    while (url.length > 1_450_000 && q > 0.3) url = canvas.toDataURL("image/jpeg", (q -= 0.12)); // shrink to fit the cap
+    return url.length <= 1_450_000 ? url : null;
   } catch {
     return null; // a tainted canvas (cross-origin image) or any failure → submit without the screenshot
   }
@@ -245,8 +250,8 @@ async function submit(el: HTMLElement, sel: string, btn: HTMLButtonElement) {
     });
   if (opt("build")) payload.buildId = BUILD_ID;
   if (opt("screenshot")) {
-    const shot = await captureScreenshot();
-    if (shot && shot.length < 1_400_000) payload.screenshot = shot;
+    const shot = await captureScreenshot(); // already capped to fit the column; null if it couldn't be captured
+    if (shot) payload.screenshot = shot;
   }
 
   try {
