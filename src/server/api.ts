@@ -53,7 +53,7 @@ import { crudHandlers, type CrudHandlers } from "./crud";
 import { mountOperations, verifyApiToken, principal, type DbFor } from "./operations";
 import { isAdmin, superadminEmails } from "./access";
 import { renderCockpitPage } from "./cockpit-view";
-import { themeHeadHtml } from "../themes/head";
+import { themeHeadHtml, panelChromeHtml } from "../themes/head";
 import { accessIndex } from "./access-facet";
 import { configHealth, renderConfigHealth, loadConfig } from "./env";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "./project";
@@ -240,7 +240,7 @@ export async function createApp() {
       basePath: "/panel",
       title: "saasuluk",
       authorize: (c) => signedIn(c),
-      headHtml: themeHeadHtml(),
+      headHtml: panelChromeHtml(), // issue #12 — site chrome (promo banner + branded top bar + footer) in the panel
       homeHeading: (c) => (isAdmin(c) ? "Owner dashboard" : "Your account"),
       homeLabel: "Overview",
       hideEntities: dashboardHiddenEntities,

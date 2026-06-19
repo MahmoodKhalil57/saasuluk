@@ -23,7 +23,7 @@ import { scalarResponse, scalarV4Response, enrichedSpec, enrichedV4, SCALAR_VERS
 import { swaggerResponse } from "@suluk/swagger";
 import { ogImageSvg, DEPLOYMENT_HEADER } from "@suluk/seo";
 import { renderCockpitPage } from "../src/server/cockpit-view";
-import { themeHeadHtml } from "../src/themes/head";
+import { themeHeadHtml, panelChromeHtml } from "../src/themes/head";
 import { BUILD_ID } from "../src/build-id";
 import { referenceInsightsResponse } from "@suluk/reference";
 import { SCALAR_FORK_HASH } from "./gen/scalar-fork";
@@ -377,7 +377,7 @@ app.route(
     basePath: "/panel",
     title: "saasuluk",
     authorize: (c) => isSignedIn(c),
-    headHtml: themeHeadHtml(),
+    headHtml: panelChromeHtml(), // issue #12 — site chrome (promo banner + branded top bar + footer) in the panel
     uploadPath: "/panel/upload",
     homeHeading: (c) => (isAdmin(c as unknown as Context) ? "Owner dashboard" : "Your account"),
     homeLabel: "Overview",

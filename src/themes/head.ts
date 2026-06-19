@@ -13,3 +13,44 @@ export const THEME_STAMPER =
 export function themeHeadHtml(): string {
   return `<script>${THEME_STAMPER}</script><link rel="stylesheet" href="/schemes.css"/>`;
 }
+
+/**
+ * Site chrome for the /panel dashboard (issue #12) — themeHeadHtml() PLUS the main-site promo banner, a branded top
+ * bar (logo → store · "View store" · theme cycle · sign out) and a footer, injected into the @suluk/panel shell's
+ * `.pf-main` column at runtime. It's self-contained (no bundled modules — the panel is served outside Vite), uses the
+ * site CSS vars from /schemes.css, and shares the `theme` / `promo_dismissed` localStorage keys with the main site so
+ * the experience stays consistent. Pass as the panel's `headHtml`.
+ */
+export function panelChromeHtml(): string {
+  const css = `<style>
+  .pf-main{min-height:100vh}
+  .scb-promo{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 16px;font-size:13px;text-align:center;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 15%,var(--panel)),var(--panel));border-bottom:1px solid var(--line)}
+  .scb-promo b{color:var(--accent)}
+  .scb-promo button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
+  .scb-bar{display:flex;align-items:center;gap:12px;padding:11px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+  .scb-bar .scb-brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:-.02em;color:var(--fg);text-decoration:none;font-size:15px}
+  .scb-bar .scb-dot{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--accent-2),var(--accent));display:grid;place-items:center;color:#fff;font-size:12px}
+  .scb-bar .scb-sp{flex:1}
+  .scb-bar a.scb-l,.scb-bar button.scb-b{font-size:13px;font-family:inherit;color:var(--muted);text-decoration:none;background:var(--bg-soft,transparent);border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}
+  .scb-bar a.scb-l:hover,.scb-bar button.scb-b:hover{color:var(--fg);border-color:color-mix(in srgb,var(--accent) 42%,var(--line))}
+  .scb-foot{margin-top:auto;padding:18px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .scb-foot a{color:var(--muted)}
+  </style>`;
+  const js = `<script>(function(){
+  function ready(fn){document.readyState!=="loading"?fn():document.addEventListener("DOMContentLoaded",fn);}
+  ready(function(){
+    var main=document.querySelector(".pf-main");if(!main)return;
+    var bar=document.createElement("div");bar.className="scb-bar";
+    bar.innerHTML='<a class="scb-brand" href="/"><span class="scb-dot">s</span> saasuluk</a><span class="scb-sp"></span><a class="scb-l" href="/">View store \\u2197</a><button class="scb-b" id="scb-theme" type="button">Theme</button><button class="scb-b" id="scb-out" type="button">Sign out</button>';
+    main.insertBefore(bar,main.firstChild);
+    try{if(!localStorage.getItem("promo_dismissed")){var p=document.createElement("div");p.className="scb-promo";p.innerHTML='<span>\\uD83C\\uDF89 Launch week \\u2014 use code <b>LAUNCH30</b> at checkout for 30% off.</span><button aria-label="Dismiss">\\u00d7</button>';p.querySelector("button").addEventListener("click",function(){try{localStorage.setItem("promo_dismissed","1");}catch(e){}p.remove();});main.insertBefore(p,bar);}}catch(e){}
+    var foot=document.createElement("footer");foot.className="scb-foot";foot.innerHTML='<span>\\u00a9 saasuluk</span><a href="/">Store</a><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a>';main.appendChild(foot);
+    var order=["light","dark","system"];function pref(){try{return localStorage.getItem("theme")||"system";}catch(e){return "system";}}
+    function lbl(t){return "Theme: "+t.charAt(0).toUpperCase()+t.slice(1);}
+    var tb=document.getElementById("scb-theme");tb.textContent=lbl(pref());
+    tb.addEventListener("click",function(){var n=order[(order.indexOf(pref())+1)%3];try{localStorage.setItem("theme",n);}catch(e){}var dk=n==="dark"||(n==="system"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);var d=document.documentElement;d.dataset.theme=dk?"dark":"light";d.dataset.themePref=n;tb.textContent=lbl(n);});
+    document.getElementById("scb-out").addEventListener("click",function(){fetch("/api/auth/sign-out",{method:"POST",credentials:"same-origin"}).then(function(){location.href="/";}).catch(function(){location.href="/";});});
+  });
+  })();</script>`;
+  return themeHeadHtml() + css + js;
+}
