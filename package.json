@@ -21,7 +21,7 @@
     "deploy": "bun run build && bun run build:worker && wrangler deploy",
     "deploy:cf": "bun run build && bun run build:worker && bun run scripts/deploy.ts",
     "deploy:editor": "bun run scripts/deploy-editor.ts",
-    "deploy:ci": "wrangler deploy",
+    "deploy:ci": "bun run scripts/deploy-ci.ts",
     "gen:schemes": "bun run scripts/gen-schemes.ts",
     "build:all": "bun run build && bun run build:worker",
     "lint": "eslint .",
