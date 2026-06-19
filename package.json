@@ -32,8 +32,8 @@
     "check:suluk": "bun run scripts/check-suluk.ts",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run check:suluk",
     "stage": "bun run scripts/stage.ts",
-    "ci:local": "wrkflw run --runtime emulation .github/workflows/ci.yml",
-    "deploy:local": "wrkflw run --runtime emulation .github/workflows/deploy.yml",
+    "ci:local": "bun run stage format && bun run stage lint && bun run stage typecheck && bun run stage suluk && bun run stage test && bun run stage build",
+    "deploy:local": "bun run stage build && bun run stage deploy",
     "wrkflw:validate": "wrkflw validate .github/workflows",
     "push": "bash scripts/push.sh"
   },
