@@ -351,8 +351,12 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         background: color-mix(in srgb, var(--bg) 82%, transparent);
         backdrop-filter: blur(12px) saturate(1.4);
       }
+      /* 3-column grid so the nav is centered in the VIEWPORT (issue #4), independent of the brand/chrome widths:
+         brand | nav (centered) | chrome (end). When the nav folds (≤1024px) the middle auto-column collapses to 0,
+         leaving brand⟷chrome. */
       header.site .wrap {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
         align-items: center;
         gap: 22px;
         height: 60px;
@@ -360,6 +364,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       .brand {
         display: flex;
         align-items: center;
+        justify-self: start;
         gap: 9px;
         font-weight: 800;
         letter-spacing: -0.02em;
@@ -379,6 +384,8 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       }
       nav.main {
         display: flex;
+        align-items: center;
+        justify-self: center;
         gap: 4px;
       }
       nav.main a {
@@ -397,7 +404,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         color: var(--fg);
       }
       .chrome {
-        margin-inline-start: auto;
+        justify-self: end;
         display: flex;
         gap: 8px;
         align-items: center;
@@ -416,7 +423,10 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       .iconbtn:hover {
         background: var(--bg-soft);
       }
-      @media (max-width: 760px) {
+      /* Fold the primary nav into the hamburger drawer below 1024px: the full 6-link nav + chrome needs ~890px, so
+         between 760–1030px it used to overflow (issue #4). Below 1024px → hamburger; the secondary chrome controls
+         (search/scheme/lang) still only fold at ≤760px (there's room for them with the nav gone). */
+      @media (max-width: 1024px) {
         nav.main {
           display: none;
         }
@@ -1019,13 +1029,17 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       #sk-chat.cart-open-hide {
         display: none !important;
       }
-      /* mobile nav drawer — slides from the START edge (opposite the cart), RTL-aware; hamburger shows < 760px */
+      /* mobile nav drawer — slides from the START edge (opposite the cart), RTL-aware; hamburger shows ≤ 1024px.
+         The display toggle is keyed on the ID (#navtoggle) so it ALWAYS beats `.iconbtn { display: inline-grid }`
+         regardless of source order — a class rule lost that fight, leaving the hamburger stuck visible on desktop. */
       .navtoggle {
-        display: none;
         font-size: 16px;
       }
-      @media (max-width: 760px) {
-        .navtoggle {
+      #navtoggle {
+        display: none;
+      }
+      @media (max-width: 1024px) {
+        #navtoggle {
           display: inline-grid;
           place-items: center;
         }
@@ -1452,9 +1466,6 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           transform: scale(1);
         }
       }
-      .navtoggle {
-        display: none;
-      }
       /* only the clip-path circle plays on a theme switch (suppress the default root cross-fade) */
       ::view-transition-old(root),
       ::view-transition-new(root) {
@@ -1592,11 +1603,8 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         padding: 18px;
       }
 
-      /* ── responsivity: fold secondary controls into the mobile drawer ─────────────────────── */
+      /* ── responsivity: fold the SECONDARY controls (search/scheme/lang) into the mobile drawer below 760px ── */
       @media (max-width: 760px) {
-        .navtoggle {
-          display: inline-grid;
-        }
         .chrome #palette-open,
         .chrome .langmenu,
         .chrome #scheme-btn {
@@ -2188,18 +2196,27 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         // Expanding-circle view transition originating from a clicked element — shared by the theme toggle AND the
         // color-scheme picker (issue #3). Reads prefers-reduced-motion LIVE; falls back to an instant mutate when the
         // browser lacks startViewTransition or the user prefers reduced motion.
-        function circleReveal(originEl, mutate) {
+        function circleReveal(origin, mutate) {
           var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-          if (!document.startViewTransition || !originEl || !originEl.getBoundingClientRect || reduce) {
+          // Capture the origin POINT synchronously, BEFORE mutate (or any follow-up re-render) can detach the element —
+          // reading the rect later inside .ready.then() would return (0,0) for a now-removed node (issue #3: the swatch
+          // grid re-renders, so the reveal used to start from the top-left corner instead of the click).
+          var pt = null;
+          if (origin && origin.getBoundingClientRect) {
+            var r = origin.getBoundingClientRect();
+            if (r.width || r.height) pt = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          } else if (origin && typeof origin.x === "number") {
+            pt = origin;
+          }
+          if (!document.startViewTransition || !pt || reduce) {
             mutate();
             return;
           }
           document
             .startViewTransition(mutate)
             .ready.then(function () {
-              var r = originEl.getBoundingClientRect(),
-                x = r.left + r.width / 2,
-                y = r.top + r.height / 2;
+              var x = pt.x,
+                y = pt.y;
               var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
               root.animate(
                 { clipPath: ["circle(0px at " + x + "px " + y + "px)", "circle(" + rad + "px at " + x + "px " + y + "px)"] },
@@ -2286,7 +2303,15 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
               } catch (e) {}
             }
           });
-          renderGrid(search ? search.value : ""); // popover highlight updates immediately (outside the transition)
+          // Reflect the picked scheme in the popover IMMEDIATELY. We toggle the highlight in place (not renderGrid,
+          // which both reads the stale root.dataset.scheme — set async inside the transition — and would rebuild the
+          // grid, detaching the swatch the reveal animates from). Fixes issue #3: selection now updates on first click.
+          if (grid)
+            grid.querySelectorAll("[data-scheme]").forEach(function (b) {
+              var sel = b.getAttribute("data-scheme") === name;
+              b.classList.toggle("on", sel);
+              b.setAttribute("aria-selected", sel ? "true" : "false");
+            });
         }
         function openPop() {
           if (!pop) return;

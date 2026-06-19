@@ -38,7 +38,7 @@ import Layout from "../layouts/Layout.astro";
   <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; align-items:start; margin-top:8px">
     <div
       id="map"
-      style="height:300px; border-radius:14px; border:1px solid var(--line); overflow:hidden; background:var(--bg-soft)"
+      style="height:300px; border-radius:14px; border:1px solid var(--line); overflow:hidden; background:var(--bg-soft); position:relative; z-index:0; isolation:isolate"
       role="img"
       aria-label="Map of our location"
     >
