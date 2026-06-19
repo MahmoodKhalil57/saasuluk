@@ -73,7 +73,7 @@ const footerCols: { head: string; links: [string, Key | string][] }[] = [
       ["/products", "products"],
       ["/pricing", "pricing"],
       ["/metrics", "metrics"],
-      ["/dashboard", "dashboard"],
+      ["/panel", "dashboard"],
     ],
   },
   {
@@ -92,7 +92,6 @@ const footerCols: { head: string; links: [string, Key | string][] }[] = [
       ["/scalar", "Scalar · 3.1 view"],
       ["/swagger", "Swagger UI"],
       ["/openapi.json", "OpenAPI v4 doc"],
-      ["/panel", "Admin panel"],
       ["/superadmin", "Superadmin"],
       ["/cockpit", "Cockpit"],
       ["/cost", "Cost ledger"],
@@ -1891,9 +1890,9 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
                   <strong id="authpopname"></strong><span id="authpopemail"></span>
                 </div>
               </div>
-              <a role="menuitem" href="/dashboard" {...navAttrs("/dashboard")} data-i18n="dashboard">Dashboard</a>
-              <a role="menuitem" href="/dashboard/s/orders" {...navAttrs("/dashboard/s/orders")}>Orders</a>
-              <a role="menuitem" href="/dashboard/s/wishlist" {...navAttrs("/dashboard/s/wishlist")}>Wishlist</a>
+              <a role="menuitem" href="/panel" {...navAttrs("/panel")} data-i18n="dashboard">Dashboard</a>
+              <a role="menuitem" href="/panel/s/orders" {...navAttrs("/panel/s/orders")}>Orders</a>
+              <a role="menuitem" href="/panel/s/wishlist" {...navAttrs("/panel/s/wishlist")}>Wishlist</a>
               <button role="menuitem" id="authsignout" type="button">Sign out</button>
             </div>
           </div>
@@ -2601,7 +2600,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           {
             name: "navigate",
             description:
-              "Navigate to a page on this site. Use a same-site path such as /products, /pricing, /products/<slug>, /blogs, /faqs, or /dashboard.",
+              "Navigate to a page on this site. Use a same-site path such as /products, /pricing, /products/<slug>, /blogs, /faqs, or /panel.",
             parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
             run: function (a) {
               var p = String(a.path || "");

@@ -114,10 +114,10 @@ import Layout from "../../layouts/Layout.astro";
             if (L.length) ship = '<div class="sx-ship"><b>Shipping to</b>' + L.map(esc).join("<br>") + "</div>";
           }
         } catch (e) {}
-        // digital delivery — a PAID order's downloadable lines get an immediate access link (also lives on /dashboard/s/orders).
+        // digital delivery — a PAID order's downloadable lines get an immediate access link (also lives on /panel/s/orders).
         const dls = items.filter((it) => it.downloadUrl);
         const dlBlock = dls.length
-          ? '<div class="card sx-card" style="margin-top:14px"><h2 style="margin-top:0;font-size:16px">Your downloads</h2><p style="color:var(--muted);font-size:13px;margin:0 0 10px">Instant access — also in <a href="/dashboard/s/orders">your orders</a>.</p>' +
+          ? '<div class="card sx-card" style="margin-top:14px"><h2 style="margin-top:0;font-size:16px">Your downloads</h2><p style="color:var(--muted);font-size:13px;margin:0 0 10px">Instant access — also in <a href="/panel/s/orders">your orders</a>.</p>' +
             dls
               .map(
                 (it) =>
@@ -188,7 +188,7 @@ import Layout from "../../layouts/Layout.astro";
           if (r.paid) {
             localStorage.removeItem("cart");
             window.dispatchEvent(new Event("cart-changed"));
-            state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${esc(orderId)} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and a receipt is on its way to your inbox. Track it any time in <a href="/dashboard/s/orders">your orders</a>.</p><div class="cta"><a class="btn" href="/dashboard/s/orders">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
+            state.innerHTML = `<span class="pill accent">Paid</span><h1 style="margin-top:14px">Order #${esc(orderId)} <span class="gradient">confirmed</span> 🎉</h1><p class="tag center">Your payment cleared through Stripe and a receipt is on its way to your inbox. Track it any time in <a href="/panel/s/orders">your orders</a>.</p><div class="cta"><a class="btn" href="/panel/s/orders">View your orders →</a><a class="btn ghost" href="/products">Keep shopping</a></div>`;
             if (r.order) document.getElementById("summary").innerHTML = summaryHtml(r.order);
           } else {
             state.innerHTML = `<h1>Payment not confirmed yet</h1><p class="tag center">We couldn't confirm order #${esc(orderId)}. If you just paid, give it a moment and refresh — or <a href="/checkout">return to checkout</a>.</p>`;

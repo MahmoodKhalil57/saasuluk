@@ -111,9 +111,9 @@ import { Icon } from "astro-icon/components";
         try {
           const q = new URLSearchParams(location.search);
           const p = q.get("redirectTo") || q.get("next");
-          return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/dashboard";
+          return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/panel";
         } catch (e) {
-          return "/dashboard";
+          return "/panel";
         }
       })();
       // field-error feedback (mirrors @suluk/nano-stores markInvalid + clearInvalidOnInput): the base CSS rings

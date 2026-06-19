@@ -715,7 +715,7 @@ import Layout from "../layouts/Layout.astro";
             disc = null;
             const oid = (r.order && r.order.id) || r.orderId;
             document.getElementById("result").innerHTML =
-              `<span class="card" style="display:block">✓ Order #${oid} placed — ${money(r.totalCents)}. <a href="/dashboard">View it in your account →</a></span>`;
+              `<span class="card" style="display:block">✓ Order #${oid} placed — ${money(r.totalCents)}. <a href="/panel">View it in your account →</a></span>`;
             if (window.toast) window.toast("Order placed ✓", { type: "success" });
             render();
           } else throw new Error(r.error || "Checkout could not complete.");

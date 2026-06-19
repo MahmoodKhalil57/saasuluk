@@ -223,44 +223,38 @@ export async function createApp() {
     return c.json({ ...summarize(events), opStats });
   });
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // /superadmin (verified session, not a header)
-  app.route(
-    "/",
-    panelApp({
-      document,
-      basePath: "/panel",
-      title: "saasuluk",
-      authorize: (c) => isAdmin(c),
-      headHtml: themeHeadHtml(),
-      homeHeading: "Superadmin",
-      homeLabel: "Overview",
-      groups: adminGroups,
-      sections: adminSections,
-      stats: () => adminStats(db as never),
-    }),
-  ); // @suluk/panel — admin dashboard (full document, grouped, KPIs + cost ledger)
-  // The user /dashboard — consolidated self-service area (replaces /account + /dashboard), role-projected.
+  // Unified /panel (issue #7) — ONE self-service + store-management surface for every signed-in user. It REPLACES the
+  // old admin-only /panel AND the user /dashboard. @suluk/panel resolves groups/sections/stats/home/heading per-request,
+  // so a single mount serves both audiences off the role-projected document:
+  //   • every signed-in user gets the personal account groups (profile, security, sessions, orders, wishlist, billing,
+  //     developer, danger) — role-projected so they only ever see their own rows;
+  //   • owners/admins ALSO get the "Store · …" management groups (catalog, orders, content, inbox, ops).
+  // /superadmin stays as the exhaustive raw-CRUD console for power users.
   const signedIn = (c: Context) => !!(c.get("sessionUser") || c.get("tokenUser"));
-  app.use("/dashboard", (c, next) => (signedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
-  app.use("/dashboard/*", (c, next) => (signedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+  app.use("/panel", (c, next) => (signedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+  app.use("/panel/*", (c, next) => (signedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
   app.route(
     "/",
     panelApp({
       document: (c) => projectDocument(document, viewerOf(c), canonHash),
-      basePath: "/dashboard",
+      basePath: "/panel",
       title: "saasuluk",
       authorize: (c) => signedIn(c),
       headHtml: themeHeadHtml(),
-      homeHeading: "Your dashboard",
+      homeHeading: (c) => (isAdmin(c) ? "Owner dashboard" : "Your account"),
       homeLabel: "Overview",
-      sections: dashboardSections,
-      groups: dashboardGroups,
       hideEntities: dashboardHiddenEntities,
+      groups: (c) => (isAdmin(c) ? [...dashboardGroups, ...adminGroups] : dashboardGroups),
+      sections: (c) => (isAdmin(c) ? [...dashboardSections, ...adminSections] : dashboardSections),
       home: (c) => dashboardHome({ admin: isAdmin(c) }),
-      stats: (c) => userStats(db as never, principal(c)),
+      stats: (c) => (isAdmin(c) ? adminStats(db as never) : userStats(db as never, principal(c))),
     }),
   );
-  app.get("/account", (c) => c.redirect("/dashboard", 301));
-  app.get("/account/*", (c) => c.redirect("/dashboard", 301));
+  // /dashboard + /account are retired → 301 to the unified /panel (sub-paths preserved so deep links survive).
+  app.get("/dashboard", (c) => c.redirect("/panel", 301));
+  app.get("/dashboard/*", (c) => c.redirect(c.req.path.replace(/^\/dashboard/, "/panel"), 301));
+  app.get("/account", (c) => c.redirect("/panel", 301));
+  app.get("/account/*", (c) => c.redirect("/panel", 301));
   app.route(
     "/",
     mcpApp({

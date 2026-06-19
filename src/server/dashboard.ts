@@ -34,10 +34,10 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
     ]);
     const spent = orders.reduce((n, o) => n + (Number(o.totalCents) || 0), 0);
     return [
-      { label: "Orders", value: orders.length, href: "/dashboard/s/orders" },
+      { label: "Orders", value: orders.length, href: "/panel/s/orders" },
       { label: "Total spent", value: "$" + (spent / 100).toFixed(2), hint: "all time" },
-      { label: "Wishlist", value: wl.length, href: "/dashboard/s/wishlist" },
-      { label: "API keys", value: toks.length, href: "/dashboard/s/developer" },
+      { label: "Wishlist", value: wl.length, href: "/panel/s/wishlist" },
+      { label: "API keys", value: toks.length, href: "/panel/s/developer" },
     ];
   } catch {
     return [];
@@ -219,14 +219,14 @@ export function dashboardHome(opts: { admin: boolean }): string {
 </div>
 <div class="dh-quick">
   <a class="dh-qa" href="/products"><span>🛍️</span> Browse products</a>
-  <a class="dh-qa" href="/dashboard/s/orders"><span>📦</span> Your orders</a>
-  <a class="dh-qa" href="/dashboard/s/wishlist"><span>❤️</span> Wishlist</a>
-  <a class="dh-qa" href="/dashboard/s/billing"><span>💳</span> Billing</a>
-  <a class="dh-qa" href="/dashboard/s/developer"><span>🔑</span> API keys</a>
+  <a class="dh-qa" href="/panel/s/orders"><span>📦</span> Your orders</a>
+  <a class="dh-qa" href="/panel/s/wishlist"><span>❤️</span> Wishlist</a>
+  <a class="dh-qa" href="/panel/s/billing"><span>💳</span> Billing</a>
+  <a class="dh-qa" href="/panel/s/developer"><span>🔑</span> API keys</a>
   ${adminTile}
 </div>
 <div class="dh-grid">
-  <div class="pf-section"><h2 style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">Recent orders <a href="/dashboard/s/orders" style="font-size:13px;font-weight:500;white-space:nowrap">View all →</a></h2><p class="pf-sub">Your latest purchases.</p><div id="dh-orders" class="pf-muted">Loading…</div></div>
+  <div class="pf-section"><h2 style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">Recent orders <a href="/panel/s/orders" style="font-size:13px;font-weight:500;white-space:nowrap">View all →</a></h2><p class="pf-sub">Your latest purchases.</p><div id="dh-orders" class="pf-muted">Loading…</div></div>
   <div class="pf-section"><h2>Recommended for you</h2><p class="pf-sub">Fresh from the catalog.</p><div id="dh-recs" class="dh-recs"></div></div>
 </div>
 <script>(function(){
@@ -241,7 +241,7 @@ export function dashboardHome(opts: { admin: boolean }): string {
   fetch("/order",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(os){
     os=(os||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).slice(0,4);
     var box=document.getElementById("dh-orders");
-    box.innerHTML=os.length?os.map(function(o){return '<a class="pf-row" href="/dashboard/s/orders" style="text-decoration:none;color:inherit"><span>#'+esc(o.id)+' <span class="pf-pill">'+esc(o.status)+'</span></span><span class="pf-muted">'+esc(money(o.totalCents))+' · '+esc(when(o.createdAt))+'</span></a>';}).join(""):'<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';
+    box.innerHTML=os.length?os.map(function(o){return '<a class="pf-row" href="/panel/s/orders" style="text-decoration:none;color:inherit"><span>#'+esc(o.id)+' <span class="pf-pill">'+esc(o.status)+'</span></span><span class="pf-muted">'+esc(money(o.totalCents))+' · '+esc(when(o.createdAt))+'</span></a>';}).join(""):'<div class="pf-empty">No orders yet — <a href="/products">shop the store →</a></div>';
   }).catch(function(){document.getElementById("dh-orders").innerHTML='<div class="pf-empty">Could not load orders.</div>';});
   fetch("/product",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(ps){
     ps=(ps||[]).filter(function(p){return p.status==="published";}).slice(0,4);
@@ -322,7 +322,7 @@ const ORDERS = `
         '</div></div>';}).join("");
     box.querySelectorAll(".od-head").forEach(function(h){h.addEventListener("click",function(){h.closest(".od-card").classList.toggle("open");});});
     box.querySelectorAll("[data-buy]").forEach(function(b){b.addEventListener("click",function(e){e.stopPropagation();var o=os.find(function(x){return String(x.id)===b.dataset.buy;});if(o)buyAgain(parse(o.items));});});
-  }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your orders. <a href="/dashboard/s/orders">Retry</a></div>';});
+  }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your orders. <a href="/panel/s/orders">Retry</a></div>';});
 })();</script>`;
 
 // A shoppable WISHLIST — the @suluk/panel auto-list showed raw numeric productId/variantId with no name/image/price.
@@ -363,7 +363,7 @@ const WISHLIST = `
       fetch("/wishlistItem/"+encodeURIComponent(b.dataset.rm),{method:"DELETE",credentials:"same-origin"}).then(function(r){
         if(r.ok){var card=b.closest(".wl-card");if(card)card.remove();if(window.toast)window.toast("Removed",{type:"success"});if(!box.querySelectorAll(".wl-card").length)box.innerHTML=EMPTY;}
         else{b.disabled=false;if(window.toast)window.toast("Could not remove.",{type:"error"});}});});});
-  }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your wishlist. <a href="/dashboard/s/wishlist">Retry</a></div>';});
+  }).catch(function(){box.className="";box.innerHTML='<div class="pf-empty">Could not load your wishlist. <a href="/panel/s/wishlist">Retry</a></div>';});
 })();</script>`;
 
 export const dashboardSections: PanelSection[] = [
@@ -394,12 +394,18 @@ export async function adminStats(db: AnyDb): Promise<StatCard[]> {
   }
 }
 
+// Owner/admin store-management groups, appended AFTER the personal account groups (dashboardGroups) on the unified
+// /panel so an owner sees their own account PLUS the store. Titles are "Store · …" so they never collide with the
+// personal groups, and they intentionally DON'T re-list entities already in dashboardGroups (Cart/Review/Address/
+// Project render admin-scoped there for an admin) — that avoids duplicate sidebar links to the same entity list.
+// Order is managed through the bespoke "fulfillment" section (richer than raw CRUD); Order/WishlistItem/ApiToken/
+// BillingAccount stay in dashboardHiddenEntities, and /superadmin remains the exhaustive raw-CRUD console.
 export const adminGroups = [
-  { title: "Catalog", entities: ["Product", "Category", "Variant", "DiscountCode"] },
-  { title: "Commerce", entities: ["Order", "Cart", "WishlistItem", "Review"], sections: ["fulfillment"] },
-  { title: "Content", entities: ["Post", "Faq"] },
-  { title: "Accounts", entities: ["Project", "ApiToken", "BillingAccount"] },
-  { title: "Ops", sections: ["cost"] },
+  { title: "Store · Catalog", entities: ["Product", "Category", "Variant", "DiscountCode"] },
+  { title: "Store · Orders", sections: ["fulfillment"] },
+  { title: "Store · Content", entities: ["Post", "Faq", "Media"] },
+  { title: "Store · Inbox", entities: ["ContactSubmission", "NewsletterSubscriber"] },
+  { title: "Store · Ops", sections: ["cost"] },
 ];
 
 // Admin FULFILLMENT — the workflow order.status never had: list paid orders waiting to ship + recent shipments, and

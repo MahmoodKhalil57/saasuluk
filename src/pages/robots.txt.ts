@@ -10,7 +10,7 @@ export const prerender = true;
 export const GET: APIRoute = ({ site }) => {
   const base = (site?.href ?? "https://saasuluk.dev/").replace(/\/$/, "");
   const body = robotsTxt({
-    groups: [{ userAgent: "*", allow: ["/"], disallow: ["/account", "/dashboard", "/checkout", "/login", "/api/"] }],
+    groups: [{ userAgent: "*", allow: ["/"], disallow: ["/account", "/dashboard", "/panel", "/checkout", "/login", "/api/"] }],
     sitemaps: [`${base}/sitemap.xml`],
   });
   return new Response(body, { headers: { "content-type": "text/plain; charset=utf-8" } });
