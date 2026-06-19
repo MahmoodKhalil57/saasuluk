@@ -23,17 +23,24 @@ if (!buildId || !domain) {
   process.exit(code);
 }
 
+// POLL — Cloudflare's edge can take a few seconds to serve the new version, so a single immediate check can read the
+// PREVIOUS build and false-fail. Retry for ~40s; succeed the moment the live build matches this commit.
 console.log(`\n• wrangler exited ${code}; verifying the deploy landed via https://${domain}/api/health (expecting build ${buildId}) …`);
-try {
-  const r = await fetch(`https://${domain}/api/health`, { signal: AbortSignal.timeout(15_000) });
-  const live = (await r.json()) as { build?: string };
-  if (live.build === buildId) {
-    console.log(`✓ Deploy verified LIVE (build ${live.build}). wrangler's non-zero exit was the workers.dev /subdomain`);
-    console.log(`  step an account-scoped token can't touch — harmless for a custom-domain deploy.`);
-    process.exit(0);
+let live: string | undefined;
+for (let attempt = 1; attempt <= 10; attempt++) {
+  try {
+    const r = await fetch(`https://${domain}/api/health`, { signal: AbortSignal.timeout(10_000), cache: "no-store" });
+    live = ((await r.json()) as { build?: string }).build;
+    if (live === buildId) {
+      console.log(`✓ Deploy verified LIVE (build ${live}, after ${attempt} check${attempt > 1 ? "s" : ""}). wrangler's`);
+      console.log(`  non-zero exit was the workers.dev /subdomain step an account-scoped token can't touch — harmless`);
+      console.log(`  for a custom-domain deploy.`);
+      process.exit(0);
+    }
+  } catch {
+    /* edge not ready / transient — keep polling */
   }
-  console.error(`✗ Live build is ${live.build ?? "?"}, expected ${buildId} — the deploy did NOT land.`);
-} catch (e) {
-  console.error(`✗ Could not verify the deploy:`, e instanceof Error ? e.message : e);
+  if (attempt < 10) await new Promise((res) => setTimeout(res, 4000));
 }
+console.error(`✗ Live build is ${live ?? "?"}, expected ${buildId} after polling ~40s — the deploy did NOT land.`);
 process.exit(code);
