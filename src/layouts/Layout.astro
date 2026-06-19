@@ -6,6 +6,10 @@ import { seoTags, renderTags, organization, website, graph, deploymentMeta, skew
 import { chatWidget } from "@suluk/chat";
 import { renderBaseCss } from "@suluk/theme";
 import { BUILD_ID } from "../build-id";
+import { Icon } from "astro-icon/components";
+import { ICON, iconSvg } from "../icons";
+// theme-toggle icons resolved to SVG strings at build (the toggle swaps innerHTML per light/dark/system in JS) — see #6
+const themeIcons = { light: iconSvg(ICON.themeLight, 22), dark: iconSvg(ICON.themeDark, 22), system: iconSvg(ICON.themeSystem, 22) };
 const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
 // the a11y + motion contract (focus-visible rings, reduced-motion, aria-invalid, sr-only/skip-link, shake/reveal/
 // nav-progress) — inherited from @suluk/theme, pointed at saasuluk's own color vars.
@@ -1678,10 +1682,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             aria-label="Search"
             title="Search (⌘K)"
             aria-haspopup="dialog"
-            aria-controls="palette"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              ><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.35-4.35"></path></svg
-            ></button
+            aria-controls="palette"><Icon name={ICON.search} /></button
           >
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
           <button
@@ -1691,40 +1692,17 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             title="Color scheme"
             aria-haspopup="dialog"
             aria-controls="schemepop"
-            aria-expanded="false"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-              ><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"
-              ></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"
-              ></circle><path
-                d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 5.624 17.461 2 12 2Z"
-              ></path></svg
-            ></button
+            aria-expanded="false"><Icon name={ICON.scheme} /></button
           >
-          <button id="theme" class="iconbtn theme-btn" aria-label="Toggle theme"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-              ><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg
-            ></button
-          >
+          <button id="theme" class="iconbtn theme-btn" aria-label="Toggle theme"><Icon name={ICON.themeSystem} /></button>
           <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-              ><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"
-              ></path></svg
-            ><span id="cartcount" class="cartcount" hidden>0</span></button
+            ><Icon name={ICON.cart} /><span id="cartcount" class="cartcount" hidden>0</span></button
           >
           <div class="authmenu" id="authmenu">
             <a id="authsignin" class="btn sm" href="/login" data-i18n="signIn" hidden>Sign in</a>
             <button id="authbtn" class="authbtn" aria-haspopup="menu" aria-expanded="false" aria-controls="authpop" hidden>
               <img id="authavatar" class="authavatar" alt="" /><span id="authname" class="authname"></span>
-              <svg
-                class="authcaret"
-                viewBox="0 0 24 24"
-                width="13"
-                height="13"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg
-              >
+              <Icon name={ICON.caret} class="authcaret" width="13" height="13" />
             </button>
             <div class="authpop card" id="authpop" role="menu" hidden>
               <div class="authpop-head">
@@ -1765,10 +1743,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             aria-label="Menu"
             aria-expanded="false"
             aria-controls="mobilenav"
-            aria-haspopup="dialog"
-            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              ><path d="M3 6h18M3 12h18M3 18h18"></path></svg
-            ></button
+            aria-haspopup="dialog"><Icon name={ICON.menu} /></button
           >
         </div>
       </div>
@@ -1987,18 +1962,12 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       import "../client/palette";
     </script>
     <script is:inline set:html={`window.__schemes=${JSON.stringify(SCHEME_SWATCHES)}`} />
-    <script is:inline>
+    <script is:inline define:vars={{ themeIcons }}>
       if (window.__applyLang) window.__applyLang(window.__lang0);
       (function () {
         var root = document.documentElement,
           mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
-        var ICONS = {
-          light:
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
-          dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.36 6.36 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
-          system:
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
-        };
+        var ICONS = themeIcons; // material-symbols light/dark/system, resolved to SVG strings at build (issue #6)
         var THEMES = ["light", "dark", "system"],
           tbtn = document.getElementById("theme"),
           mLabel = document.getElementById("m-theme-label");

@@ -1,6 +1,7 @@
 import { defineConfig } from "astro/config";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
+import icon from "astro-icon";
 
 // Astro renders the marketing/app pages; a middleware delegates /api, /scalar, /superadmin, /cost and
 // /openapi.json to the Suluk-powered Hono app (one server). On Cloudflare both run in the same Worker.
@@ -10,7 +11,9 @@ export default defineConfig({
   site: process.env.SITE_URL ?? "https://saasuluk.saastemly.com",
   output: "server",
   adapter: node({ mode: "standalone" }),
-  integrations: [react()],
+  // astro-icon (issue #6): build-time, local Iconify JSON — inlines only the referenced icons as currentColor SVGs.
+  // No runtime/CDN fetch (offline-safe). Icon names funnel through src/icons.ts so swapping a set is a one-liner.
+  integrations: [react(), icon()],
   // SvelteKit-feel navigation: ClientRouter (rendered in Layout.astro <head>) swaps the DOM instead of reloading.
   // prefetch with defaultStrategy:"load" is the most aggressive warm — EVERY internal <a> on the page is prefetched
   // immediately on load (not just when it scrolls into view). clientPrerender upgrades each warm from an HTML-only
