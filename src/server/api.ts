@@ -57,7 +57,7 @@ import { themeHeadHtml, panelChromeHtml } from "../themes/head";
 import { accessIndex } from "./access-facet";
 import { configHealth, renderConfigHealth, loadConfig } from "./env";
 import { projectDocument, requestedViewer, viewerOf, docHash } from "./project";
-import { db } from "./db";
+import { db, sqlite } from "./db";
 
 export async function createApp() {
   await ensureAuthTables();
@@ -222,6 +222,25 @@ export async function createApp() {
     }
     return c.json({ ...summarize(events), opStats });
   });
+  // Admin read-only views (issue #7 phase 2) — the panel's Users / Sessions / Transactions tabs. Better Auth's
+  // user/session tables aren't domain entities, so they're served here (dev: the same bun:sqlite db), admin-gated.
+  const adminRows = (c: Context, sql: string) =>
+    isAdmin(c) ? c.json(sqlite.query(sql).all() as unknown[]) : c.json({ error: "forbidden" }, 403);
+  app.get("/admin/users", (c) =>
+    adminRows(c, "SELECT id, email, name, role, emailVerified, banned, createdAt FROM user ORDER BY createdAt DESC LIMIT 500"),
+  );
+  app.get("/admin/sessions", (c) =>
+    adminRows(
+      c,
+      "SELECT s.id, u.email, s.ipAddress, s.userAgent, s.createdAt, s.expiresAt FROM session s LEFT JOIN user u ON u.id = s.userId ORDER BY s.createdAt DESC LIMIT 500",
+    ),
+  );
+  app.get("/admin/transactions", (c) =>
+    adminRows(
+      c,
+      "SELECT id, customer_id, total_cents, status, stripe_payment_intent_id, created_at FROM \"order\" WHERE status IN ('paid','shipped','cancelled','refunded') ORDER BY created_at DESC LIMIT 500",
+    ),
+  );
   app.route("/", adminApp({ document, title: "Saasuluk", authorize: (c) => isAdmin(c), headHtml: themeHeadHtml() })); // /superadmin (verified session, not a header)
   // Unified /panel (issue #7) — ONE self-service + store-management surface for every signed-in user. It REPLACES the
   // old admin-only /panel AND the user /dashboard. @suluk/panel resolves groups/sections/stats/home/heading per-request,

@@ -402,11 +402,85 @@ export async function adminStats(db: AnyDb): Promise<StatCard[]> {
 // BillingAccount stay in dashboardHiddenEntities, and /superadmin remains the exhaustive raw-CRUD console.
 export const adminGroups = [
   { title: "Store · Catalog", entities: ["Product", "Category", "Variant", "DiscountCode"] },
-  { title: "Store · Orders", sections: ["fulfillment"] },
+  { title: "Store · Orders", sections: ["fulfillment", "transactions"] },
+  { title: "Store · People", sections: ["users", "allsessions"] }, // issue #7 phase 2 — Better Auth user/session admin views
   { title: "Store · Content", entities: ["Post", "Faq", "Media"] },
   { title: "Store · Inbox", entities: ["ContactSubmission", "NewsletterSubscriber", "Report"] },
   { title: "Store · Ops", sections: ["cost"] },
 ];
+
+// Admin read-only TABLE sections (issue #7 phase 2) — Users / Sessions / Transactions, fetched from admin-gated
+// endpoints (Better Auth's user+session tables; paid/refunded orders). A tiny generic renderer keeps them DRY.
+function tableSection(o: {
+  title: string;
+  sub: string;
+  url: string;
+  cols: { key: string; label: string; kind?: "money" | "date" | "bool" | "pill" }[];
+}): string {
+  return `
+<div class="pf-section">
+  <h2 style="margin-top:0">${o.title}</h2>
+  <p class="pf-sub">${o.sub}</p>
+  <div id="tbl" class="pf-muted">Loading…</div>
+</div>
+<script>(function(){
+  var COLS=${JSON.stringify(o.cols)};
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"})[c];});}
+  function fmt(v,k){ if(v==null||v==="")return "—";
+    if(k==="money")return "$"+(Number(v)/100).toFixed(2);
+    if(k==="date"){var n=Number(v);var d=isNaN(n)?new Date(v):new Date(n>1e12?n:n*1000);return isNaN(d.getTime())?esc(String(v)):d.toLocaleString();}
+    if(k==="bool")return v?"\\u2713":"\\u2014";
+    var t=esc(v); return t.length>54?t.slice(0,54)+"\\u2026":t;
+  }
+  fetch(${JSON.stringify(o.url)},{credentials:"same-origin"}).then(function(r){return r.ok?r.json():[];}).then(function(rows){
+    rows=Array.isArray(rows)?rows:(rows.results||rows.data||[]);
+    var box=document.getElementById("tbl");
+    if(!rows.length){box.innerHTML='<div class="pf-empty">Nothing here yet.</div>';return;}
+    var th=COLS.map(function(c){return '<th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">'+esc(c.label)+'</th>';}).join("");
+    var body=rows.map(function(row){return "<tr>"+COLS.map(function(c){var cell=c.kind==="pill"?'<span class="pf-pill">'+esc(row[c.key])+'</span>':fmt(row[c.key],c.kind);return '<td style="padding:9px 10px;border-bottom:1px solid var(--line);font-size:13px">'+cell+'</td>';}).join("")+"</tr>";}).join("");
+    box.innerHTML='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'+th+'</tr></thead><tbody>'+body+'</tbody></table></div><p class="pf-sub" style="margin-top:10px">'+rows.length+' row'+(rows.length===1?'':'s')+'</p>';
+  }).catch(function(){document.getElementById("tbl").innerHTML='<div class="pf-empty">Could not load.</div>';});
+})();</script>`;
+}
+
+const USERS = tableSection({
+  title: "Users",
+  sub: "Everyone who has signed up.",
+  url: "/admin/users",
+  cols: [
+    { key: "email", label: "Email" },
+    { key: "name", label: "Name" },
+    { key: "role", label: "Role", kind: "pill" },
+    { key: "emailVerified", label: "Verified", kind: "bool" },
+    { key: "banned", label: "Banned", kind: "bool" },
+    { key: "createdAt", label: "Joined", kind: "date" },
+  ],
+});
+const ALL_SESSIONS = tableSection({
+  title: "Sessions",
+  sub: "Active sign-ins across every user.",
+  url: "/admin/sessions",
+  cols: [
+    { key: "email", label: "User" },
+    { key: "ipAddress", label: "IP" },
+    { key: "userAgent", label: "Device" },
+    { key: "createdAt", label: "Started", kind: "date" },
+    { key: "expiresAt", label: "Expires", kind: "date" },
+  ],
+});
+const TRANSACTIONS = tableSection({
+  title: "Transactions",
+  sub: "Paid, shipped and refunded orders.",
+  url: "/admin/transactions",
+  cols: [
+    { key: "id", label: "Order" },
+    { key: "customer_id", label: "Customer" },
+    { key: "total_cents", label: "Amount", kind: "money" },
+    { key: "status", label: "Status", kind: "pill" },
+    { key: "stripe_payment_intent_id", label: "Stripe PI" },
+    { key: "created_at", label: "Date", kind: "date" },
+  ],
+});
 
 // Admin FULFILLMENT — the workflow order.status never had: list paid orders waiting to ship + recent shipments, and
 // transition paid → shipped (with carrier + tracking) or → cancelled via POST /order/:id/status, which emails the
@@ -521,6 +595,9 @@ const FULFILL = `
 
 export const adminSections: PanelSection[] = [
   { id: "fulfillment", label: "Orders", summary: "Search, inspect, fulfill + refund", render: () => FULFILL },
+  { id: "transactions", label: "Transactions", summary: "Paid + refunded orders", render: () => TRANSACTIONS },
+  { id: "users", label: "Users", summary: "Everyone who has signed up", render: () => USERS },
+  { id: "allsessions", label: "Sessions", summary: "Active sign-ins (all users)", render: () => ALL_SESSIONS },
   {
     id: "cost",
     label: "Cost ledger",

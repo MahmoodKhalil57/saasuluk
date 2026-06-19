@@ -26,6 +26,7 @@ const HONO = [
   "/openapi.json",
   "/superadmin",
   "/cost",
+  "/admin",
   ...ENTITIES.map((e) => `/${lowerFirst(e.name)}`),
   "/checkout/order",
   "/checkout/pay",

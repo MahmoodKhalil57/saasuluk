@@ -348,6 +348,29 @@ app.get("/cost", async (c) => {
   return c.json({ ...summarize(events), opStats });
 });
 
+// Admin read-only views (issue #7 phase 2) — the panel's Users / Sessions / Transactions tabs. Better Auth's user +
+// session tables aren't domain entities, so they're served here, admin-gated (never a spoofable header).
+async function adminRows(c: Context<{ Bindings: Env }>, sql: string) {
+  if (!isAdmin(c as unknown as Context)) return c.json({ error: "forbidden" }, 403);
+  const { results } = await c.env.DB.prepare(sql).all();
+  return c.json(results);
+}
+app.get("/admin/users", (c) =>
+  adminRows(c, "SELECT id, email, name, role, emailVerified, banned, createdAt FROM user ORDER BY createdAt DESC LIMIT 500"),
+);
+app.get("/admin/sessions", (c) =>
+  adminRows(
+    c,
+    "SELECT s.id, u.email, s.ipAddress, s.userAgent, s.createdAt, s.expiresAt FROM session s LEFT JOIN user u ON u.id = s.userId ORDER BY s.createdAt DESC LIMIT 500",
+  ),
+);
+app.get("/admin/transactions", (c) =>
+  adminRows(
+    c,
+    "SELECT id, customer_id, total_cents, status, stripe_payment_intent_id, created_at FROM \"order\" WHERE status IN ('paid','shipped','cancelled','refunded') ORDER BY created_at DESC LIMIT 500",
+  ),
+);
+
 // Signed-in (verified session OR API token) — the gate for the user /dashboard.
 const isSignedIn = (c: Context): boolean => {
   const g = c as unknown as { get: (k: string) => unknown };
