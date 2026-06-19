@@ -939,6 +939,82 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         width: 100%;
         justify-content: center;
       }
+      /* cart-drawer discount entry + "Ask AI" chat handoff (issue #2) */
+      .cartdrawer-head-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .cart-chatbtn {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 5px 11px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--bg-soft);
+        color: var(--fg);
+        cursor: pointer;
+        line-height: 1;
+      }
+      .cart-chatbtn:hover {
+        border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+      }
+      .cart-disc {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .cart-disc input {
+        flex: 1;
+        min-width: 0;
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--panel);
+        color: var(--fg);
+        font-size: 13.5px;
+      }
+      .cart-disc input:focus-visible {
+        outline: none;
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+      }
+      .cart-disc .btn {
+        width: auto;
+        flex: none;
+        padding-inline: 15px;
+      }
+      .cart-applied {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+      .cart-applied button {
+        background: none;
+        border: 0;
+        color: inherit;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        padding: 0 2px;
+      }
+      .cart-msg {
+        font-size: 12.5px;
+        margin: 0 0 10px;
+      }
+      .cart-msg:empty {
+        display: none;
+      }
+      .cart-discrow span:last-child {
+        color: var(--accent);
+      }
+      /* while the cart drawer is open, suppress the floating AI chat so it can't overlap the drawer/checkout CTA */
+      #sk-chat.cart-open-hide {
+        display: none !important;
+      }
       /* mobile nav drawer — slides from the START edge (opposite the cart), RTL-aware; hamburger shows < 760px */
       .navtoggle {
         display: none;
@@ -1925,10 +2001,31 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
     >
       <div class="cartdrawer-head">
         <strong data-i18n="cart">Cart</strong>
-        <button id="cartclose" class="iconbtn" aria-label="Close cart">✕</button>
+        <div class="cartdrawer-head-actions">
+          <button id="cartchat" class="cart-chatbtn" type="button" aria-label="Ask the AI assistant about your cart">Ask&nbsp;AI</button>
+          <button id="cartclose" class="iconbtn" aria-label="Close cart">✕</button>
+        </div>
       </div>
       <div id="cartlines" class="cartlines"></div>
       <div class="cartdrawer-foot">
+        <!-- in-drawer discount entry (issue #2): mirrors the checkout flow against /discount/validate, persists via the
+             shared `discount` store, and re-validates on open + cart change so a now-ineligible code drops cleanly. -->
+        <div class="cart-disc">
+          <input
+            id="cartcode"
+            placeholder="Discount code"
+            aria-label="Discount code"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+          />
+          <button id="cartapply" class="btn ghost" type="button" data-i18n="apply">Apply</button>
+        </div>
+        <span id="cartapplied" class="cart-applied" hidden></span>
+        <p id="cartdiscMsg" class="cart-msg" aria-live="polite"></p>
+        <div class="cartsub cart-discrow" id="cartdiscRow" hidden>
+          <span data-i18n="discount">Discount</span><span id="cartdiscAmt"></span>
+        </div>
         <div class="cartsub"><span data-i18n="subtotal">Subtotal</span><span id="cartsubtotal">$0.00</span></div>
         <a id="cartcheckout" class="btn" href="/checkout" data-i18n="checkout" style="opacity:.45;pointer-events:none">Checkout</a>
       </div>

@@ -44,6 +44,8 @@ type Key =
   | "checkout"
   | "cart"
   | "subtotal"
+  | "apply"
+  | "discount"
   | "emptyCart"
   | "skipToContent";
 
@@ -70,6 +72,8 @@ export const DICT: Record<Locale, Record<Key, string>> = {
     checkout: "Checkout",
     cart: "Cart",
     subtotal: "Subtotal",
+    apply: "Apply",
+    discount: "Discount",
     emptyCart: "Your cart is empty.",
     skipToContent: "Skip to content",
   },
@@ -95,6 +99,8 @@ export const DICT: Record<Locale, Record<Key, string>> = {
     checkout: "Pagar",
     cart: "Carrito",
     subtotal: "Subtotal",
+    apply: "Aplicar",
+    discount: "Descuento",
     emptyCart: "Tu carrito está vacío.",
     skipToContent: "Saltar al contenido",
   },
@@ -120,6 +126,8 @@ export const DICT: Record<Locale, Record<Key, string>> = {
     checkout: "الدفع",
     cart: "السلة",
     subtotal: "المجموع الفرعي",
+    apply: "تطبيق",
+    discount: "خصم",
     emptyCart: "سلتك فارغة.",
     skipToContent: "تخطَّ إلى المحتوى",
   },

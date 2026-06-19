@@ -27,6 +27,24 @@ const reapplyLang = () => {
   if (w.__applyLang && w.__lang0) w.__applyLang(w.__lang0);
 };
 
+interface DiscountValidation {
+  valid: boolean;
+  newTotalCents?: number;
+  discountType?: "percent" | "fixed";
+  discountValue?: number;
+  reason?: string;
+}
+const postJson = async <T>(path: string, body: unknown): Promise<T> => {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`${path} → ${r.status}`);
+  return (await r.json()) as T;
+};
+
 function wire() {
   const btn = el("cartbtn"),
     drawer = el("cartdrawer"),
@@ -111,6 +129,95 @@ function wire() {
     else if (act === "rm") cart.remove(id, vid);
   });
 
+  // ---- discount (issue #2) ----
+  // Mirrors the checkout flow: POST /discount/validate for the SERVER-authoritative amount, persist the validated
+  // {code,type,value} through the shared `discount` store (so a code entered here or on checkout survives nav/refresh/
+  // tabs), and re-validate on open + cart change so a now-ineligible code (min-subtotal etc.) drops cleanly.
+  const codeInput = el("cartcode") as HTMLInputElement | null;
+  const applyBtn = el("cartapply") as HTMLButtonElement | null;
+  const appliedEl = el("cartapplied");
+  const discMsg = el("cartdiscMsg");
+  const discRow = el("cartdiscRow");
+  const discAmtEl = el("cartdiscAmt");
+
+  const setMsg = (html: string) => {
+    if (discMsg) discMsg.innerHTML = html;
+  };
+  const renderDiscRow = (amountCents: number) => {
+    if (!discRow || !discAmtEl) return;
+    discRow.hidden = !(amountCents > 0);
+    discAmtEl.textContent = amountCents > 0 ? `−${money(amountCents)}` : "";
+  };
+  function removeDiscount() {
+    discount.clear();
+    if (appliedEl) appliedEl.hidden = true;
+    renderDiscRow(0);
+    setMsg("");
+  }
+  const paintPill = (code: string) => {
+    if (!appliedEl) return;
+    appliedEl.hidden = false;
+    appliedEl.innerHTML = `✓ ${esc(code)} applied <button type="button" title="Remove" aria-label="Remove discount">×</button>`;
+    appliedEl.querySelector("button")?.addEventListener("click", removeDiscount);
+  };
+  const showApplied = (code: string) => {
+    paintPill(code);
+    if (codeInput) codeInput.value = "";
+    setMsg("");
+  };
+  // reflect the persisted discount immediately (no network) — so a code applied on checkout shows here the instant the
+  // drawer opens, before any re-validation round-trip resolves.
+  const renderApplied = () => {
+    const d = discount.get();
+    if (d) paintPill(d.code);
+    else if (appliedEl) {
+      appliedEl.hidden = true;
+      renderDiscRow(0);
+    }
+  };
+  const applyCode = async (code: string, opts: { silent?: boolean } = {}) => {
+    const sub = cart.$subtotalCents.get();
+    const r = await postJson<DiscountValidation>("/discount/validate", { code, subtotalCents: sub, items: cart.lines() });
+    if (r.valid) {
+      discount.apply({ code: code.toUpperCase(), type: r.discountType ?? "percent", value: r.discountValue ?? 0 });
+      renderDiscRow(sub - (typeof r.newTotalCents === "number" ? r.newTotalCents : sub));
+      showApplied(code.toUpperCase());
+    } else {
+      discount.clear();
+      if (appliedEl) appliedEl.hidden = true;
+      renderDiscRow(0);
+      if (!opts.silent) setMsg(`<span style="color:#e5484d">✗ ${esc(r.reason || "Invalid code.")}</span>`);
+    }
+  };
+  applyBtn?.addEventListener("click", async () => {
+    const code = codeInput?.value.trim();
+    if (!code) return;
+    applyBtn.disabled = true;
+    try {
+      await applyCode(code);
+    } catch {
+      setMsg(`<span style="color:#e5484d">✗ Could not validate the code.</span>`);
+    } finally {
+      applyBtn.disabled = false;
+    }
+  });
+  codeInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyBtn?.click();
+    }
+  });
+  // re-validate (debounced) whenever the cart subtotal changes while a code is applied — keeps min-subtotal codes honest
+  // and refreshes the discount amount. Fires once immediately on subscribe, which conveniently refreshes on load too.
+  let revalTimer = 0;
+  cart.$subtotalCents.subscribe(() => {
+    const d = discount.get();
+    if (!d) return;
+    window.clearTimeout(revalTimer);
+    revalTimer = window.setTimeout(() => void applyCode(d.code, { silent: true }).catch(() => {}), 250);
+  });
+  discount.$discount.subscribe(renderApplied);
+
   // ---- open / close ----
   // the page chrome behind the modal — made `inert` while open so focus is trapped + it's hidden from AT (a real
   // modal, honouring aria-modal). The drawer + backdrop are body-level siblings, so they stay interactive.
@@ -130,6 +237,11 @@ function wire() {
     });
     drawer.setAttribute("aria-hidden", "false");
     for (const n of chrome()) n.inert = true;
+    document.getElementById("sk-chat")?.classList.add("cart-open-hide"); // keep the floating AI chat from overlapping
+    const d = discount.get();
+    if (d)
+      void applyCode(d.code, { silent: true }).catch(() => {}); // refresh the discount amount vs the live cart
+    else renderApplied();
     (el("cartclose") as HTMLElement | null)?.focus();
   };
   const close = () => {
@@ -140,6 +252,7 @@ function wire() {
     window.setTimeout(() => {
       drawer.hidden = true;
       back.hidden = true;
+      document.getElementById("sk-chat")?.classList.remove("cart-open-hide"); // restore the chat once the drawer is gone
     }, 220);
     lastFocus?.focus();
   };
@@ -149,8 +262,19 @@ function wire() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !drawer.hidden) close();
   });
+  // "Ask AI": close the drawer, then hand off to the floating chat launcher once it's visible again (after the 220ms
+  // close transition + chat un-hide). No-op if the chat widget isn't mounted on this page.
+  el("cartchat")?.addEventListener("click", () => {
+    close();
+    window.setTimeout(() => (document.getElementById("sk-chat-launch") as HTMLElement | null)?.click(), 240);
+  });
+  // defensive: if a nav lands with the drawer closed, make sure we never leave the chat hidden.
+  window.addEventListener("astro:page-load", () => {
+    if (!drawer.classList.contains("open")) document.getElementById("sk-chat")?.classList.remove("cart-open-hide");
+  });
 
   renderLines();
+  renderApplied();
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
