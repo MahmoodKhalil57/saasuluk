@@ -88,6 +88,19 @@ export const VALIDATIONS: Record<string, Record<string, unknown>> = {
   NewsletterSubscriber: { email: email(), subscribedAt: ts() },
   ContactSubmission: { name: line(120), email: email(), subject: line(200), message: rich(5000), createdAt: ts() },
   Media: { url: url(), alt: line(300), width: int(0, 100_000), height: int(0, 100_000) },
+  Report: {
+    note: rich(5000),
+    url: rich(2000),
+    selector: rich(800),
+    elementHtml: rich(20_000),
+    elementCss: jsonBlob(20_000),
+    pageInfo: jsonBlob(4000),
+    userInfo: jsonBlob(4000),
+    buildId: line(80),
+    screenshot: rich(1_500_000), // a downscaled JPEG data URL (client caps the dimensions)
+    status: { type: "string", enum: ["new", "triaged", "resolved"] },
+    createdAt: ts(),
+  },
   ApiToken: {
     userId: uid(),
     name: line(120),

@@ -206,6 +206,26 @@ export const media = sqliteTable("media", {
   height: integer("height"),
 });
 
+// In-app bug/feedback reports (issue #11): a visitor types "report", picks any element on the page, and submits a
+// note plus the metadata they opt into — the picked element (selector/html/computed-css), the page, the user, the
+// client build id + time, and an optional downscaled screenshot. World-writable (access: "submit"), admin-read.
+export const report = sqliteTable("report", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  note: text("note"),
+  url: text("url").notNull(),
+  selector: text("selector"),
+  elementHtml: text("element_html"),
+  elementCss: text("element_css"), // JSON of key computed styles
+  pageInfo: text("page_info"), // JSON { title, referrer, viewport, scroll }
+  userInfo: text("user_info"), // JSON { email, userAgent, locale, theme, scheme }
+  buildId: text("build_id"),
+  screenshot: text("screenshot"), // a downscaled JPEG data URL, or null
+  status: text("status", { enum: ["new", "triaged", "resolved"] })
+    .notNull()
+    .default("new"),
+  createdAt: integer("created_at"),
+});
+
 // ── platform ─────────────────────────────────────────────────────────────────────────────────────────────
 export const apiToken = sqliteTable("api_token", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -277,6 +297,7 @@ export const SCHEMA_SQL = (
     contactSubmission,
     stockNotification,
     media,
+    report,
     apiToken,
     project,
     billingAccount,

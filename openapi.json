@@ -10073,6 +10073,1080 @@
         }
       }
     },
+    "report": {
+      "requests": {
+        "listReport": {
+          "method": "get",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "ok",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "note": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "type": "string",
+                      "maxLength": 2000,
+                      "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                    },
+                    "selector": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "elementHtml": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "elementCss": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pageInfo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "userInfo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "buildId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "screenshot": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "new",
+                        "triaged",
+                        "resolved"
+                      ]
+                    },
+                    "createdAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "List Report",
+          "tags": [
+            "Report"
+          ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 6
+              }
+            ],
+            "estimateMicroUsd": 6
+          }
+        },
+        "createReport": {
+          "method": "post",
+          "responses": {
+            "201": {
+              "status": 201,
+              "description": "created",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                  },
+                  "selector": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "elementHtml": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "elementCss": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pageInfo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "userInfo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "buildId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "screenshot": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "new",
+                      "triaged",
+                      "resolved"
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Create Report",
+          "tags": [
+            "Report"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+              },
+              "selector": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elementHtml": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elementCss": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "userInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "buildId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "screenshot": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "triaged",
+                  "resolved"
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 130
+          }
+        }
+      }
+    },
+    "report/{id}": {
+      "requests": {
+        "getReport": {
+          "method": "get",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "ok",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                  },
+                  "selector": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "elementHtml": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "elementCss": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pageInfo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "userInfo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "buildId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "screenshot": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "new",
+                      "triaged",
+                      "resolved"
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "404": {
+              "status": 404,
+              "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Get Report by id",
+          "tags": [
+            "Report"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 6
+              }
+            ],
+            "estimateMicroUsd": 6
+          }
+        },
+        "updateReport": {
+          "method": "patch",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "updated",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                  },
+                  "selector": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "elementHtml": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "elementCss": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pageInfo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "userInfo": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "buildId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "screenshot": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "new",
+                      "triaged",
+                      "resolved"
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Update Report",
+          "tags": [
+            "Report"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+              },
+              "selector": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elementHtml": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elementCss": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "userInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "buildId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "screenshot": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "triaged",
+                  "resolved"
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 130
+          }
+        },
+        "deleteReport": {
+          "method": "delete",
+          "responses": {
+            "204": {
+              "status": 204,
+              "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Delete Report",
+          "tags": [
+            "Report"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 18
+              }
+            ],
+            "estimateMicroUsd": 118
+          }
+        }
+      }
+    },
     "apiToken": {
       "requests": {
         "listApiToken": {
@@ -14592,6 +15666,134 @@
           "alt",
           "width",
           "height"
+        ],
+        "additionalProperties": false
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "elementHtml": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "elementCss": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pageInfo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "userInfo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "buildId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "screenshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "triaged",
+              "resolved"
+            ]
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "note",
+          "url",
+          "selector",
+          "elementHtml",
+          "elementCss",
+          "pageInfo",
+          "userInfo",
+          "buildId",
+          "screenshot",
+          "status",
+          "createdAt"
         ],
         "additionalProperties": false
       },

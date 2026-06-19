@@ -404,7 +404,7 @@ export const adminGroups = [
   { title: "Store · Catalog", entities: ["Product", "Category", "Variant", "DiscountCode"] },
   { title: "Store · Orders", sections: ["fulfillment"] },
   { title: "Store · Content", entities: ["Post", "Faq", "Media"] },
-  { title: "Store · Inbox", entities: ["ContactSubmission", "NewsletterSubscriber"] },
+  { title: "Store · Inbox", entities: ["ContactSubmission", "NewsletterSubscriber", "Report"] },
   { title: "Store · Ops", sections: ["cost"] },
 ];
 

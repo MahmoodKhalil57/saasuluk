@@ -58,6 +58,7 @@ export const ENTITIES: EntityDef[] = [
   { name: "NewsletterSubscriber", table: s.newsletterSubscriber, access: "submit", r: 6, w: 20 },
   { name: "ContactSubmission", table: s.contactSubmission, access: "submit", r: 6, w: 20 },
   { name: "Media", table: s.media, access: "public", r: 6, w: 25 },
+  { name: "Report", table: s.report, access: "submit", r: 6, w: 30 }, // in-app bug reports: world-submit, admin-read
   // platform — tokens/projects are owned; billing is owner-read but system-written
   { name: "ApiToken", table: s.apiToken, ownerCol: "userId", access: "owned", r: 8, w: 30 },
   { name: "BillingAccount", table: s.billingAccount, ownerCol: "principal", access: "ownedReadonly", r: 8, w: 30 },

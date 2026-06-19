@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS faq (id INTEGER PRIMARY KEY AUTOINCREMENT, question T
 CREATE TABLE IF NOT EXISTS newsletter_subscriber (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, subscribed_at INTEGER);
 CREATE TABLE IF NOT EXISTS contact_submission (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL, subject TEXT NOT NULL, message TEXT NOT NULL, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS media (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, alt TEXT NOT NULL, width INTEGER, height INTEGER);
+CREATE TABLE IF NOT EXISTS report (id INTEGER PRIMARY KEY AUTOINCREMENT, note TEXT, url TEXT NOT NULL, selector TEXT, element_html TEXT, element_css TEXT, page_info TEXT, user_info TEXT, build_id TEXT, screenshot TEXT, status TEXT NOT NULL DEFAULT 'new', created_at INTEGER);
 CREATE TABLE IF NOT EXISTS api_token (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, name TEXT NOT NULL, prefix TEXT NOT NULL, hashed_key TEXT NOT NULL, created_at INTEGER, last_used_at INTEGER, revoked_at INTEGER);
 CREATE TABLE IF NOT EXISTS project (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, owner_id TEXT, status TEXT NOT NULL DEFAULT 'active');
 CREATE TABLE IF NOT EXISTS billing_account (id INTEGER PRIMARY KEY AUTOINCREMENT, principal TEXT NOT NULL, stripe_customer_id TEXT, subscription_id TEXT, last_reported_micro_usd INTEGER, last_reported_at INTEGER, created_at INTEGER);
