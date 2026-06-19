@@ -64,22 +64,34 @@ function paintOut() {
   }
 }
 
-/** Re-derive the header auth UI from the source of truth. Optimistic from the hint, authoritative from $session;
- *  NEVER flips to signed-out on an unknown/errored session — only on a definitive signed-out response. */
+// Once we've seen a DEFINITIVE signed-out response we remember it, so a later transient/undefined store state (e.g. a
+// failed refetch) can't be misread as "signed in" via a stale hint. Reset the moment we see a real user again.
+let confirmedOut = false;
+
+/** Re-derive the header auth UI from the source of truth (issue #5). Three states, and the ONLY thing that signs the
+ *  user out is a CONFIRMED signed-out response (200 + null / 401 / 403 → data === null with no error). A transient
+ *  failure, loading, or an undefined store value NEVER signs out — it paints optimistically from the su_user hint. */
 function render() {
-  const s = $session.get() as { data?: { user?: User } | null; error?: unknown };
-  if (s && "data" in s && s.data !== undefined) {
-    const u = s.data && s.data.user;
-    if (u) paintIn(u);
-    else paintOut(); // data === null / no user ⇒ a real, confirmed signed-out response
+  const s = $session.get() as { data?: { user?: User } | null; error?: unknown; loading?: boolean };
+  const user = s && s.data && s.data.user;
+  if (user) {
+    confirmedOut = false;
+    paintIn(user); // confirmed signed-IN
     return;
   }
-  // No authoritative answer yet (loading or errored). Paint optimistically; do NOT sign out.
+  if (s && s.data === null && !s.error) {
+    confirmedOut = true;
+    paintOut(); // confirmed signed-OUT — a real null response, not an error
+    return;
+  }
+  // transient / errored / loading / undefined → do NOT sign out. Paint optimistically from the hint.
   const hint = readHint();
   if (hint && (hint.name || hint.email)) paintIn(hint);
+  else if (confirmedOut)
+    paintOut(); // we previously confirmed signed-out and have no hint — keep it signed-out
   else {
     const signin = el("authsignin");
-    if (signin) signin.hidden = false;
+    if (signin) signin.hidden = false; // unknown + no hint → show "Sign in" (without removing su_user)
   }
 }
 

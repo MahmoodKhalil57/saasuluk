@@ -54,6 +54,13 @@ const $session = createFetcherStore(["/api/auth/get-session"], {
       throw new Error("session " + r.status); // 5xx / transient — keep the last-known state, do NOT sign out
     }),
   cacheLifetime: 600_000,
+  // Issue #5 — the avatar flipped to "Sign in" on tab refocus. Two nanoquery behaviours caused it:
+  //  • revalidateOnFocus refetched get-session on every tab focus (>dedupeTime), and
+  //  • a failed fetch's default onErrorRetry runs invalidateKeys → cache.delete, WIPING the last-known-good user.
+  // Disable both for the session store: focus must not refetch, and a transient failure must not retry-into-a-wipe.
+  // The su_user hint + per-navigation re-render + revalidateOnReconnect keep it fresh enough.
+  revalidateOnFocus: false,
+  onErrorRetry: null,
 });
 
 // Per-id factories, memoized so we don't spin up a fresh store object on every read.

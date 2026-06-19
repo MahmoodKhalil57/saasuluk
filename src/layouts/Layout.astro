@@ -2015,20 +2015,19 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           if (mLabel) mLabel.textContent = pref;
           if (popOpen) renderGrid(search ? search.value : ""); // swatches preview the active light/dark mode
         }
-        function cycleTheme(e) {
-          var cur = root.dataset.themePref || "system",
-            next = THEMES[(THEMES.indexOf(cur) + 1) % 3];
-          var btn = e && e.currentTarget && e.currentTarget.getBoundingClientRect ? e.currentTarget : tbtn;
-          if (!document.startViewTransition || !btn) {
-            applyTheme(next);
+        // Expanding-circle view transition originating from a clicked element — shared by the theme toggle AND the
+        // color-scheme picker (issue #3). Reads prefers-reduced-motion LIVE; falls back to an instant mutate when the
+        // browser lacks startViewTransition or the user prefers reduced motion.
+        function circleReveal(originEl, mutate) {
+          var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (!document.startViewTransition || !originEl || !originEl.getBoundingClientRect || reduce) {
+            mutate();
             return;
           }
           document
-            .startViewTransition(function () {
-              applyTheme(next);
-            })
+            .startViewTransition(mutate)
             .ready.then(function () {
-              var r = btn.getBoundingClientRect(),
+              var r = originEl.getBoundingClientRect(),
                 x = r.left + r.width / 2,
                 y = r.top + r.height / 2;
               var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
@@ -2038,6 +2037,14 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
               );
             })
             .catch(function () {});
+        }
+        function cycleTheme(e) {
+          var cur = root.dataset.themePref || "system",
+            next = THEMES[(THEMES.indexOf(cur) + 1) % 3];
+          var btn = e && e.currentTarget && e.currentTarget.getBoundingClientRect ? e.currentTarget : tbtn;
+          circleReveal(btn, function () {
+            applyTheme(next);
+          });
         }
         if (tbtn) {
           applyTheme(root.dataset.themePref || "system");
@@ -2094,19 +2101,22 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           });
           grid.innerHTML = list.length ? list.map(card).join("") : '<p class="scheme-empty">No schemes match.</p>';
         }
-        function setScheme(name) {
-          if (name) {
-            root.dataset.scheme = name;
-            try {
-              localStorage.setItem("scheme", name);
-            } catch (e) {}
-          } else {
-            delete root.dataset.scheme;
-            try {
-              localStorage.removeItem("scheme");
-            } catch (e) {}
-          }
-          renderGrid(search ? search.value : "");
+        function setScheme(name, originEl) {
+          // animate the scheme swap with the same expanding-circle reveal as the theme toggle, from the clicked swatch
+          circleReveal(originEl, function () {
+            if (name) {
+              root.dataset.scheme = name;
+              try {
+                localStorage.setItem("scheme", name);
+              } catch (e) {}
+            } else {
+              delete root.dataset.scheme;
+              try {
+                localStorage.removeItem("scheme");
+              } catch (e) {}
+            }
+          });
+          renderGrid(search ? search.value : ""); // popover highlight updates immediately (outside the transition)
         }
         function openPop() {
           if (!pop) return;
@@ -2148,7 +2158,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         if (grid)
           grid.addEventListener("click", function (e) {
             var c = e.target.closest && e.target.closest("[data-scheme]");
-            if (c) setScheme(c.getAttribute("data-scheme"));
+            if (c) setScheme(c.getAttribute("data-scheme"), c); // pass the swatch as the circle-reveal origin
           });
         document.addEventListener("keydown", function (e) {
           if (e.key === "Escape" && popOpen) closePop();
@@ -2210,6 +2220,9 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           localStorage.setItem("lang", e.target.value);
         } catch (x) {}
         document.cookie = "lang=" + e.target.value + ";path=/;max-age=31536000;samesite=lax";
+        // Issue #1 — the switch "needed a reload" because __lang0 stayed stale, so the astro:page-load re-apply
+        // (which uses window.__lang0) reverted the chrome to the old locale on the next soft nav. Keep it in sync.
+        window.__lang0 = e.target.value;
         if (window.__applyLang) window.__applyLang(e.target.value);
         window.dispatchEvent(new Event("locale-changed")); // re-render localized money/dates (cart drawer + pages)
       });
