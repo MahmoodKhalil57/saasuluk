@@ -6,6 +6,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [{ "binding": "DB", "database_name": "saasuluk-db", "database_id": "c190f7e4-85f7-4e77-be49-091b8927d9de" }],
   "routes": [{ "pattern": "saasuluk.saastemly.com", "custom_domain": true }],
+  // We serve only on the custom domain, so don't touch the workers.dev subdomain. (An Account-scoped API token can't
+  // manage it — wrangler would 403 [code: 10000] on that step AFTER a successful deploy, falsely failing the pipeline.)
+  "workers_dev": false,
   "assets": { "directory": "dist/client", "binding": "ASSETS" },
   // Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
   // RESEND_API_KEY, EMAIL_FROM) are stored ENCRYPTED via `wrangler secret put` — never in this file.
