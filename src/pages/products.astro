@@ -89,8 +89,8 @@ import Layout from "../layouts/Layout.astro";
           const pct = onSale ? Math.round((1 - p.priceCents / p.compareAtCents) * 100) : 0;
           const badge = onSale ? `<span class="sale-badge">−${pct}%</span>` : "";
           const price = onSale
-            ? `<span><span style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--accent)">${money(p.priceCents)}</span> <s style="color:var(--muted);font-size:14px">${money(p.compareAtCents)}</s></span>`
-            : `<span style="font-size:22px;font-weight:800;letter-spacing:-.02em">${money(p.priceCents)}</span>`;
+            ? `<span><span data-money="${p.priceCents}" style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--accent)">${money(p.priceCents)}</span> <s data-money="${p.compareAtCents}" style="color:var(--muted);font-size:14px">${money(p.compareAtCents)}</s></span>`
+            : `<span data-money="${p.priceCents}" style="font-size:22px;font-weight:800;letter-spacing:-.02em">${money(p.priceCents)}</span>`;
           return `<div class="card" style="display:flex;flex-direction:column;padding:0;overflow:hidden;position:relative">
         ${badge}${media}
         <div style="padding:16px 18px;display:flex;flex-direction:column;flex:1">

@@ -141,7 +141,9 @@ const productNodes = [
       {
         onSale && (
           <p style="margin:-2px 0 8px">
-            <s style="color:var(--muted);font-size:18px">{moneyOrFree(product.compareAtCents as number)}</s>{" "}
+            <s style="color:var(--muted);font-size:18px" data-money={product.compareAtCents}>
+              {moneyOrFree(product.compareAtCents as number)}
+            </s>{" "}
             <span class="pill accent" style="font-size:12px;margin-inline-start:6px">
               Save {savePct}%
             </span>
@@ -323,6 +325,16 @@ const productNodes = [
             }
           }
         }
+        // issue #1B — re-render the (range/variant/Free-aware) price in the new locale on a live language switch, no
+        // reload. Re-bound per page under data-astro-rerun, so drop the prior page's hook before adding this one.
+        if (window.__priceLocaleHook) window.removeEventListener("locale-changed", window.__priceLocaleHook);
+        window.__priceLocaleHook = function () {
+          var priceEl = document.getElementById("price");
+          if (!priceEl) return;
+          if (variants.length) update();
+          else priceEl.textContent = rangeLabel();
+        };
+        window.addEventListener("locale-changed", window.__priceLocaleHook);
 
         // ── Back-in-stock waitlist (shown when sold out). The page is static (build-time inventory), so for a
         //    non-variant product confirm the LIVE level; variant sold-out is driven from update() above. ──

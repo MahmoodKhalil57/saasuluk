@@ -193,8 +193,12 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             var k = el.getAttribute("data-i18n");
             if (DICT[l] && DICT[l][k]) el.textContent = DICT[l][k];
           });
-          var sel = document.getElementById("lang");
-          if (sel) sel.value = l;
+          // reflect the active locale in the header icon-menu (aria-checked) + the mobile drawer's <select>
+          document.querySelectorAll("#langpop .langopt").forEach(function (o) {
+            o.setAttribute("aria-checked", o.getAttribute("data-lang") === l ? "true" : "false");
+          });
+          var ml = document.getElementById("m-lang");
+          if (ml) ml.value = l;
         };
         window.__lang0 = curLang();
         document.documentElement.lang = window.__lang0;
@@ -1367,6 +1371,67 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         height: 17px;
         display: block;
       }
+      /* language icon-menu (issue #1A) — replaces the header <select> with an Icones button + anchored dropdown */
+      .langmenu {
+        position: relative;
+        display: inline-grid;
+      }
+      .langpop {
+        position: absolute;
+        top: calc(100% + 8px);
+        inset-inline-end: 0;
+        z-index: 52;
+        min-width: 168px;
+        padding: 6px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 18px 50px rgba(16, 16, 40, 0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        opacity: 0;
+        transform: translateY(-6px) scale(0.97);
+        transition:
+          opacity 0.15s ease,
+          transform 0.15s ease;
+        pointer-events: none;
+      }
+      .langpop.open {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .langpop[hidden] {
+        display: none;
+      }
+      .langopt {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        padding: 9px 11px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--fg);
+        font: inherit;
+        font-size: 14px;
+        text-align: start;
+        cursor: pointer;
+      }
+      .langopt:hover {
+        background: var(--bg-soft);
+      }
+      .langopt[aria-checked="true"] {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .langopt[aria-checked="true"]::after {
+        content: "✓";
+        font-size: 13px;
+      }
       .theme-btn svg {
         transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
       }
@@ -1533,7 +1598,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           display: inline-grid;
         }
         .chrome #palette-open,
-        .chrome #lang,
+        .chrome .langmenu,
         .chrome #scheme-btn {
           display: none;
         }
@@ -1760,7 +1825,27 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             aria-haspopup="dialog"
             aria-controls="palette"><Icon name={ICON.search} /></button
           >
-          <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
+          <div class="langmenu">
+            <button
+              id="lang-btn"
+              class="iconbtn"
+              type="button"
+              aria-label="Language"
+              title="Language"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="langpop"><Icon name={ICON.lang} /></button
+            >
+            <div id="langpop" class="langpop" role="menu" aria-label="Language" hidden>
+              {
+                LOCALES.map((l) => (
+                  <button class="langopt" type="button" role="menuitemradio" data-lang={l} aria-checked="false">
+                    <span>{LOCALE_LABEL[l]}</span>
+                  </button>
+                ))
+              }
+            </div>
+          </div>
           <button
             id="scheme-btn"
             class="iconbtn"
@@ -2273,25 +2358,64 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         if (mlang) {
           mlang.value = window.__lang0 || "en";
           mlang.addEventListener("change", function (e) {
-            var L = document.getElementById("lang");
-            if (L) {
-              L.value = e.target.value;
-              L.dispatchEvent(new Event("change"));
-            }
+            setLang(e.target.value);
           });
         }
       })();
-      document.getElementById("lang").addEventListener("change", function (e) {
+      // ── language: persist + live-apply, shared by the header icon-menu (#1A) and the mobile drawer's <select> ──
+      function setLang(L) {
         try {
-          localStorage.setItem("lang", e.target.value);
+          localStorage.setItem("lang", L);
         } catch (x) {}
-        document.cookie = "lang=" + e.target.value + ";path=/;max-age=31536000;samesite=lax";
-        // Issue #1 — the switch "needed a reload" because __lang0 stayed stale, so the astro:page-load re-apply
-        // (which uses window.__lang0) reverted the chrome to the old locale on the next soft nav. Keep it in sync.
-        window.__lang0 = e.target.value;
-        if (window.__applyLang) window.__applyLang(e.target.value);
+        document.cookie = "lang=" + L + ";path=/;max-age=31536000;samesite=lax";
+        // Issue #1 — keep window.__lang0 in sync, else the astro:page-load re-apply (which reads it) reverts the chrome
+        // to the old locale on the next soft nav (that was the "needs a manual reload" symptom).
+        window.__lang0 = L;
+        if (window.__applyLang) window.__applyLang(L); // re-translates [data-i18n] + syncs the menu + mobile <select>
         window.dispatchEvent(new Event("locale-changed")); // re-render localized money/dates (cart drawer + pages)
-      });
+      }
+      // header language icon-menu (issue #1A): replaces the old <select>. Open/close + pick a locale. The button +
+      // popup live in the persisted header, so binding once survives soft navigations.
+      (function () {
+        var lb = document.getElementById("lang-btn"),
+          lp = document.getElementById("langpop");
+        if (!lb || !lp) return;
+        function openMenu() {
+          lp.hidden = false;
+          requestAnimationFrame(function () {
+            lp.classList.add("open");
+          });
+          lb.setAttribute("aria-expanded", "true");
+        }
+        function closeMenu() {
+          lp.classList.remove("open");
+          lb.setAttribute("aria-expanded", "false");
+          setTimeout(function () {
+            lp.hidden = true;
+          }, 160);
+        }
+        lb.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (lb.getAttribute("aria-expanded") === "true") closeMenu();
+          else openMenu();
+        });
+        lp.addEventListener("click", function (e) {
+          var o = e.target.closest(".langopt");
+          if (!o) return;
+          setLang(o.getAttribute("data-lang"));
+          closeMenu();
+        });
+        document.addEventListener("click", function (e) {
+          if (lb.getAttribute("aria-expanded") === "true" && !lb.contains(e.target) && !lp.contains(e.target)) closeMenu();
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && lb.getAttribute("aria-expanded") === "true") {
+            closeMenu();
+            lb.focus();
+          }
+        });
+        if (window.__applyLang) window.__applyLang(window.__lang0 || "en"); // paint the initial active option
+      })();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
       // The session-aware account menu lives in ../client/auth.ts (imported below): it re-derives the login state from
       // the su_user hint + the cached $session store on EVERY navigation, so it's correct on every route regardless of

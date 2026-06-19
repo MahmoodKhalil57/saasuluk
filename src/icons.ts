@@ -18,6 +18,7 @@ export const ICON = {
   cart: "material-symbols:shopping-bag-outline",
   caret: "material-symbols:keyboard-arrow-down-rounded",
   menu: "material-symbols:menu-rounded",
+  lang: "material-symbols:language-korean-latin-rounded",
 } as const;
 
 /** Build-time → inline SVG string for the JS contexts. material-symbols bodies are `currentColor`, so the result
