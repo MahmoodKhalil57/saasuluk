@@ -503,6 +503,7 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         padding: 7px 13px;
         font-size: 13.5px;
         border-radius: 9px;
+        white-space: nowrap; /* keep the header "Sign in" pill on one line at narrow widths */
       }
       /* cards + grid */
       .grid {
@@ -1605,6 +1606,25 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         .authname,
         .authcaret {
           display: none;
+        }
+      }
+      /* ── small phones (≤ 420px): tighten the page gutters + header so the chrome never overflows from 320px up.
+         The 48px wrap gutters + 22px header gap pushed the brand+controls cluster ~18px past a 320px viewport. ── */
+      @media (max-width: 420px) {
+        .wrap {
+          padding-inline: 14px;
+        }
+        header.site .wrap {
+          gap: 10px;
+        }
+        .chrome {
+          gap: 5px;
+        }
+        .iconbtn {
+          padding: 6px 7px;
+        }
+        .chrome .btn.sm {
+          padding: 7px 10px; /* trim the header "Sign in" pill so its one-line label still fits a 320px viewport */
         }
       }
       /* account menu — a real session-aware avatar + name dropdown (no "Sign in" flash; cached hint reveals it) */

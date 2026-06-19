@@ -22,7 +22,14 @@ import Layout from "../layouts/Layout.astro";
   </form>
   <h2>Newsletter</h2>
   <form id="news" style="display:flex; gap:8px; max-width:520px">
-    <input name="email" type="email" placeholder="you@example.com" aria-label="Email address for newsletter" required style="flex:1" />
+    <input
+      name="email"
+      type="email"
+      placeholder="you@example.com"
+      aria-label="Email address for newsletter"
+      required
+      style="flex:1; min-width:0"
+    />
     <button class="btn ghost" type="submit">Subscribe</button>
   </form>
   <p id="nmsg" style="color:var(--muted);font-size:13px;margin-top:6px"></p>
