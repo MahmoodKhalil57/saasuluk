@@ -23,7 +23,9 @@ import Layout from "../../layouts/Layout.astro";
     <div id="state"><p style="color:var(--muted)">Confirming your payment with Stripe…</p></div>
   </section>
   <div class="sx-wrap"><div id="summary"></div></div>
-  <script is:inline>
+  <!-- data-astro-rerun + IIFE: re-read the order/session URL params and re-POST /checkout/confirm on each swap-in. -->
+  <script is:inline data-astro-rerun>
+   (function () {
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
     const safeUrl = (u) => /^(https?:\/\/|\/)/i.test(String(u == null ? "" : u)) ? u : "#"; // http(s) or relative only — never javascript:/data:
@@ -63,5 +65,6 @@ import Layout from "../../layouts/Layout.astro";
         }
       } catch (e) { state.innerHTML = '<h1>Something went wrong</h1><p class="tag center"><a href="/checkout">Back to checkout</a></p>'; }
     })();
+   })();
   </script>
 </Layout>

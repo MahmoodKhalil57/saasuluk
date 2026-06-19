@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from "astro:transitions";
 import { t, LOCALES, LOCALE_LABEL, RTL, DICT } from "../i18n";
 import { altSchemesCss, SCHEME_SWATCHES } from "../theme";
 import { seoTags, renderTags, organization, website, graph, deploymentMeta, skewGuardScript } from "@suluk/seo";
@@ -42,10 +43,20 @@ const footerCols: { head: string; links: [string, Key | string][] }[] = [
 ];
 const path = Astro.url.pathname;
 const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k : t("en", k as Key));
+// Worker-served (non-Astro) routes: Scalar/docs/admin/api manage their own document and can't be DOM-swapped. Mark
+// them at RENDER time (server-side) so ClientRouter full-loads them AND prefetch/clientPrerender skips them — runtime
+// marking would lose the race against Astro's viewport observer, which is set up before the first astro:page-load.
+const WORKER_PREFIXES = ["/api/", "/scalar", "/swagger", "/reference", "/superadmin", "/cockpit", "/panel", "/cost", "/dashboard", "/openapi.json", "/mcp", "/og.svg", "/manifest.webmanifest", "/sitemap.xml", "/robots.txt", "/llms.txt"];
+const isWorker = (href: string) => typeof href === "string" && WORKER_PREFIXES.some((w) => href === w || href.startsWith(w + "/") || href.startsWith(w + "?") || (w.endsWith("/") && href.startsWith(w)));
+const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true, "data-astro-prefetch": "false" } : {});
 ---
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* SPA router — DOM-swap navigation (no full reload, no white flash). Theme/scheme/lang are re-applied
+        pre-paint on astro:before-swap below, and the global chrome is transition:persist'd so its once-bound
+        listeners + the signed-in avatar survive swaps. */}
+    <ClientRouter />
     <Fragment set:html={headTags} />
     <script type="application/ld+json" set:html={JSON.stringify(structured)} />
     <Fragment set:html={deploymentMeta(BUILD_ID)} />
@@ -71,6 +82,43 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         };
         window.__lang0 = curLang();
         document.documentElement.lang = window.__lang0; document.documentElement.dir = (RTL.indexOf(window.__lang0) >= 0 ? "rtl" : "ltr");
+      })();
+    </script>
+    <script is:inline>
+      /* ClientRouter swap lifecycle (registered ONCE — document-level listeners survive swaps). The <head> applier
+         above only runs on a hard load, so on a soft (DOM-swap) nav we must (1) carry theme/scheme/lang/dir onto the
+         INCOMING document BEFORE it paints (no light/LTR/English flash), and (2) after the new body lands, re-translate
+         its [data-i18n] nodes and sync the persisted header's active-nav highlight to the new path. */
+      (function () {
+        var root = document.documentElement;
+        document.addEventListener("astro:before-swap", function (e) {
+          var d = e.newDocument && e.newDocument.documentElement; if (!d) return;
+          if (root.dataset.theme) d.dataset.theme = root.dataset.theme;
+          if (root.dataset.themePref) d.dataset.themePref = root.dataset.themePref;
+          if (root.dataset.scheme) d.dataset.scheme = root.dataset.scheme; else delete d.dataset.scheme;
+          d.lang = root.lang || "en";
+          d.dir = root.dir || "ltr";
+        });
+        document.addEventListener("astro:page-load", function () {
+          if (window.__applyLang) window.__applyLang(window.__lang0 || root.lang || "en");
+          var path = location.pathname;
+          document.querySelectorAll("#site-header nav.main a, #mobilenav nav a").forEach(function (a) {
+            var on = a.getAttribute("href") === path;
+            a.classList.toggle("on", on);
+            if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+          });
+          // Worker-served (non-Astro) routes can't be DOM-swapped — Scalar/docs/admin manage their own document. Mark
+          // their links data-astro-reload so ClientRouter does a clean full navigation instead of a broken half-swap.
+          var WORKER = ["/api/", "/scalar", "/swagger", "/reference", "/superadmin", "/cockpit", "/panel", "/cost", "/dashboard", "/openapi.json", "/mcp", "/og.svg", "/manifest.webmanifest", "/sitemap.xml", "/robots.txt", "/llms.txt"];
+          document.querySelectorAll('a[href^="/"]').forEach(function (a) {
+            if (a.hasAttribute("data-astro-reload")) return;
+            var p = a.getAttribute("href") || "";
+            for (var i = 0; i < WORKER.length; i++) { var w = WORKER[i]; if (p === w || p.indexOf(w + "/") === 0 || p.indexOf(w + "?") === 0 || (w.charAt(w.length - 1) === "/" && p.indexOf(w) === 0)) { a.setAttribute("data-astro-reload", ""); a.setAttribute("data-astro-prefetch", "false"); break; } }
+          });
+          // the persisted header's scroll-state/progress are bound once on window; nudge them to recompute against
+          // the freshly-swapped (scroll-reset) page so the glassy "scrolled" class + hairline aren't stuck.
+          window.dispatchEvent(new Event("scroll"));
+        });
       })();
     </script>
     <style is:global>
@@ -315,15 +363,15 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
   </head>
   <body>
     <a class="skip-link" href="#main-content" data-i18n="skipToContent">Skip to content</a>
-    <div id="promo-bar" class="promo-bar">
+    <div id="promo-bar" class="promo-bar" transition:persist="promo-bar">
       <span>🎉 Launch week — use code <b>LAUNCH30</b> at checkout for 30% off your order.</span>
       <button id="promo-dismiss" type="button" aria-label="Dismiss announcement">×</button>
     </div>
     <script is:inline>try { if (localStorage.getItem("promo_dismissed")) document.getElementById("promo-bar").hidden = true; } catch (e) {}</script>
-    <header class="site" id="site-header">
+    <header class="site" id="site-header" transition:persist="site-header">
       <div class="wrap">
         <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
-        <nav class="main">{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}><span>{t("en", key)}</span></a>)}</nav>
+        <nav class="main">{nav.map(([href, key]) => <a href={href} {...navAttrs(href)} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}><span>{t("en", key)}</span></a>)}</nav>
         <div class="chrome">
           <button id="palette-open" class="iconbtn palette-btn" aria-label="Search" title="Search (⌘K)" aria-haspopup="dialog" aria-controls="palette"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></button>
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
@@ -338,9 +386,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
             </button>
             <div class="authpop card" id="authpop" role="menu" hidden>
               <div class="authpop-head"><img id="authpopavatar" alt="" /><div style="min-width:0"><strong id="authpopname"></strong><span id="authpopemail"></span></div></div>
-              <a role="menuitem" href="/dashboard" data-i18n="dashboard">Dashboard</a>
-              <a role="menuitem" href="/dashboard/s/orders">Orders</a>
-              <a role="menuitem" href="/dashboard/s/wishlist">Wishlist</a>
+              <a role="menuitem" href="/dashboard" {...navAttrs("/dashboard")} data-i18n="dashboard">Dashboard</a>
+              <a role="menuitem" href="/dashboard/s/orders" {...navAttrs("/dashboard/s/orders")}>Orders</a>
+              <a role="menuitem" href="/dashboard/s/wishlist" {...navAttrs("/dashboard/s/wishlist")}>Wishlist</a>
               <button role="menuitem" id="authsignout" type="button">Sign out</button>
             </div>
           </div>
@@ -365,8 +413,8 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     </header>
 
     <!-- color-scheme picker — a previews popover; swatches are DERIVED from @suluk/theme (never hand-maintained) -->
-    <div id="schemeback" class="popback" hidden></div>
-    <div id="schemepop" class="schemepop" role="dialog" aria-modal="true" aria-label="Color scheme" aria-hidden="true" hidden>
+    <div id="schemeback" class="popback" hidden transition:persist="schemeback"></div>
+    <div id="schemepop" class="schemepop" role="dialog" aria-modal="true" aria-label="Color scheme" aria-hidden="true" hidden transition:persist="schemepop">
       <div class="schemepop-head">
         <strong data-i18n="colorScheme">Color scheme</strong>
         <input id="scheme-search" type="search" placeholder="Search 43 schemes…" aria-label="Search schemes" autocomplete="off" />
@@ -374,7 +422,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
       <div id="scheme-grid" class="scheme-grid" role="listbox" aria-label="Schemes"></div>
     </div>
     <main id="main-content"><div class="wrap"><slot /></div></main>
-    <footer class="site">
+    <footer class="site" transition:persist="site-footer">
       <div class="wrap">
         <div class="newsletter">
           <div>
@@ -392,7 +440,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
             <p style="color:var(--muted); font-size:14px; margin-top:12px; max-width:34ch">A premium SaaS starter where every layer — data, API, docs, UI, admin, cost — is projected from one typed contract.</p>
           </div>
           {footerCols.map((col) => (
-            <div><h4>{col.head}</h4>{col.links.map(([href, key]) => <a href={href} data-i18n={(key in DICT.en) ? key : undefined}>{label(key)}</a>)}</div>
+            <div><h4>{col.head}</h4>{col.links.map(([href, key]) => <a href={href} {...navAttrs(href)} data-i18n={(key in DICT.en) ? key : undefined}>{label(key)}</a>)}</div>
           ))}
         </div>
         <div class="bottom">
@@ -417,17 +465,17 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     </script>
     <!-- cart drawer (populated by the bundled @suluk/nano-stores module below) -->
     <!-- ⌘K command palette (global search-and-jump over /search) -->
-    <div id="paletteback" class="paletteback" hidden></div>
-    <div id="palette" class="palette" role="dialog" aria-modal="true" aria-label="Search" aria-hidden="true" hidden>
+    <div id="paletteback" class="paletteback" hidden transition:persist="paletteback"></div>
+    <div id="palette" class="palette" role="dialog" aria-modal="true" aria-label="Search" aria-hidden="true" hidden transition:persist="palette">
       <input id="palette-input" type="search" placeholder="Search products & posts…" aria-label="Search" autocomplete="off" />
       <ul id="palette-results" class="palette-results" role="listbox"></ul>
       <div class="palette-foot">↑↓ navigate · ↵ open · esc close</div>
     </div>
     <!-- mobile navigation drawer (the desktop nav is hidden < 760px; @suluk/nano-stores createDrawer drives it) -->
-    <div id="navback" class="cartback" hidden></div>
-    <aside id="mobilenav" class="mobilenav" role="dialog" aria-modal="true" aria-label="Navigation" aria-hidden="true" hidden>
+    <div id="navback" class="cartback" hidden transition:persist="navback"></div>
+    <aside id="mobilenav" class="mobilenav" role="dialog" aria-modal="true" aria-label="Navigation" aria-hidden="true" hidden transition:persist="mobilenav">
       <div class="mobilenav-head"><a class="brand" href="/"><span class="dot">s</span> saasuluk</a><button id="navclose" class="iconbtn" aria-label="Close menu">✕</button></div>
-      <nav>{nav.map(([href, key]) => <a href={href} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
+      <nav>{nav.map(([href, key]) => <a href={href} {...navAttrs(href)} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
       <div class="mnav-actions">
         <div class="mnav-row">
           <button class="btn ghost sm" type="button" data-act="search">Search</button>
@@ -439,8 +487,8 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         </div>
       </div>
     </aside>
-    <div id="cartback" class="cartback" hidden></div>
-    <aside id="cartdrawer" class="cartdrawer" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-hidden="true" hidden>
+    <div id="cartback" class="cartback" hidden transition:persist="cartback"></div>
+    <aside id="cartdrawer" class="cartdrawer" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-hidden="true" hidden transition:persist="cartdrawer">
       <div class="cartdrawer-head">
         <strong data-i18n="cart">Cart</strong>
         <button id="cartclose" class="iconbtn" aria-label="Close cart">✕</button>
@@ -451,7 +499,13 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         <a id="cartcheckout" class="btn" href="/checkout" data-i18n="checkout" style="opacity:.45;pointer-events:none">Checkout</a>
       </div>
     </aside>
-    <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+    <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false" transition:persist="toasts"></div>
+    <!-- navigation progress hairline (@suluk/theme .navprogress). Rendered + persisted here (not runtime-appended to
+         body) so the bar survives DOM-swap navs; src/client/ux.ts drives it off astro:before-preparation/page-load. -->
+    <div class="navprogress" aria-hidden="true" transition:persist="navprogress"></div>
+    <script>import "../client/stores";</script>
+    <script>import "../client/auth";</script>
+    <script>import "../client/prefetch";</script>
     <script>import "../client/format";</script>
     <script>import "../client/cart";</script>
     <script>import "../client/toast";</script>
@@ -553,34 +607,9 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         window.dispatchEvent(new Event("locale-changed")); // re-render localized money/dates (cart drawer + pages)
       });
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
-      // Session-aware account menu: confirm the session, fill the avatar + name + dropdown, cache the hint for a
-      // flash-free next paint, and wire the dropdown + sign-out. Replaces the bolted-on avatar LINK with a real menu.
-      (function () {
-        var signin = document.getElementById("authsignin"), btn = document.getElementById("authbtn"), pop = document.getElementById("authpop");
-        if (!btn) return;
-        function setIn(u) {
-          var name = u.name || (u.email || "").split("@")[0];
-          var img = u.image || ("/avatar?seed=" + encodeURIComponent(u.email || name));
-          document.getElementById("authavatar").src = img;
-          document.getElementById("authname").textContent = name;
-          document.getElementById("authpopavatar").src = img;
-          document.getElementById("authpopname").textContent = name;
-          document.getElementById("authpopemail").textContent = u.email || "";
-          btn.hidden = false; if (signin) signin.hidden = true;
-          try { localStorage.setItem("su_user", JSON.stringify({ name: name, email: u.email, image: u.image })); } catch (e) {}
-        }
-        function setOut() {
-          btn.hidden = true; if (pop) pop.hidden = true; if (signin) signin.hidden = false;
-          try { localStorage.removeItem("su_user"); } catch (e) {}
-        }
-        fetch("/api/auth/get-session", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (s) { var u = s && s.user; if (u) setIn(u); else setOut(); }).catch(function () {});
-        btn.addEventListener("click", function (e) { e.stopPropagation(); var willOpen = pop.hidden; pop.hidden = !willOpen; btn.setAttribute("aria-expanded", String(willOpen)); });
-        document.addEventListener("click", function (e) { if (pop && !pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); } });
-        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pop && !pop.hidden) { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); btn.focus(); } });
-        var so = document.getElementById("authsignout");
-        if (so) so.addEventListener("click", function () { so.textContent = "Signing out…"; fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" }).then(function () { setOut(); location.reload(); }).catch(function () { location.href = "/login"; }); });
-      })();
+      // The session-aware account menu lives in ../client/auth.ts (imported below): it re-derives the login state from
+      // the su_user hint + the cached $session store on EVERY navigation, so it's correct on every route regardless of
+      // whether the persisted header was kept, rebuilt, or replaced by a prerender activation.
     </script>
     <script is:inline set:html={skewGuardScript()}></script>
     <script is:inline>
@@ -635,7 +664,7 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
         ];
       })();
     </script>
-    <div id="cookie-banner" class="cookie-banner" hidden>
+    <div id="cookie-banner" class="cookie-banner" hidden transition:persist="cookie-banner">
       <span>We use only <b>essential</b> cookies to keep you signed in — no tracking, no ads. <a href="/privacy">Privacy</a>.</span>
       <button class="btn sm" id="cookie-ok" type="button">Got it</button>
     </div>
@@ -653,6 +682,6 @@ const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k
     </script>
     <!-- @suluk/chat — the floating, contract-driven assistant (browse + act). Baked into the static shell; its
          script talks to the worker's /chat SSE endpoint. Theme-aware via the same CSS vars as the rest of the site. -->
-    <Fragment set:html={chatWidget({ title: "saasuluk assistant" })} />
+    <div id="suluk-chat-root" transition:persist="suluk-chat-root"><Fragment set:html={chatWidget({ title: "saasuluk assistant" })} /></div>
   </body>
 </html>

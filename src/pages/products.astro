@@ -25,13 +25,19 @@ import Layout from "../layouts/Layout.astro";
     </select>
   </div>
   <p class="store-count" id="count" aria-live="polite"></p>
-  <div class="grid" id="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>
-  <script is:inline>
+  <div class="grid" id="grid" data-prefetch-list style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))"></div>
+  <!-- data-astro-rerun: re-execute on every swap-in so the grid re-renders cache-first on return visits. The whole
+       body is IIFE-wrapped because is:inline top-level declarations land in GLOBAL scope and would collide on rerun. -->
+  <script is:inline data-astro-rerun>
+   (function () {
+    function start() {
+    const S = window.$stores;
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
     const setCart = (c) => localStorage.setItem("cart", JSON.stringify(c));
     const esc = (s) => String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
     let ALL = [];
+    let CATS = [];
     const state = { q: "", cat: "", sort: "featured" };
     function card(p) {
       const media = p.imageUrl
@@ -73,6 +79,8 @@ import Layout from "../layouts/Layout.astro";
       }
       g.innerHTML = products.map(card).join("");
       bindCards(g);
+      // optimistic list→detail handoff: pre-seed each visible product's detail cache so its page paints instantly.
+      if (S && S.seedProduct) products.forEach((p) => S.seedProduct(p));
       const total = ALL.filter((p) => p.status === "published").length;
       count.textContent = products.length === total ? `${total} product${total === 1 ? "" : "s"}` : `${products.length} of ${total} products`;
     }
@@ -104,26 +112,28 @@ import Layout from "../layouts/Layout.astro";
       g.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:34px 18px"><p style="margin:0 0 13px;color:var(--muted)">${esc(msg)}</p><button class="btn ghost" id="gridRetry">Retry</button></div>`;
       g.querySelector("#gridRetry").addEventListener("click", retry);
     }
-    async function load() {
-      skeleton(6);
-      try {
-        const [prods, cats] = await Promise.all([
-          fetch("/product").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
-          fetch("/category").then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        ]);
-        ALL = Array.isArray(prods) ? prods : [];
-        const catSel = document.getElementById("cat");
-        const used = new Set(ALL.filter((p) => p.status === "published").map((p) => String(p.categoryId)));
-        (cats || []).filter((c) => used.has(String(c.id))).forEach((c) => { const o = document.createElement("option"); o.value = String(c.id); o.textContent = c.name; catSel.appendChild(o); });
-        apply();
-      } catch (e) {
-        errorState("We couldn't load the store. Check your connection and try again.", load);
-        if (window.toast) window.toast("Couldn't load products.", { type: "error" });
-      }
+    function populateCats() {
+      const catSel = document.getElementById("cat"); if (!catSel) return;
+      const used = new Set(ALL.filter((p) => p.status === "published").map((p) => String(p.categoryId)));
+      catSel.querySelectorAll("option:not([value=''])").forEach((o) => o.remove());
+      (CATS || []).filter((c) => used.has(String(c.id))).forEach((c) => { const o = document.createElement("option"); o.value = String(c.id); o.textContent = c.name; catSel.appendChild(o); });
+      if (state.cat) catSel.value = state.cat;
     }
-    document.getElementById("q").addEventListener("input", (e) => { state.q = e.target.value.trim(); apply(); });
-    document.getElementById("cat").addEventListener("change", (e) => { state.cat = e.target.value; apply(); });
-    document.getElementById("sort").addEventListener("change", (e) => { state.sort = e.target.value; apply(); });
-    load();
+    const qEl = document.getElementById("q"); if (qEl) qEl.addEventListener("input", (e) => { state.q = e.target.value.trim(); apply(); });
+    const catEl = document.getElementById("cat"); if (catEl) catEl.addEventListener("change", (e) => { state.cat = e.target.value; apply(); });
+    const sortEl = document.getElementById("sort"); if (sortEl) sortEl.addEventListener("change", (e) => { state.sort = e.target.value; apply(); });
+
+    // Cache-first SWR: a warm cache renders synchronously (no skeleton); a cold cache shows skeleton(6) then fills in,
+    // and background revalidation diffs in place. Subscriptions are torn down when we navigate away (once before-swap).
+    const unsubP = S.$products.subscribe((st) => {
+      if (st.data) { ALL = Array.isArray(st.data) ? st.data : []; populateCats(); apply(); }
+      else if (st.loading) skeleton(6);
+      else if (st.error) errorState("We couldn't load the store. Check your connection and try again.", () => S.$products.revalidate());
+    });
+    const unsubC = S.$categories.subscribe((st) => { if (st.data) { CATS = Array.isArray(st.data) ? st.data : []; populateCats(); } });
+    document.addEventListener("astro:before-swap", () => { unsubP(); unsubC(); }, { once: true });
+    }
+    if (window.$stores) start(); else window.addEventListener("suluk:stores-ready", start, { once: true });
+   })();
   </script>
 </Layout>

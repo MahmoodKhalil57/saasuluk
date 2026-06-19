@@ -11,4 +11,13 @@ export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
   integrations: [react()],
+  // SvelteKit-feel navigation: ClientRouter (rendered in Layout.astro <head>) swaps the DOM instead of reloading.
+  // prefetch with defaultStrategy:"load" is the most aggressive warm — EVERY internal <a> on the page is prefetched
+  // immediately on load (not just when it scrolls into view). clientPrerender upgrades each warm from an HTML-only
+  // <link rel=prefetch> to the Speculation Rules API — the browser prerenders the route AND all its assets with
+  // eagerness "immediate" (Chromium throttles concurrency), falling back to a plain prefetch elsewhere. So every
+  // linked route is rendered-and-ready before the click. Worker-served routes (/scalar, /reference, /dashboard…) are
+  // excluded via data-astro-prefetch="false" + data-astro-reload (stamped server-side in Layout.astro's nav/footer).
+  prefetch: { prefetchAll: true, defaultStrategy: "load" },
+  experimental: { clientPrerender: true },
 });

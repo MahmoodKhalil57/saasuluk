@@ -5,8 +5,12 @@ import Layout from "../layouts/Layout.astro";
 <Layout title="Blog — saasuluk" description="The saasuluk blog — notes on contract-first development, Cloudflare Workers, Stripe, and building a SaaS + ecommerce starter that ships itself.">
   <h1>Blog</h1>
   <p class="tag">Posts are a <b>Post</b> entity — authored in <a href="/superadmin">/superadmin</a>, served by the contract, rendered here.</p>
-  <div id="posts" style="margin-top:18px"></div>
-  <script is:inline>
+  <div id="posts" data-prefetch-list style="margin-top:18px"></div>
+  <!-- data-astro-rerun + IIFE: re-render cache-first on every swap-in without global-const collisions. -->
+  <script is:inline data-astro-rerun>
+   (function () {
+    function start() {
+    const S = window.$stores;
     const when = (t) => t ? (window.fmtDate ? window.fmtDate(Number(t)) : new Date(Number(t)).toLocaleDateString()) : "";
     function skeleton(n) {
       document.getElementById("posts").innerHTML = Array.from({ length: n }, () => `<article class="card" style="margin-bottom:12px">
@@ -15,13 +19,10 @@ import Layout from "../layouts/Layout.astro";
         <div class="skel" style="height:13px;width:97%;margin-bottom:6px"></div>
         <div class="skel" style="height:13px;width:80%"></div></article>`).join("");
     }
-    async function load() {
-      skeleton(4); // shimmer placeholders until the fetch resolves
-      try {
-        const res = await fetch("/post");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const posts = (await res.json()).filter((p) => p.status === "published").sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
-        document.getElementById("posts").innerHTML = posts.length ? posts.map((p) => `
+    function render(list) {
+      const el = document.getElementById("posts"); if (!el) return;
+      const posts = (list || []).filter((p) => p.status === "published").sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+      el.innerHTML = posts.length ? posts.map((p) => `
         <article class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
           ${p.coverImageUrl ? `<a href="/blogs/${p.slug}" style="display:block;aspect-ratio:16/9;overflow:hidden"><img src="${p.coverImageUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" /></a>` : ""}
           <div style="padding:16px 18px">
@@ -30,11 +31,19 @@ import Layout from "../layouts/Layout.astro";
             <p>${p.excerpt || ""}</p><a href="/blogs/${p.slug}">Read more →</a>
           </div>
         </article>`).join("") : `<p style="color:var(--muted)">No posts yet.</p>`;
-      } catch (e) { // never leave the skeleton up on a failed fetch
-        document.getElementById("posts").innerHTML = `<div class="card" style="text-align:center;padding:30px"><p style="margin:0 0 12px;color:var(--muted)">Couldn't load the blog. Check your connection and try again.</p><button class="btn ghost" id="blogRetry">Retry</button></div>`;
-        document.getElementById("blogRetry").addEventListener("click", load);
-      }
     }
-    load();
+    const unsub = S.$posts.subscribe((st) => {
+      if (st.data) render(st.data);
+      else if (st.loading) skeleton(4);
+      else if (st.error) {
+        const el = document.getElementById("posts"); if (!el) return;
+        el.innerHTML = `<div class="card" style="text-align:center;padding:30px"><p style="margin:0 0 12px;color:var(--muted)">Couldn't load the blog. Check your connection and try again.</p><button class="btn ghost" id="blogRetry">Retry</button></div>`;
+        const rb = el.querySelector("#blogRetry"); if (rb) rb.addEventListener("click", () => S.$posts.revalidate());
+      }
+    });
+    document.addEventListener("astro:before-swap", () => unsub(), { once: true });
+    }
+    if (window.$stores) start(); else window.addEventListener("suluk:stores-ready", start, { once: true });
+   })();
   </script>
 </Layout>

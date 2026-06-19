@@ -10,11 +10,27 @@ const faqNodes = [faqPage(SEED_FAQS.map((f) => ({ question: f.question, answer: 
   <h1>Frequently asked questions</h1>
   <p class="tag">Each FAQ is a <b>Faq</b> entity, sorted by <code>sortOrder</code>, served from the contract.</p>
   <div id="faqs" style="margin-top:18px"></div>
-  <script is:inline>
-    async function load() {
-      const faqs = (await (await fetch("/faq")).json()).filter((f) => f.isActive).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-      document.getElementById("faqs").innerHTML = faqs.length ? faqs.map((f) => `<details class="card" style="margin-bottom:8px"><summary style="cursor:pointer;color:var(--fg);font-weight:600">${f.question}</summary><p style="margin-top:8px">${f.answer}</p></details>`).join("") : `<p style="color:var(--muted)">No FAQs yet — add some in <a href="/superadmin">/superadmin</a>.</p>`;
+  <!-- data-astro-rerun + IIFE: cache-first render of the persisted $faqs store, re-run on each swap-in. -->
+  <script is:inline data-astro-rerun>
+   (function () {
+    function start() {
+    const S = window.$stores;
+    function render(list) {
+      const el = document.getElementById("faqs"); if (!el) return;
+      const faqs = (list || []).filter((f) => f.isActive).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      el.innerHTML = faqs.length ? faqs.map((f) => `<details class="card" style="margin-bottom:8px"><summary style="cursor:pointer;color:var(--fg);font-weight:600">${f.question}</summary><p style="margin-top:8px">${f.answer}</p></details>`).join("") : `<p style="color:var(--muted)">No FAQs yet — add some in <a href="/superadmin">/superadmin</a>.</p>`;
     }
-    load();
+    const unsub = S.$faqs.subscribe((st) => {
+      if (st.data) render(st.data);
+      else if (st.error) {
+        const el = document.getElementById("faqs"); if (!el) return;
+        el.innerHTML = `<p style="color:var(--muted)">Couldn't load FAQs. <button class="btn ghost sm" id="faqRetry" type="button">Retry</button></p>`;
+        const rb = el.querySelector("#faqRetry"); if (rb) rb.addEventListener("click", () => S.$faqs.revalidate());
+      }
+    });
+    document.addEventListener("astro:before-swap", () => unsub(), { once: true });
+    }
+    if (window.$stores) start(); else window.addEventListener("suluk:stores-ready", start, { once: true });
+   })();
   </script>
 </Layout>

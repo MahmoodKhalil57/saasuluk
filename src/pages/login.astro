@@ -28,7 +28,10 @@ import Layout from "../layouts/Layout.astro";
     </div>
     <p class="center" style="color:var(--muted); font-size:13px; margin-top:14px">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
   </section>
-  <script is:inline>
+  <!-- data-astro-rerun + IIFE: rebind the auth form/tabs/OAuth on each swap-in and re-read ?redirectTo from the URL. -->
+  <script is:inline data-astro-rerun>
+   (function () {
+    if (!document.getElementById("form")) return;
     let mode = "signin";
     const $ = (id) => document.getElementById(id);
     const submitText = { signin: "Sign in", signup: "Create account", magic: "Email me a link", forgot: "Send reset link" };
@@ -86,5 +89,6 @@ import Layout from "../layouts/Layout.astro";
       btn.disabled = false; btn.textContent = submitText[mode];
     });
     setMode("signin");
+   })();
   </script>
 </Layout>

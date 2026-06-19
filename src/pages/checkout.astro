@@ -107,7 +107,11 @@ import Layout from "../layouts/Layout.astro";
     </div>
   </div>
 
-  <script is:inline>
+  <!-- data-astro-rerun + IIFE: rebind checkout on each swap-in; the lone window 'cart-changed' listener is removed on
+       the next swap (once) so it never stacks across visits. -->
+  <script is:inline data-astro-rerun>
+   (function () {
+    if (!document.getElementById("placeOrder")) return;
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const esc = (s) => String(s || "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
     const cart = () => JSON.parse(localStorage.getItem("cart") || "[]");
@@ -328,11 +332,14 @@ import Layout from "../layouts/Layout.astro";
       const saved = window.discount && window.discount.get();
       if (saved && saved.code && subtotal() > 0) applyCode(saved.code, { silent: true }).then(() => { if (disc) showApplied(disc.code); });
     })();
-    window.addEventListener("cart-changed", () => { if (disc) applyCode(disc.code, { silent: true }).catch(() => {}); else render(); });
+    const onCartChanged = () => { if (disc) applyCode(disc.code, { silent: true }).catch(() => {}); else render(); };
+    window.addEventListener("cart-changed", onCartChanged);
+    document.addEventListener("astro:before-swap", () => window.removeEventListener("cart-changed", onCartChanged), { once: true });
     // address: restore the last-used one + persist on edit (kept across orders — most buyers ship to the same place)
     Object.values(ADDR_IDS).forEach((id) => { const el = document.getElementById(id); if (el) el.addEventListener("input", persistAddr); });
     restoreAddr();
     setupEmail(); // sets the receipt-email lock + the cancel/guest banner (cookie-authoritative)
     render();
+   })();
   </script>
 </Layout>

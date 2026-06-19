@@ -24,6 +24,8 @@ function mobileNav() {
 }
 
 function navProgress() {
+  // The bar is rendered + transition:persist'd in Layout.astro so it survives DOM-swap navigation; fall back to a
+  // runtime-appended one only if a page somehow omits it.
   let bar = document.querySelector(".navprogress") as HTMLElement | null;
   if (!bar) { bar = document.createElement("div"); bar.className = "navprogress"; bar.setAttribute("aria-hidden", "true"); document.body.appendChild(bar); }
   const p = createProgressBar({ el: bar });
@@ -31,23 +33,21 @@ function navProgress() {
   const begin = () => { if (iv != null) return; p.start(); iv = window.setInterval(() => p.tick(), 140); };
   const end = () => { if (iv != null) { window.clearInterval(iv); iv = null; } p.done(); window.setTimeout(() => p.reset(), 300); };
 
-  document.addEventListener("click", (e) => {
-    const a = (e.target as HTMLElement).closest("a");
-    if (!a || a.target === "_blank" || a.hasAttribute("download")) return;
-    const href = a.getAttribute("href");
-    if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
-    let sameOrigin = true;
-    try { sameOrigin = new URL(a.href, location.href).origin === location.origin; } catch { /* keep true */ }
-    if (sameOrigin) begin();
-  }, true);
-  window.addEventListener("beforeunload", begin);
-  window.addEventListener("pageshow", end); // bfcache restore → clear a stale bar
+  // ClientRouter owns the cadence: a soft nav begins at astro:before-preparation and completes at astro:page-load.
+  // (There is no full unload anymore, so the old click/beforeunload wiring would start a bar that never finishes.)
+  document.addEventListener("astro:before-preparation", begin);
+  document.addEventListener("astro:page-load", end);
 }
+
+let revealCleanup: (() => void) | null = null;
+function reveal() { revealCleanup?.(); revealCleanup = revealOnScroll(); } // re-observe the freshly-swapped [data-reveal] nodes
 
 function init() {
   navProgress();
   mobileNav();
-  revealOnScroll(); // reveals [data-reveal] elements present at load (server-rendered sections)
+  reveal(); // reveals [data-reveal] elements present at load (server-rendered sections)
+  // Each swapped-in page brings new [data-reveal] nodes the first IntersectionObserver never saw; re-observe them.
+  document.addEventListener("astro:page-load", reveal);
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

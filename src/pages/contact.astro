@@ -30,22 +30,35 @@ import Layout from "../layouts/Layout.astro";
     </div>
   </div>
   <script is:inline>
+    /* Swap-safe Leaflet: register ONCE; ensure() runs on each astro:page-load — it inits the (fresh) #map element only
+       when present, and loads the Leaflet CSS/JS exactly once (a global guard) so revisits don't dup the head tags. */
     (function () {
-      var el = document.getElementById("map"); if (!el) return;
       var COORD = [37.7749, -122.4194]; // demo location (a template owner sets their own)
       function init() {
-        if (!window.L) return;
-        var map = L.map("map", { scrollWheelZoom: false }).setView(COORD, 11);
+        var el = document.getElementById("map");
+        if (!el || el.dataset.mapReady || !window.L) return; // no #map on this page, already built, or lib not ready
+        el.dataset.mapReady = "1";
+        var map = L.map(el, { scrollWheelZoom: false }).setView(COORD, 11);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 18 }).addTo(map);
         L.marker(COORD).addTo(map).bindPopup("saasuluk — on the edge");
         setTimeout(function () { map.invalidateSize(); }, 250);
       }
-      var css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
-      var js = document.createElement("script"); js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.crossOrigin = ""; js.onload = init; document.head.appendChild(js);
+      function ensure() {
+        if (!document.getElementById("map")) return;
+        if (window.L) { init(); return; }
+        if (window.__leafletReq) return; // already loading — its onload will init the current #map
+        window.__leafletReq = true;
+        var css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
+        var js = document.createElement("script"); js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.crossOrigin = ""; js.onload = init; document.head.appendChild(js);
+      }
+      document.addEventListener("astro:page-load", ensure);
     })();
   </script>
-  <script is:inline>
-    document.getElementById("contact").addEventListener("submit", async (e) => {
+  <!-- data-astro-rerun + IIFE: rebind the contact + newsletter forms on each swap-in (own elements, no leak). -->
+  <script is:inline data-astro-rerun>
+   (function () {
+    const contactForm = document.getElementById("contact");
+    if (contactForm) contactForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = e.target, btn = f.querySelector("button[type=submit]");
       btn.disabled = true; // prevent a duplicate submission
@@ -60,7 +73,8 @@ import Layout from "../layouts/Layout.astro";
         if (window.toast) window.toast(err.message || "Could not send your message.", { type: "error" });
       } finally { btn.disabled = false; }
     });
-    document.getElementById("news").addEventListener("submit", async (e) => {
+    const newsForm = document.getElementById("news");
+    if (newsForm) newsForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
       try {
@@ -71,5 +85,6 @@ import Layout from "../layouts/Layout.astro";
         document.getElementById("nmsg").textContent = "Could not subscribe — please try again.";
       } finally { btn.disabled = false; }
     });
+   })();
   </script>
 </Layout>

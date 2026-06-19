@@ -120,14 +120,23 @@ const productNodes = [
   </form>
 
   <h2>You might also like</h2>
-  <div class="grid" id="related"></div>
+  <div class="grid" id="related" data-prefetch-list></div>
 
   <section id="recent-sec" hidden style="margin-top:34px">
     <h2>Recently viewed</h2>
-    <div class="grid" id="recent"></div>
+    <div class="grid" id="recent" data-prefetch-list></div>
   </section>
 
-  <script is:inline define:vars={{ product, variants, baseImages: images }}>
+  <script type="application/json" id="pd-data" set:html={JSON.stringify({ product, variants, baseImages: images }).replaceAll("<", "\\u003c")}></script>
+  <!-- Swap-safe under ClientRouter: per-product data lives in the JSON tag above (part of the swapped <main>, so it
+       differs per page), and run() executes on every astro:page-load reading the CURRENT page's data. This avoids the
+       define:vars global-const collision that data-astro-rerun would hit when navigating between different products. -->
+  <script is:inline>
+   (function () {
+    function run() {
+      var __el = document.getElementById("pd-data"); if (!__el) return; // this swap landed on a non-product page
+      var __d = JSON.parse(__el.textContent || "{}");
+      var product = __d.product, variants = __d.variants || [], baseImages = __d.baseImages || [];
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     const moneyOrFree = (c) => (Number(c) === 0 ? "Free" : money(c));
     const esc = (s) => String(s || "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
@@ -186,10 +195,16 @@ const productNodes = [
     //    non-variant product confirm the LIVE level; variant sold-out is driven from update() above. ──
     function showBis(show) { const f = document.getElementById("bis-form"); if (f) f.hidden = !show; }
     if (!variants.length) {
-      fetch(`/product/${product.id}`, { headers: { accept: "application/json" } })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((p) => { if (p && Number(p.inventory) <= 0) { const a = document.getElementById("add"); if (a) { a.disabled = true; a.textContent = "Sold out"; } showBis(true); } })
-        .catch(() => {});
+      const soldOut = (p) => { if (p && Number(p.inventory) <= 0) { const a = document.getElementById("add"); if (a) { a.disabled = true; a.textContent = "Sold out"; } showBis(true); } };
+      if (window.$stores) {
+        // Consume the list→detail seed: paints the live level instantly from cache, then revalidates inventory.
+        const ps = window.$stores.productStore(product.id);
+        const un = ps.subscribe((st) => { if (st && st.data) soldOut(st.data); });
+        document.addEventListener("astro:before-swap", () => un(), { once: true });
+      } else {
+        fetch(`/product/${product.id}`, { headers: { accept: "application/json" } })
+          .then((r) => (r.ok ? r.json() : null)).then(soldOut).catch(() => {});
+      }
     }
     {
       const bisForm = document.getElementById("bis-form");
@@ -313,5 +328,8 @@ const productNodes = [
     })();
     update();
     loadReviews();
+    }
+    document.addEventListener("astro:page-load", run);
+   })();
   </script>
 </Layout>

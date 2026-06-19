@@ -13,7 +13,9 @@ import Layout from "../layouts/Layout.astro";
   <table><thead><tr><th>Product</th><th>Units</th><th>Price</th></tr></thead><tbody id="top"></tbody></table>
   <h2>Cost ledger (what the app spent)</h2>
   <pre id="cost" class="card" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12.5px"></pre>
-  <script is:inline>
+  <!-- data-astro-rerun + IIFE so the admin dashboard re-hydrates on each swap-in (fresh on arrival; admin-only). -->
+  <script is:inline data-astro-rerun>
+   (function () {
     const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
     async function load() {
       try {
@@ -41,5 +43,6 @@ import Layout from "../layouts/Layout.astro";
       }
     }
     load();
+   })();
   </script>
 </Layout>

@@ -70,6 +70,10 @@ Each request is metered (`@suluk/cost`): `src/server/api.ts` attributes cost to 
 frontend action (`x-suluk-action`, set by the dashboard buttons) down to each source. You see the cost as it
 is; pricing is the cost plus your margin (`@suluk/stripe` reports the usage to Stripe Billing Meters).
 
+Navigation is SPA-style (Astro `ClientRouter` + aggressive prerender + persisted SWR stores) — instant, no flash,
+optimistic data. Before adding a page, a link list, or a data source, read **[docs/navigation.md](docs/navigation.md)**:
+it documents the patterns and the one place aggressive prefetch can bite as the catalogue grows.
+
 ## Deploy (Cloudflare)
 
 The stack is Cloudflare-native: Hono → Workers, Drizzle(sqlite-core) → D1, the Astro build → assets.
