@@ -89,7 +89,7 @@ import Layout from "../layouts/Layout.astro";
           const pct = onSale ? Math.round((1 - p.priceCents / p.compareAtCents) * 100) : 0;
           const badge = onSale ? `<span class="sale-badge">−${pct}%</span>` : "";
           const price = onSale
-            ? `<span><span data-money="${p.priceCents}" style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--accent)">${money(p.priceCents)}</span> <s data-money="${p.compareAtCents}" style="color:var(--muted);font-size:14px">${money(p.compareAtCents)}</s></span>`
+            ? `<span><span data-money="${p.priceCents}" style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--accent)">${money(p.priceCents)}</span> <s data-money="${p.compareAtCents}" data-money-nodiscount style="color:var(--muted);font-size:14px">${money(p.compareAtCents)}</s></span>`
             : `<span data-money="${p.priceCents}" style="font-size:22px;font-weight:800;letter-spacing:-.02em">${money(p.priceCents)}</span>`;
           return `<div class="card" style="display:flex;flex-direction:column;padding:0;overflow:hidden;position:relative">
         ${badge}${media}
@@ -139,6 +139,7 @@ import Layout from "../layouts/Layout.astro";
           }
           g.innerHTML = products.map(card).join("");
           bindCards(g);
+          if (window.relocalize) window.relocalize(g); // apply the active locale + any live % discount to the new cards
           // optimistic list→detail handoff: pre-seed each visible product's detail cache so its page paints instantly.
           if (S && S.seedProduct) products.forEach((p) => S.seedProduct(p));
           const total = ALL.filter((p) => p.status === "published").length;

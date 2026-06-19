@@ -22,17 +22,44 @@ export const fmtNum = (n: number): string => formatNumber(LOCALE_CONFIG, lang(),
 /** a timestamp/date → a localized medium date. */
 export const fmtDate = (value: number | string | Date): string => formatDate(LOCALE_CONFIG, lang(), value, { dateStyle: "medium" });
 
+/** The active PERCENT discount (0–100), read straight from the persisted `discount` store so it's available even
+ *  before cart.ts has wired `window.discount`. Only percent codes adjust per-item shop prices (a fixed code is an
+ *  order-level amount that can't be meaningfully spread across individual items). Returns 0 when none applies. */
+function activePercentDiscount(): number {
+  try {
+    const raw = localStorage.getItem("discount");
+    if (!raw) return 0;
+    const d = JSON.parse(raw) as { type?: string; value?: number };
+    if (d && d.type === "percent") {
+      const v = Number(d.value);
+      if (v > 0) return Math.min(100, v);
+    }
+  } catch {
+    /* storage disabled / malformed — no discount */
+  }
+  return 0;
+}
+
 /**
- * Live re-localization (issue #1B). Pages tag any rendered money/number/date with the RAW value in a data-attribute —
- * `data-money="1999"` (cents), `data-num="42"`, `data-date="1780000000000"` (epoch-ms or an ISO string) — and this
- * re-formats every such node in place. Wired to `locale-changed` (a language switch) + `astro:page-load` (a soft nav,
- * and a hard load whose server text was in the request-locale), so on-page prices/dates follow the locale instantly
- * under the SPA, no reload. The data-attribute is the source of truth; the textContent is just the display.
+ * Live re-localization (issue #1B) + live discount preview (issues #9/#10). Pages tag any rendered money/number/date
+ * with the RAW value in a data-attribute — `data-money="1999"` (cents), `data-num="42"`, `data-date="…"` — and this
+ * re-formats every such node in place. Wired to `locale-changed` (language switch), `astro:page-load` (soft nav), AND
+ * `discount-changed` (a code applied/removed in the cart), so a switch or discount updates on-page prices instantly,
+ * no reload. When a PERCENT code is active, each `[data-money]` shows the discounted price with the original struck
+ * through (opt out per node with `data-money-nodiscount`, e.g. an already-struck compare-at price). The data-attribute
+ * is always the source of truth, so removing the code re-renders straight back to the full price.
  */
 export function relocalize(root: ParentNode = document): void {
+  const pct = activePercentDiscount();
   root.querySelectorAll<HTMLElement>("[data-money]").forEach((el) => {
     const c = Number(el.getAttribute("data-money"));
-    if (Number.isFinite(c)) el.textContent = fmtMoney(c);
+    if (!Number.isFinite(c)) return;
+    if (pct > 0 && c > 0 && !el.hasAttribute("data-money-nodiscount")) {
+      const discounted = Math.round(c * (1 - pct / 100));
+      el.innerHTML = `${fmtMoney(discounted)} <s class="money-was">${fmtMoney(c)}</s>`;
+    } else {
+      el.textContent = fmtMoney(c);
+    }
   });
   root.querySelectorAll<HTMLElement>("[data-num]").forEach((el) => {
     const n = Number(el.getAttribute("data-num"));
@@ -59,4 +86,5 @@ w.relocalize = relocalize;
 if (typeof window !== "undefined") {
   window.addEventListener("locale-changed", () => relocalize());
   window.addEventListener("astro:page-load", () => relocalize());
+  window.addEventListener("discount-changed", () => relocalize()); // a code applied/removed in the cart → live shop prices
 }

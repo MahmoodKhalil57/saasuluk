@@ -141,7 +141,7 @@ const productNodes = [
       {
         onSale && (
           <p style="margin:-2px 0 8px">
-            <s style="color:var(--muted);font-size:18px" data-money={product.compareAtCents}>
+            <s style="color:var(--muted);font-size:18px" data-money={product.compareAtCents} data-money-nodiscount>
               {moneyOrFree(product.compareAtCents as number)}
             </s>{" "}
             <span class="pill accent" style="font-size:12px;margin-inline-start:6px">

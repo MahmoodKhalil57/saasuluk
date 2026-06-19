@@ -901,6 +901,14 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         font-size: 13.5px;
         white-space: nowrap;
       }
+      /* struck-through ORIGINAL price shown beside a live discounted price when a % code is applied (issues #9/#10) */
+      .money-was {
+        font-size: 0.78em;
+        font-weight: 400;
+        color: var(--muted);
+        margin-inline-start: 5px;
+        text-decoration: line-through;
+      }
       .cartline-ctrl {
         display: flex;
         align-items: center;
