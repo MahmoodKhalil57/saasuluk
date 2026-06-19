@@ -360,52 +360,42 @@ app.route(
   "/",
   adminApp({ document, title: "Saasuluk (Cloudflare)", authorize: (c) => isAdmin(c as unknown as Context), headHtml: themeHeadHtml() }),
 );
-// /superadmin's admin panel — @suluk/panel as a full dashboard: every entity (grouped), admin KPIs, the global cost
-// ledger (moved here from the old user /dashboard). Admin-gated; full document.
-app.route(
-  "/",
-  panelApp({
-    document,
-    basePath: "/panel",
-    title: "saasuluk",
-    authorize: (c) => isAdmin(c as unknown as Context),
-    headHtml: themeHeadHtml(),
-    uploadPath: "/panel/upload",
-    homeHeading: "Superadmin",
-    homeLabel: "Overview",
-    groups: adminGroups,
-    sections: adminSections,
-    stats: (c) => adminStats(drizzle(c.env.DB) as never),
-  }),
-);
-
-// The signed-in USER's /dashboard — the consolidated self-service area (replaces /account + /dashboard). Same panel
-// framework, but projected to the CALLER's role: they get ONLY their own entities (orders, wishlist, reviews,
-// projects, cart) plus the custom sections (profile, security, sessions, billing, API keys, danger zone). Anonymous
-// visitors are bounced to /login.
-app.use("/dashboard", (c, next) => (isSignedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
-app.use("/dashboard/*", (c, next) => (isSignedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+// Unified /panel (issue #7) — ONE self-service + store-management surface for every signed-in user, replacing the old
+// admin-only /panel AND the user /dashboard. @suluk/panel resolves groups/sections/stats/home/heading per-request, so
+// a single mount serves both audiences off the role-projected document:
+//   • every signed-in user gets the personal account groups (profile, security, sessions, orders, wishlist, billing,
+//     developer, danger) — projected to the CALLER so they only ever see their own rows;
+//   • owners/admins ALSO get the "Store · …" management groups (catalog, orders→fulfillment, content incl. media,
+//     inbox of contact submissions + newsletter subscribers, cost ledger).
+// /superadmin (above) stays as the exhaustive raw-CRUD console. Anonymous visitors are bounced to /login.
+app.use("/panel", (c, next) => (isSignedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
+app.use("/panel/*", (c, next) => (isSignedIn(c) ? next() : Promise.resolve(c.redirect("/login"))));
 app.route(
   "/",
   panelApp({
     document: (c) => projectDocument(document, viewerOf(c as unknown as Context), CANON_HASH),
-    basePath: "/dashboard",
+    basePath: "/panel",
     title: "saasuluk",
     authorize: (c) => isSignedIn(c),
     headHtml: themeHeadHtml(),
     uploadPath: "/panel/upload",
-    homeHeading: "Your dashboard",
+    homeHeading: (c) => (isAdmin(c as unknown as Context) ? "Owner dashboard" : "Your account"),
     homeLabel: "Overview",
-    sections: dashboardSections,
-    groups: dashboardGroups,
     hideEntities: dashboardHiddenEntities,
+    groups: (c) => (isAdmin(c as unknown as Context) ? [...dashboardGroups, ...adminGroups] : dashboardGroups),
+    sections: (c) => (isAdmin(c as unknown as Context) ? [...dashboardSections, ...adminSections] : dashboardSections),
     home: (c) => dashboardHome({ admin: isAdmin(c as unknown as Context) }), // bespoke, role-aware product overview
-    stats: (c) => userStats(drizzle(c.env.DB) as never, principal(c as unknown as Context)),
+    stats: (c) =>
+      isAdmin(c as unknown as Context)
+        ? adminStats(drizzle(c.env.DB) as never)
+        : userStats(drizzle(c.env.DB) as never, principal(c as unknown as Context)),
   }),
 );
-// /account is retired — fold it into /dashboard.
-app.get("/account", (c) => c.redirect("/dashboard", 301));
-app.get("/account/*", (c) => c.redirect("/dashboard", 301));
+// /dashboard + /account are retired → 301 to the unified /panel (sub-paths preserved so deep links survive).
+app.get("/dashboard", (c) => c.redirect("/panel", 301));
+app.get("/dashboard/*", (c) => c.redirect(c.req.path.replace(/^\/dashboard/, "/panel"), 301));
+app.get("/account", (c) => c.redirect("/panel", 301));
+app.get("/account/*", (c) => c.redirect("/panel", 301));
 
 // Media uploads for @suluk/panel — admin-only, raster images only (no SVG → no inline-script vector), 5 MB cap,
 // random key (no path traversal / overwrite); stored in R2 and served back with nosniff + a locked-down CSP.
