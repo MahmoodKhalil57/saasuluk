@@ -10,7 +10,11 @@ interface Window {
   /** the shared cart store — see src/client/cart.ts (@suluk/nano-stores createCartStore) */
   cart?: unknown;
   /** the persisted applied-discount store — see src/client/cart.ts (@suluk/nano-stores createDiscountStore) */
-  discount?: { get(): { code: string; type: "percent" | "fixed"; value: number } | null; apply(d: { code: string; type: "percent" | "fixed"; value: number }): void; clear(): void };
+  discount?: {
+    get(): { code: string; type: "percent" | "fixed"; value: number } | null;
+    apply(d: { code: string; type: "percent" | "fixed"; value: number }): void;
+    clear(): void;
+  };
   /** Layout's locale text-swapper + the resolved initial locale */
   __applyLang?: (locale: string) => void;
   __lang0?: string;

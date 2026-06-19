@@ -12,21 +12,37 @@ import { ruleToRequires } from "@suluk/hono";
 import { policyFor } from "./access";
 import { tableByEntity } from "./domain";
 
-export interface AccessFacet { requires: "anyone" | "authenticated" | "admin"; scope?: "owner" }
+export interface AccessFacet {
+  requires: "anyone" | "authenticated" | "admin";
+  scope?: "owner";
+}
 
 /** Custom (non-CRUD) operations. The declared access is ENFORCED on the wire by @suluk/hono's enforceAccess
  *  (api.ts / worker.ts) — so these facets are load-bearing, not decorative. */
 const OP_ACCESS: Record<string, AccessFacet> = {
-  checkout: { requires: "anyone" }, payCheckout: { requires: "anyone" }, confirmCheckout: { requires: "anyone" }, quoteCheckout: { requires: "anyone" },
-  validateDiscount: { requires: "anyone" }, search: { requires: "anyone" }, recommendRelated: { requires: "anyone" },
+  checkout: { requires: "anyone" },
+  payCheckout: { requires: "anyone" },
+  confirmCheckout: { requires: "anyone" },
+  quoteCheckout: { requires: "anyone" },
+  validateDiscount: { requires: "anyone" },
+  search: { requires: "anyone" },
+  recommendRelated: { requires: "anyone" },
   // store analytics expose revenue / customer counts / order data — admin-only (was public; enforced via the gate now).
-  analyticsSummary: { requires: "admin" }, analyticsRevenue: { requires: "admin" }, analyticsTopProducts: { requires: "admin" },
+  analyticsSummary: { requires: "admin" },
+  analyticsRevenue: { requires: "admin" },
+  analyticsTopProducts: { requires: "admin" },
   setOrderStatus: { requires: "admin" }, // admin fulfillment — admin enforced on the WIRE + projected, not just the in-handler gate
-  subscribeNewsletter: { requires: "anyone" }, unsubscribeNewsletter: { requires: "anyone" }, submitContact: { requires: "anyone" }, subscribeStock: { requires: "anyone" }, generateAvatar: { requires: "anyone" },
+  subscribeNewsletter: { requires: "anyone" },
+  unsubscribeNewsletter: { requires: "anyone" },
+  submitContact: { requires: "anyone" },
+  subscribeStock: { requires: "anyone" },
+  generateAvatar: { requires: "anyone" },
   markReviewHelpful: { requires: "authenticated" },
   orderInvoice: { requires: "authenticated" }, // the wire requires sign-in; the handler additionally scopes to the order's owner (or admin)
-  createToken: { requires: "authenticated" }, revokeToken: { requires: "authenticated", scope: "owner" },
-  connectBilling: { requires: "authenticated" }, reportUsage: { requires: "authenticated", scope: "owner" },
+  createToken: { requires: "authenticated" },
+  revokeToken: { requires: "authenticated", scope: "owner" },
+  connectBilling: { requires: "authenticated" },
+  reportUsage: { requires: "authenticated", scope: "owner" },
   openBillingPortal: { requires: "authenticated" },
   exportAccount: { requires: "authenticated" }, // your own data only (owner-scoped in the handler)
 };
@@ -34,7 +50,7 @@ const OP_ACCESS: Record<string, AccessFacet> = {
 /** Annotate every operation with x-suluk-access, derived from the same registry that drives enforcement. In place. */
 export function annotateAccess(doc: OpenAPIv4Document): OpenAPIv4Document {
   for (const pi of Object.values(doc.paths ?? {})) {
-    const requests = (pi as { requests?: Record<string, Record<string, unknown>> }).requests ?? {};
+    const requests = (pi as unknown as { requests?: Record<string, Record<string, unknown>> }).requests ?? {};
     for (const [name, req] of Object.entries(requests)) {
       const m = /^(list|get|create|update|delete)([A-Z]\w*)$/.exec(name);
       const def = m ? tableByEntity[m[2]] : undefined; // only a REAL entity claims the CRUD branch (else e.g. createToken collides)
@@ -42,7 +58,8 @@ export function annotateAccess(doc: OpenAPIv4Document): OpenAPIv4Document {
       if (m && def) {
         const rule = policyFor(def.access, def.ownerCol)[m[1] as "list" | "get" | "create" | "update" | "delete"];
         facet = { requires: ruleToRequires(rule), ...(rule === "owner" ? { scope: "owner" as const } : {}) };
-      } else if (OP_ACCESS[name]) { // custom ops, incl. those whose name matches the CRUD shape (createToken → Token has no table)
+      } else if (OP_ACCESS[name]) {
+        // custom ops, incl. those whose name matches the CRUD shape (createToken → Token has no table)
         facet = OP_ACCESS[name];
       }
       if (facet) req["x-suluk-access"] = facet;

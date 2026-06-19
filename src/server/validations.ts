@@ -20,28 +20,91 @@ const email = () => ({ type: "string", format: "email", maxLength: 254 });
 const url = (maxLength = 2048) => ({ type: "string", format: "uri", maxLength });
 const int = (minimum: number, maximum: number) => ({ type: "integer", minimum, maximum });
 const ts = () => int(0, TS_MAX);
-const uid = () => line(128);                                   // a Better Auth user id (opaque)
-const cents = (maximum = 1_000_000_000) => int(0, maximum);   // ≤ $10M by default
-const jsonBlob = (maxLength: number) => rich(maxLength);       // a JSON string column (line-items etc.) — bound length
+const uid = () => line(128); // a Better Auth user id (opaque)
+const cents = (maximum = 1_000_000_000) => int(0, maximum); // ≤ $10M by default
+const jsonBlob = (maxLength: number) => rich(maxLength); // a JSON string column (line-items etc.) — bound length
 
 /** Per-entity field → constraint overlay. Merged onto the generated property schema (constraints win, type stays). */
 export const VALIDATIONS: Record<string, Record<string, unknown>> = {
   Category: { name: line(100), slug: slug() },
-  Product: { name: line(160), slug: slug(100), description: rich(5000), priceCents: cents(), categoryId: int(1, ID_MAX), inventory: int(0, 1_000_000), imageUrl: url(), stripePriceId: line(120, "^price_[A-Za-z0-9]+$") },
+  Product: {
+    name: line(160),
+    slug: slug(100),
+    description: rich(5000),
+    priceCents: cents(),
+    categoryId: int(1, ID_MAX),
+    inventory: int(0, 1_000_000),
+    imageUrl: url(),
+    stripePriceId: line(120, "^price_[A-Za-z0-9]+$"),
+  },
   Variant: { productId: int(1, ID_MAX), title: line(160), priceCents: cents(), inventory: int(0, 1_000_000) },
-  DiscountCode: { code: code(40), discountValue: int(0, 1_000_000_000), currentUses: int(0, 1_000_000_000), maxUses: int(1, 1_000_000), expiresAt: ts() },
+  DiscountCode: {
+    code: code(40),
+    discountValue: int(0, 1_000_000_000),
+    currentUses: int(0, 1_000_000_000),
+    maxUses: int(1, 1_000_000),
+    expiresAt: ts(),
+  },
   Cart: { customerId: uid(), items: jsonBlob(100_000), discountCode: code(40) },
-  Order: { customerId: uid(), items: jsonBlob(100_000), totalCents: cents(100_000_000_000), discountCode: code(40), stripePaymentIntentId: line(255), createdAt: ts() },
-  Review: { productId: int(1, ID_MAX), customerId: uid(), rating: int(1, 5), title: line(160), body: rich(5000), helpfulCount: int(0, 1_000_000_000), createdAt: ts() },
+  Order: {
+    customerId: uid(),
+    items: jsonBlob(100_000),
+    totalCents: cents(100_000_000_000),
+    discountCode: code(40),
+    stripePaymentIntentId: line(255),
+    createdAt: ts(),
+  },
+  Review: {
+    productId: int(1, ID_MAX),
+    customerId: uid(),
+    rating: int(1, 5),
+    title: line(160),
+    body: rich(5000),
+    helpfulCount: int(0, 1_000_000_000),
+    createdAt: ts(),
+  },
   WishlistItem: { customerId: uid(), productId: int(1, ID_MAX), variantId: int(1, ID_MAX), addedAt: ts() },
-  Address: { customerId: uid(), name: line(120), line1: line(200), line2: line(200), city: line(120), state: line(120), postalCode: line(20), country: line(2, "^[A-Za-z]{2}$"), isDefault: { type: "boolean" } },
-  Post: { title: line(200), slug: slug(120), excerpt: rich(500), body: rich(50_000), publishedAt: ts(), authorId: uid(), coverImageUrl: url() },
+  Address: {
+    customerId: uid(),
+    name: line(120),
+    line1: line(200),
+    line2: line(200),
+    city: line(120),
+    state: line(120),
+    postalCode: line(20),
+    country: line(2, "^[A-Za-z]{2}$"),
+    isDefault: { type: "boolean" },
+  },
+  Post: {
+    title: line(200),
+    slug: slug(120),
+    excerpt: rich(500),
+    body: rich(50_000),
+    publishedAt: ts(),
+    authorId: uid(),
+    coverImageUrl: url(),
+  },
   Faq: { question: line(300), answer: rich(2000), sortOrder: int(0, 100_000) },
   NewsletterSubscriber: { email: email(), subscribedAt: ts() },
   ContactSubmission: { name: line(120), email: email(), subject: line(200), message: rich(5000), createdAt: ts() },
   Media: { url: url(), alt: line(300), width: int(0, 100_000), height: int(0, 100_000) },
-  ApiToken: { userId: uid(), name: line(120), prefix: line(20), hashedKey: line(128, "^[a-f0-9]+$"), createdAt: ts(), lastUsedAt: ts(), revokedAt: ts() },
-  BillingAccount: { principal: uid(), stripeCustomerId: line(255), subscriptionId: line(255), lastReportedMicroUsd: int(0, ID_MAX), lastReportedAt: ts(), createdAt: ts() },
+  ApiToken: {
+    userId: uid(),
+    name: line(120),
+    prefix: line(20),
+    hashedKey: line(128, "^[a-f0-9]+$"),
+    createdAt: ts(),
+    lastUsedAt: ts(),
+    revokedAt: ts(),
+  },
+  BillingAccount: {
+    principal: uid(),
+    stripeCustomerId: line(255),
+    subscriptionId: line(255),
+    lastReportedMicroUsd: int(0, ID_MAX),
+    lastReportedAt: ts(),
+    createdAt: ts(),
+  },
   Project: { name: line(160), ownerId: uid() },
 };
 

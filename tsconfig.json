@@ -1,8 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es2022", "module": "esnext", "moduleResolution": "bundler",
-    "strict": true, "skipLibCheck": true, "types": ["bun"], "jsx": "react-jsx",
-    "baseUrl": "."
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["bun"],
+    "jsx": "react-jsx"
   },
   "include": ["src"]
 }

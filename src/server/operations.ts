@@ -9,10 +9,39 @@
 import { and, eq, gt, gte, inArray, isNotNull, isNull, like, lt, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import type { CostModel } from "@suluk/cost";
-import { product, variant, post, order, cart, review, reviewHelpfulVote, contactSubmission, stockNotification, discountCode, newsletterSubscriber, apiToken, billingAccount, costEvent, wishlistItem } from "./schema";
+import {
+  product,
+  variant,
+  post,
+  order,
+  cart,
+  review,
+  reviewHelpfulVote,
+  contactSubmission,
+  stockNotification,
+  discountCode,
+  newsletterSubscriber,
+  apiToken,
+  billingAccount,
+  costEvent,
+  wishlistItem,
+} from "./schema";
 import { sendEmailAsync, brandedEmail } from "./email";
 import { orderConfirmationEmail, orderStatusEmail } from "@suluk/email";
-import { customerParams, subscriptionParams, meterEventParams, billingPortalSessionParams, computeDiscountAmount, requiresStripe, resolveShipping, resolveTax, composeTotal, restStripe, retrievePaymentIntent, type Discount } from "@suluk/stripe";
+import {
+  customerParams,
+  subscriptionParams,
+  meterEventParams,
+  billingPortalSessionParams,
+  computeDiscountAmount,
+  requiresStripe,
+  resolveShipping,
+  resolveTax,
+  composeTotal,
+  restStripe,
+  retrievePaymentIntent,
+  type Discount,
+} from "@suluk/stripe";
 import { shippingProvider, taxProvider } from "./commerce";
 import { METER_EVENT_DEFAULT } from "./env";
 import { hardenSchema } from "@suluk/harden";
@@ -26,7 +55,7 @@ const publicProducts = <T extends Record<string, unknown>>(rows: T[]): T[] => ro
 
 /** Escape untrusted text before embedding it in server-built HTML (e.g. the owner-notification email body). The
  *  client-side analog of esc() — a contact form's name/subject/message are attacker-controlled and must not inject. */
-const escHtml = (s: string): string => s.replace(/[<>&"]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[m]!));
+const escHtml = (s: string): string => s.replace(/[<>&"]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[m]!);
 
 /** Buyer-facing projection of an order row (the /checkout/confirm response + success page). Strips ops-only columns
  *  — the customerId principal and stripePaymentIntentId — so the session-capability holder sees only their receipt. */
@@ -34,9 +63,19 @@ const publicOrderShape = <T extends Record<string, unknown> | undefined>(o: T): 
   if (!o) return null;
   const r = o as Record<string, unknown>;
   return {
-    id: r.id, status: r.status, items: r.items, shippingAddress: r.shippingAddress, customerEmail: r.customerEmail,
-    totalCents: r.totalCents, shippingCents: r.shippingCents, taxCents: r.taxCents, shippingMethod: r.shippingMethod,
-    discountCode: r.discountCode, carrier: r.carrier, trackingNumber: r.trackingNumber, createdAt: r.createdAt,
+    id: r.id,
+    status: r.status,
+    items: r.items,
+    shippingAddress: r.shippingAddress,
+    customerEmail: r.customerEmail,
+    totalCents: r.totalCents,
+    shippingCents: r.shippingCents,
+    taxCents: r.taxCents,
+    shippingMethod: r.shippingMethod,
+    discountCode: r.discountCode,
+    carrier: r.carrier,
+    trackingNumber: r.trackingNumber,
+    createdAt: r.createdAt,
   };
 };
 
@@ -44,8 +83,13 @@ const publicOrderShape = <T extends Record<string, unknown> | undefined>(o: T): 
  *  identicon. Keyed by the avatar seed (handle / customerId), lower-cased. Real signed-up users are never in this
  *  map — putting a stranger's stock face on a real account would misrepresent them. Photos live in public/img/people/. */
 const PERSONA_PHOTOS: Record<string, string> = {
-  maya: "/img/people/maya.jpg", daniel: "/img/people/daniel.jpg", sara: "/img/people/sara.jpg",
-  ada: "/img/people/ada.jpg", lin: "/img/people/lin.jpg", rob: "/img/people/rob.jpg", mei: "/img/people/mei.jpg",
+  maya: "/img/people/maya.jpg",
+  daniel: "/img/people/daniel.jpg",
+  sara: "/img/people/sara.jpg",
+  ada: "/img/people/ada.jpg",
+  lin: "/img/people/lin.jpg",
+  rob: "/img/people/rob.jpg",
+  mei: "/img/people/mei.jpg",
 };
 
 /** SHA-256 of an API key (Web Crypto — Worker-safe). We store only the hash; the plaintext is shown once. */
@@ -62,7 +106,7 @@ export const principal = (c: Context): string | null =>
 
 /** Read a secret/var from the Worker env (c.env) or the dev process.env — so one handler works in both runtimes. */
 const secret = (c: Context, name: string): string | undefined =>
-  ((c.env as Record<string, string> | undefined)?.[name]) ?? (typeof process !== "undefined" ? process.env?.[name] : undefined);
+  (c.env as Record<string, string> | undefined)?.[name] ?? (typeof process !== "undefined" ? process.env?.[name] : undefined);
 
 /**
  * Report a principal's NEW accrued cost to the Stripe Billing Meter — DELTA-based + idempotent: it meters only
@@ -84,9 +128,15 @@ export async function reportPrincipalUsage(
   // duplicate submission of the same delta window, AND a compare-and-swap that advances the high-water-mark only
   // if it is still `seen` — so the cron + the button (or two reports) can't double-bill the same usage.
   const identifier = `${opts.principal}:${total}`;
-  await restStripe(opts.key).billing.meterEvents.create({ ...meterEventParams({ eventName: opts.eventName, customerId: acct.stripeCustomerId, value: delta }), identifier });
+  await restStripe(opts.key).billing.meterEvents.create({
+    ...meterEventParams({ eventName: opts.eventName, customerId: acct.stripeCustomerId, value: delta }),
+    identifier,
+  });
   // high-water-mark CAS: only advance if no other isolate already reported past `seen` (claimOnce → exactly-once usage).
-  const claimed = await claimOnce(dz, billingAccount, and(eq(billingAccount.id, acct.id), eq(billingAccount.lastReportedMicroUsd, seen))!, { lastReportedMicroUsd: total, lastReportedAt: Date.now() });
+  const claimed = await claimOnce(dz, billingAccount, and(eq(billingAccount.id, acct.id), eq(billingAccount.lastReportedMicroUsd, seen))!, {
+    lastReportedMicroUsd: total,
+    lastReportedAt: Date.now(),
+  });
   return { reported: claimed, deltaMicroUsd: delta, totalMicroUsd: total, customerId: acct.stripeCustomerId };
 }
 
@@ -96,23 +146,52 @@ export async function sweepBillingUsage(dz: Dz, key: string, eventName: string):
   let reported = 0;
   for (const a of accts) {
     if (!a.stripeCustomerId) continue;
-    try { if ((await reportPrincipalUsage(dz, { key, eventName, principal: a.principal })).reported) reported++; } catch { /* skip one bad account */ }
+    try {
+      if ((await reportPrincipalUsage(dz, { key, eventName, principal: a.principal })).reported) reported++;
+    } catch {
+      /* skip one bad account */
+    }
   }
   return { swept: accts.length, reported };
 }
 
 /** Email the store owner ONCE when a product/variant dips to/below the low-stock threshold after a paid sale. The
  *  conditional latch flip is the once-only gate (re-armed on restock), so concurrent paid orders don't multi-send. */
-async function alertLowStock(c: Context, dz: Dz, kind: "product" | "variant", id: number, threshold: number, owners: string[]): Promise<void> {
+async function alertLowStock(
+  c: Context,
+  dz: Dz,
+  kind: "product" | "variant",
+  id: number,
+  threshold: number,
+  owners: string[],
+): Promise<void> {
   if (!owners.length) return; // no recipients configured → skip the extra read+write entirely
   const tbl = (kind === "product" ? product : variant) as typeof product; // both share id/inventory/lowStockAlerted
-  const row = (await dz.select().from(tbl).where(eq(tbl.id, id)).get()) as { inventory?: number; lowStockAlerted?: boolean; name?: string; title?: string } | undefined;
+  const row = (await dz.select().from(tbl).where(eq(tbl.id, id)).get()) as
+    | { inventory?: number; lowStockAlerted?: boolean; name?: string; title?: string }
+    | undefined;
   if (!row || Number(row.inventory) > threshold || row.lowStockAlerted) return; // above threshold, or already alerted at this level
   if (!(await claimOnce(dz, tbl, and(eq(tbl.id, id), eq(tbl.lowStockAlerted, false))!, { lowStockAlerted: true }))) return; // a concurrent paid order won the flip + already emailed
-  const label = kind === "product" ? String(row.name ?? ("Product #" + id)) : ("Variant #" + id + (row.title ? " (" + row.title + ")" : ""));
+  const label = kind === "product" ? String(row.name ?? "Product #" + id) : "Variant #" + id + (row.title ? " (" + row.title + ")" : "");
   const origin = new URL(c.req.url).origin;
-  sendEmailAsync( // fire-and-forget — a mail failure must never break the sale (same contract as the receipt)
-    { to: owners.join(","), subject: ("Low stock: " + label).slice(0, 180), html: brandedEmail("Low stock alert", "<p><b>" + escHtml(label) + "</b> is down to " + Number(row.inventory) + " unit(s) (threshold " + threshold + "). Restock soon.</p><p><a href=\"" + origin + "/superadmin\">Open the admin cockpit →</a></p>") },
+  sendEmailAsync(
+    // fire-and-forget — a mail failure must never break the sale (same contract as the receipt)
+    {
+      to: owners.join(","),
+      subject: ("Low stock: " + label).slice(0, 180),
+      html: brandedEmail(
+        "Low stock alert",
+        "<p><b>" +
+          escHtml(label) +
+          "</b> is down to " +
+          Number(row.inventory) +
+          " unit(s) (threshold " +
+          threshold +
+          '). Restock soon.</p><p><a href="' +
+          origin +
+          '/superadmin">Open the admin cockpit →</a></p>',
+      ),
+    },
     { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") },
   );
 }
@@ -130,21 +209,43 @@ export async function markOrderPaid(c: Context, dz: Dz, orderId: number): Promis
   const changed = await claimOnce(dz, order, and(eq(order.id, orderId), eq(order.status, "pending"))!, { status: "paid" });
   if (changed) {
     if (o.discountCode) {
-      await dz.update(discountCode).set({ currentUses: sql`${discountCode.currentUses} + 1` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
+      await dz
+        .update(discountCode)
+        .set({ currentUses: sql`${discountCode.currentUses} + 1` })
+        .where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim()))
+        .run();
     }
     const owners = superadminEmails(secret(c, "SUPERADMIN_EMAILS")); // low-stock alert recipients (empty → checks no-op)
     const threshold = Number(secret(c, "LOW_STOCK_THRESHOLD")) || 5;
     // decrement stock for each paid line (product + variant), clamped at 0 — the SINGLE place inventory is reduced,
     // on the once-only paid transition, so a webhook re-delivery / double-confirm can't double-decrement.
     let items: { productId?: number; variantId?: number; qty?: number }[] = [];
-    try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+    try {
+      items = JSON.parse(o.items || "[]");
+    } catch {
+      items = [];
+    }
     for (const it of items) {
       const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
       // no max(0) clamp: the decrement must be the EXACT inverse of restockOrderLines' +qty, or a refund over-inflates
       // stock. stockError blocks overselling at checkout, so inventory stays >=0 in the normal path; a rare race that
       // dips it below 0 renders as "Sold out" (the <=0 check) and a later refund returns it to the true value.
-      if (it.productId != null) { await dz.update(product).set({ inventory: sql`${product.inventory} - ${qty}` }).where(eq(product.id, Number(it.productId))).run(); await alertLowStock(c, dz, "product", Number(it.productId), threshold, owners); }
-      if (it.variantId != null) { await dz.update(variant).set({ inventory: sql`${variant.inventory} - ${qty}` }).where(eq(variant.id, Number(it.variantId))).run(); await alertLowStock(c, dz, "variant", Number(it.variantId), threshold, owners); }
+      if (it.productId != null) {
+        await dz
+          .update(product)
+          .set({ inventory: sql`${product.inventory} - ${qty}` })
+          .where(eq(product.id, Number(it.productId)))
+          .run();
+        await alertLowStock(c, dz, "product", Number(it.productId), threshold, owners);
+      }
+      if (it.variantId != null) {
+        await dz
+          .update(variant)
+          .set({ inventory: sql`${variant.inventory} - ${qty}` })
+          .where(eq(variant.id, Number(it.variantId)))
+          .run();
+        await alertLowStock(c, dz, "variant", Number(it.variantId), threshold, owners);
+      }
     }
   }
   return changed;
@@ -160,7 +261,11 @@ export async function cancelPendingOrder(dz: Dz, orderId: number): Promise<boole
  *  the fulfillment queue forever. Returns the count cancelled. Run from the Worker's scheduled() cron. */
 export async function reapAbandonedOrders(dz: Dz, olderThanMs = 86_400_000): Promise<number> {
   const cutoff = Date.now() - olderThanMs;
-  const stale = (await dz.select().from(order).where(and(eq(order.status, "pending"), lt(order.createdAt, cutoff))).all()) as { id: number }[];
+  const stale = (await dz
+    .select()
+    .from(order)
+    .where(and(eq(order.status, "pending"), lt(order.createdAt, cutoff)))
+    .all()) as { id: number }[];
   for (const o of stale) await cancelPendingOrder(dz, o.id);
   return stale.length;
 }
@@ -169,21 +274,53 @@ export async function reapAbandonedOrders(dz: Dz, olderThanMs = 86_400_000): Pro
  *  reaped (younger than the 24h reap), ONE "complete your order" nudge, then stamp recoveryEmailedAt so it never
  *  re-sends. Atomic CLAIM (UPDATE ... RETURNING) then send, so an overlapping cron can't double-email (the lesson from
  *  the back-in-stock review). Takes mail config + site origin explicitly — scheduled() has no request Context. */
-export async function sweepAbandonedCartEmails(dz: Dz, opts: { apiKey?: string; from?: string; origin: string; idleMs?: number; reapMs?: number }): Promise<number> {
+export async function sweepAbandonedCartEmails(
+  dz: Dz,
+  opts: { apiKey?: string; from?: string; origin: string; idleMs?: number; reapMs?: number },
+): Promise<number> {
   const now = Date.now();
-  const idleCutoff = now - (opts.idleMs ?? 3_600_000);  // idle ≥ 1h before we nudge
+  const idleCutoff = now - (opts.idleMs ?? 3_600_000); // idle ≥ 1h before we nudge
   const reapCutoff = now - (opts.reapMs ?? 86_400_000); // younger than the reap window (don't nudge about-to-be-cancelled orders)
-  const claimed = await claimRows<{ customerEmail?: string; items?: string | null }>(dz, order, and(
-    eq(order.status, "pending"), isNull(order.recoveryEmailedAt), isNotNull(order.customerEmail),
-    lt(order.createdAt, idleCutoff), gt(order.createdAt, reapCutoff),
-  )!, { recoveryEmailedAt: now });
+  const claimed = await claimRows<{ customerEmail?: string; items?: string | null }>(
+    dz,
+    order,
+    and(
+      eq(order.status, "pending"),
+      isNull(order.recoveryEmailedAt),
+      isNotNull(order.customerEmail),
+      lt(order.createdAt, idleCutoff),
+      gt(order.createdAt, reapCutoff),
+    )!,
+    { recoveryEmailedAt: now },
+  );
   let sent = 0;
   for (const o of claimed) {
     if (!o.customerEmail) continue;
     let lines: { name?: string; qty?: number }[] = [];
-    try { lines = JSON.parse(o.items || "[]"); } catch { /* ignore a malformed snapshot */ }
-    const list = lines.slice(0, 6).map((l) => "<li>" + escHtml(String(l.name ?? "item")) + " × " + (Number(l.qty) || 1) + "</li>").join("");
-    sendEmailAsync({ to: String(o.customerEmail), subject: "You left something in your cart", html: brandedEmail("Still thinking it over?", "<p>Your cart is still waiting — finish checking out before these sell out.</p>" + (list ? "<ul>" + list + "</ul>" : "") + "<p><a href=\"" + opts.origin + "/checkout\">Complete your order →</a></p>") }, { apiKey: opts.apiKey, from: opts.from });
+    try {
+      lines = JSON.parse(o.items || "[]");
+    } catch {
+      /* ignore a malformed snapshot */
+    }
+    const list = lines
+      .slice(0, 6)
+      .map((l) => "<li>" + escHtml(String(l.name ?? "item")) + " × " + (Number(l.qty) || 1) + "</li>")
+      .join("");
+    sendEmailAsync(
+      {
+        to: String(o.customerEmail),
+        subject: "You left something in your cart",
+        html: brandedEmail(
+          "Still thinking it over?",
+          "<p>Your cart is still waiting — finish checking out before these sell out.</p>" +
+            (list ? "<ul>" + list + "</ul>" : "") +
+            '<p><a href="' +
+            opts.origin +
+            '/checkout">Complete your order →</a></p>',
+        ),
+      },
+      { apiKey: opts.apiKey, from: opts.from },
+    );
     sent++;
   }
   return sent;
@@ -194,14 +331,33 @@ export async function sweepAbandonedCartEmails(dz: Dz, opts: { apiKey?: string; 
  *  paid/shipped → cancelled transition), so a webhook re-delivery can't double-restock. */
 export async function restockOrderLines(dz: Dz, o: { items?: string | null; discountCode?: string | null }): Promise<void> {
   let items: { productId?: number; variantId?: number; qty?: number }[] = [];
-  try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+  try {
+    items = JSON.parse(o.items || "[]");
+  } catch {
+    items = [];
+  }
   for (const it of items) {
     const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
     // restock RAISES stock → re-arm the low-stock latch so a future dip alerts again (else the owner is warned once, never again).
-    if (it.productId != null) await dz.update(product).set({ inventory: sql`${product.inventory} + ${qty}`, lowStockAlerted: false }).where(eq(product.id, Number(it.productId))).run();
-    if (it.variantId != null) await dz.update(variant).set({ inventory: sql`${variant.inventory} + ${qty}`, lowStockAlerted: false }).where(eq(variant.id, Number(it.variantId))).run();
+    if (it.productId != null)
+      await dz
+        .update(product)
+        .set({ inventory: sql`${product.inventory} + ${qty}`, lowStockAlerted: false })
+        .where(eq(product.id, Number(it.productId)))
+        .run();
+    if (it.variantId != null)
+      await dz
+        .update(variant)
+        .set({ inventory: sql`${variant.inventory} + ${qty}`, lowStockAlerted: false })
+        .where(eq(variant.id, Number(it.variantId)))
+        .run();
   }
-  if (o.discountCode) await dz.update(discountCode).set({ currentUses: sql`max(0, ${discountCode.currentUses} - 1)` }).where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim())).run();
+  if (o.discountCode)
+    await dz
+      .update(discountCode)
+      .set({ currentUses: sql`max(0, ${discountCode.currentUses} - 1)` })
+      .where(eq(discountCode.code, String(o.discountCode).toUpperCase().trim()))
+      .run();
 }
 
 /** Refund a paid order (Stripe charge.refunded): flip paid/shipped → cancelled ONCE and restock. The conditional UPDATE
@@ -217,7 +373,8 @@ export async function refundOrder(dz: Dz, orderId: number): Promise<boolean> {
   }
   if (o.status !== "paid" && o.status !== "shipped") return false;
   // claim paid/shipped→cancelled exactly once — a webhook re-delivery finds it already cancelled (no double-restock).
-  if (!(await claimOnce(dz, order, and(eq(order.id, orderId), inArray(order.status, ["paid", "shipped"]))!, { status: "cancelled" }))) return false;
+  if (!(await claimOnce(dz, order, and(eq(order.id, orderId), inArray(order.status, ["paid", "shipped"]))!, { status: "cancelled" })))
+    return false;
   // restock ONLY a paid (not-yet-shipped) order — a shipped order's goods already left, so they don't return to stock.
   if (o.status === "paid") await restockOrderLines(dz, o);
   return true;
@@ -233,19 +390,36 @@ const buyerEmail = (c: Context): string | null => (c.get("sessionEmail") as stri
  * here: a duplicate PENDING order is benign (only one Checkout Session ever completes) and the client disables the
  * button. The narrow SQL filter (paid + total + recent) keeps it cheap; items + buyer are matched in memory.
  */
-async function recentPaidDuplicate(dz: Dz, opts: { who: string | null; email: string | null; itemsJson: string; total: number }): Promise<number | null> {
+async function recentPaidDuplicate(
+  dz: Dz,
+  opts: { who: string | null; email: string | null; itemsJson: string; total: number },
+): Promise<number | null> {
   if (!opts.who && !opts.email) return null; // anonymous with no email can't be correlated — skip
   const since = Date.now() - 90_000;
-  const rows = (await dz.select().from(order).where(and(eq(order.status, "paid"), eq(order.totalCents, opts.total), gte(order.createdAt, since))).all()) as { id: number; items: string | null; customerId: string | null; customerEmail: string | null }[];
+  const rows = (await dz
+    .select()
+    .from(order)
+    .where(and(eq(order.status, "paid"), eq(order.totalCents, opts.total), gte(order.createdAt, since)))
+    .all()) as { id: number; items: string | null; customerId: string | null; customerEmail: string | null }[];
   const m = rows.find((o) => (o.items ?? "") === opts.itemsJson && (opts.who ? o.customerId === opts.who : o.customerEmail === opts.email));
   return m ? m.id : null;
 }
 
 /** Known-carrier tracking deep-link for the order-status email (else the email links to the buyer's orders page). */
-const CARRIER_TRACK: Record<string, string> = { ups: "https://www.ups.com/track?tracknum=", usps: "https://tools.usps.com/go/TrackConfirmAction?tLabels=", fedex: "https://www.fedex.com/fedextrack/?trknbr=", dhl: "https://www.dhl.com/en/express/tracking.html?AWB=" };
+const CARRIER_TRACK: Record<string, string> = {
+  ups: "https://www.ups.com/track?tracknum=",
+  usps: "https://tools.usps.com/go/TrackConfirmAction?tLabels=",
+  fedex: "https://www.fedex.com/fedextrack/?trknbr=",
+  dhl: "https://www.dhl.com/en/express/tracking.html?AWB=",
+};
 const carrierTrackingUrl = (carrier: string | null, num: string | null): string | undefined => {
   if (!num) return undefined;
-  const base = CARRIER_TRACK[String(carrier ?? "").toLowerCase().trim()];
+  const base =
+    CARRIER_TRACK[
+      String(carrier ?? "")
+        .toLowerCase()
+        .trim()
+    ];
   return base ? base + encodeURIComponent(num) : undefined;
 };
 
@@ -254,26 +428,44 @@ const carrierTrackingUrl = (carrier: string | null, num: string | null): string 
  *  order has no PaymentIntent). Any Stripe error → false, so the caller can refuse to cancel an order it couldn't refund. */
 async function stripeRefund(key: string, sessionId: string, idemKey: string): Promise<boolean> {
   try {
-    const s = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, { headers: { authorization: `Bearer ${key}` } });
+    const s = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+      headers: { authorization: `Bearer ${key}` },
+    });
     if (!s.ok) return false;
     const sess = (await s.json()) as { payment_intent?: string };
     if (!sess.payment_intent) return true; // no charge to reverse (free / $0 order)
     const pi = sess.payment_intent;
     // ALREADY fully refunded (out-of-band in the dashboard, or a retry after a lost HTTP response)? Treat as success so
     // the cancel completes instead of looping on 502. Check the PI's latest charge's refunded state.
-    const piObj = await retrievePaymentIntent<{ latest_charge?: { amount?: number; amount_refunded?: number; refunded?: boolean } }>(key, pi, { expand: ["latest_charge"] });
+    const piObj = await retrievePaymentIntent<{ latest_charge?: { amount?: number; amount_refunded?: number; refunded?: boolean } }>(
+      key,
+      pi,
+      { expand: ["latest_charge"] },
+    );
     const ch = piObj?.latest_charge;
-    if (ch && (ch.refunded === true || (typeof ch.amount === "number" && typeof ch.amount_refunded === "number" && ch.amount_refunded >= ch.amount))) return true;
+    if (
+      ch &&
+      (ch.refunded === true || (typeof ch.amount === "number" && typeof ch.amount_refunded === "number" && ch.amount_refunded >= ch.amount))
+    )
+      return true;
     // Idempotency-Key so a retried request (after a lost response) returns the SAME refund, never a duplicate.
-    const r = await fetch("https://api.stripe.com/v1/refunds", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": idemKey }, body: `payment_intent=${encodeURIComponent(pi)}` });
+    const r = await fetch("https://api.stripe.com/v1/refunds", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded", "idempotency-key": idemKey },
+      body: `payment_intent=${encodeURIComponent(pi)}`,
+    });
     if (r.ok) return true;
     const err = (await r.json().catch(() => ({}))) as { error?: { code?: string } };
     return err.error?.code === "charge_already_refunded"; // nothing left to refund → success for our purpose
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 /** A guest's typed checkout email — lightly validated server-side so a guest order can still send a receipt. */
 const cleanEmail = (x: unknown): string | null => {
-  const s = String(x ?? "").trim().toLowerCase();
+  const s = String(x ?? "")
+    .trim()
+    .toLowerCase();
   return s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
 };
 /** base64url(email) — obscures the address in the unsubscribe URL (not a bare email in the query string). */
@@ -283,16 +475,22 @@ const unsubToken = (email: string) => btoa(email).replace(/\+/g, "-").replace(/\
  *  only the local table. No-op until RESEND_AUDIENCE_ID is configured. The local newsletter_subscriber row stays the
  *  source of truth; this just keeps Resend in sync (create on subscribe, flag unsubscribed:true on unsubscribe). */
 function resendAudienceSync(c: Context, email: string, unsubscribed: boolean): void {
-  const key = secret(c, "RESEND_API_KEY"), audience = secret(c, "RESEND_AUDIENCE_ID");
+  const key = secret(c, "RESEND_API_KEY"),
+    audience = secret(c, "RESEND_AUDIENCE_ID");
   if (!key || !audience) return;
   const h = { authorization: `Bearer ${key}`, "content-type": "application/json" };
   const base = `https://api.resend.com/audiences/${audience}/contacts`;
-  const p = (unsubscribed
-    ? fetch(`${base}/${encodeURIComponent(email)}`, { method: "PATCH", headers: h, body: JSON.stringify({ unsubscribed: true }) })
-    : fetch(base, { method: "POST", headers: h, body: JSON.stringify({ email, unsubscribed: false }) })
+  const p = (
+    unsubscribed
+      ? fetch(`${base}/${encodeURIComponent(email)}`, { method: "PATCH", headers: h, body: JSON.stringify({ unsubscribed: true }) })
+      : fetch(base, { method: "POST", headers: h, body: JSON.stringify({ email, unsubscribed: false }) })
   ).catch(() => {});
   // keep the fire-and-forget alive past the Worker response (an un-awaited fetch can otherwise be cancelled).
-  try { (c.executionCtx as { waitUntil?: (x: Promise<unknown>) => void } | undefined)?.waitUntil?.(p); } catch { /* dev/Node: no executionCtx — the promise runs inline */ }
+  try {
+    (c.executionCtx as { waitUntil?: (x: Promise<unknown>) => void } | undefined)?.waitUntil?.(p);
+  } catch {
+    /* dev/Node: no executionCtx — the promise runs inline */
+  }
 }
 
 /**
@@ -306,14 +504,23 @@ export async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Pro
     const o = await dz.select().from(order).where(eq(order.id, orderId)).get();
     if (!o || o.status !== "paid" || !o.customerEmail) return;
     let items: { name?: string; qty?: number; priceCents?: number; variantLabel?: string }[] = [];
-    try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+    try {
+      items = JSON.parse(o.items || "[]");
+    } catch {
+      items = [];
+    }
     const lines = items.map((l) => {
       const qty = Math.max(1, Math.floor(Number(l.qty) || 1));
-      return { name: l.variantLabel ? `${l.name ?? "Item"} — ${l.variantLabel}` : (l.name ?? "Item"), qty, totalCents: Math.max(0, Math.round(Number(l.priceCents) || 0)) * qty };
+      return {
+        name: l.variantLabel ? `${l.name ?? "Item"} — ${l.variantLabel}` : (l.name ?? "Item"),
+        qty,
+        totalCents: Math.max(0, Math.round(Number(l.priceCents) || 0)) * qty,
+      };
     });
     // append the adjustment lines (discount/shipping/tax) so the receipt's lines sum EXACTLY to the total.
     const goodsCents = lines.reduce((s, l) => s + l.totalCents, 0);
-    const shipC = Math.max(0, Number(o.shippingCents) || 0), taxC = Math.max(0, Number(o.taxCents) || 0);
+    const shipC = Math.max(0, Number(o.shippingCents) || 0),
+      taxC = Math.max(0, Number(o.taxCents) || 0);
     const discC = goodsCents - ((o.totalCents || 0) - shipC - taxC);
     if (discC > 0) lines.push({ name: o.discountCode ? `Discount (${o.discountCode})` : "Discount", qty: 1, totalCents: -discC });
     if (shipC > 0) lines.push({ name: "Shipping", qty: 1, totalCents: shipC });
@@ -323,16 +530,29 @@ export async function sendOrderReceipt(c: Context, dz: Dz, orderId: number): Pro
     if (o.shippingAddress) {
       try {
         const a = JSON.parse(o.shippingAddress) as ShipTo;
-        ship = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter((s): s is string => !!s && !!s.trim());
-      } catch { ship = undefined; }
+        ship = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter(
+          (s): s is string => !!s && !!s.trim(),
+        );
+      } catch {
+        ship = undefined;
+      }
     }
     const origin = new URL(c.req.url).origin;
     const { subject, html } = orderConfirmationEmail(
-      { orderNumber: String(o.id), items: lines, totalCents: o.totalCents, currency: "usd", orderUrl: `${origin}/dashboard`, ...(ship && ship.length ? { shippingAddress: ship } : {}) },
+      {
+        orderNumber: String(o.id),
+        items: lines,
+        totalCents: o.totalCents,
+        currency: "usd",
+        orderUrl: `${origin}/dashboard`,
+        ...(ship && ship.length ? { shippingAddress: ship } : {}),
+      },
       { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } },
     );
     sendEmailAsync({ to: o.customerEmail, subject, html }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
-  } catch { /* a receipt failure must never break the sale */ }
+  } catch {
+    /* a receipt failure must never break the sale */
+  }
 }
 
 /** Get-or-create the signed-in principal's Stripe customer, recorded on their billing_account row. ONE customer
@@ -343,12 +563,17 @@ export async function ensureStripeCustomer(dz: Dz, key: string, who: string, ema
   if (existing?.stripeCustomerId) return existing.stripeCustomerId;
   const customer = await restStripe(key).customers.create(customerParams({ email, metadata: { principal: who } }));
   if (existing) await dz.update(billingAccount).set({ stripeCustomerId: customer.id }).where(eq(billingAccount.id, existing.id)).run();
-  else await dz.insert(billingAccount).values({ principal: who, stripeCustomerId: customer.id, subscriptionId: null, lastReportedMicroUsd: 0, createdAt: Date.now() }).run();
+  else
+    await dz
+      .insert(billingAccount)
+      .values({ principal: who, stripeCustomerId: customer.id, subscriptionId: null, lastReportedMicroUsd: 0, createdAt: Date.now() })
+      .run();
   return customer.id;
 }
 
 /** Resolve an `Authorization: Bearer sk_…` header to the owning userId via the api_token table (or null). */
-export async function verifyApiToken(dz: { select: (...a: unknown[]) => any }, authHeader: string | undefined): Promise<string | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function verifyApiToken(dz: { select: (...a: unknown[]) => any }, authHeader: string | undefined): Promise<string | null> {
+  // eslint-disable-line @typescript-eslint/no-explicit-any
   const m = /^Bearer\s+(sk_[A-Za-z0-9_]+)$/.exec(authHeader ?? "");
   if (!m) return null;
   const hashed = await hashKey(m[1]);
@@ -362,6 +587,7 @@ type Dz = {
   select: (...a: unknown[]) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
   insert: (...a: unknown[]) => any;
   update: (...a: unknown[]) => any;
+  delete: (...a: unknown[]) => any; // library-type gap: @suluk/drizzle's Dz omitted .delete, but the real BaseSQLiteDatabase has it
 };
 export type DbFor = (c: Context) => Dz;
 
@@ -373,38 +599,101 @@ export async function notifyBackInStock(c: Context, dz: Dz, productId: number): 
   const p = (await dz.select().from(product).where(eq(product.id, productId)).get()) as { name?: string; slug?: string } | undefined;
   if (!p) return; // the hook fires from this product's own update, so this is a defensive guard, not a real path
   // CLAIM first: only rows this UPDATE flips (notifiedAt was NULL) come back; a concurrent caller claims the rest.
-  const claimed = await claimRows<{ email?: string }>(dz, stockNotification, and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))!, { notifiedAt: Date.now() });
+  const claimed = await claimRows<{ email?: string }>(
+    dz,
+    stockNotification,
+    and(eq(stockNotification.productId, productId), isNull(stockNotification.notifiedAt))!,
+    { notifiedAt: Date.now() },
+  );
   if (!claimed.length) return;
   const url = new URL(c.req.url).origin + "/products/" + String(p.slug ?? "");
-  const apiKey = secret(c, "RESEND_API_KEY"), from = secret(c, "EMAIL_FROM");
+  const apiKey = secret(c, "RESEND_API_KEY"),
+    from = secret(c, "EMAIL_FROM");
   for (const s of claimed) {
     if (!s.email) continue;
-    sendEmailAsync({ to: String(s.email), subject: ("Back in stock: " + (p.name ?? "your item")).slice(0, 180), html: brandedEmail("Back in stock 🎉", "<p><b>" + escHtml(String(p.name ?? "Your item")) + "</b> is available again — but it may not last.</p><p><a href=\"" + url + "\">Get it now →</a></p>") }, { apiKey, from });
+    sendEmailAsync(
+      {
+        to: String(s.email),
+        subject: ("Back in stock: " + (p.name ?? "your item")).slice(0, 180),
+        html: brandedEmail(
+          "Back in stock 🎉",
+          "<p><b>" +
+            escHtml(String(p.name ?? "Your item")) +
+            '</b> is available again — but it may not last.</p><p><a href="' +
+            url +
+            '">Get it now →</a></p>',
+        ),
+      },
+      { apiKey, from },
+    );
   }
 }
 
 /** afterUpdate hooks for the generic CRUD, keyed by table name (mirrors PRIVATE_READ_COLS). When inventory crosses
  *  from sold-out (<=0) back to positive — a merchant restock via the admin CRUD — fire the back-in-stock waitlist.
  *  A variant restock notifies its parent product's waitlist. */
-const CRUD_AFTER_UPDATE: Record<string, (c: Context, dz: Dz, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>> = {
-  product: async (c, dz, before, after) => { if (Number(before.inventory) <= 0 && Number(after.inventory) > 0) await notifyBackInStock(c, dz, Number(after.id)); },
-  variant: async (c, dz, before, after) => { if (Number(before.inventory) <= 0 && Number(after.inventory) > 0) await notifyBackInStock(c, dz, Number(after.productId)); },
+const CRUD_AFTER_UPDATE: Record<
+  string,
+  (c: Context, dz: Dz, before: Record<string, unknown>, after: Record<string, unknown>) => Promise<void>
+> = {
+  product: async (c, dz, before, after) => {
+    if (Number(before.inventory) <= 0 && Number(after.inventory) > 0) await notifyBackInStock(c, dz, Number(after.id));
+  },
+  variant: async (c, dz, before, after) => {
+    if (Number(before.inventory) <= 0 && Number(after.inventory) > 0) await notifyBackInStock(c, dz, Number(after.productId));
+  },
 };
 /** Tables with an afterUpdate hook — the CRUD factories pre-read the before-row only for these (mirrors redactRow). */
 export const CRUD_AFTER_UPDATE_TABLES = new Set(Object.keys(CRUD_AFTER_UPDATE));
 /** Run a table's afterUpdate hook (no-op when none). Called by BOTH CRUD twins (dev crud.ts + worker d1Crud). */
-export async function crudAfterUpdate(tableName: string, c: Context, dz: Dz, before: Record<string, unknown>, after: Record<string, unknown>): Promise<void> {
+export async function crudAfterUpdate(
+  tableName: string,
+  c: Context,
+  dz: Dz,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): Promise<void> {
   const h = CRUD_AFTER_UPDATE[tableName];
   if (h) await h(c, dz, before, after);
 }
 
 const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
-const write = (m: number): CostModel => ({ components: [{ source: "compute", basis: "per-call", microUsd: 100 }, { source: "db-write", basis: "per-call", microUsd: m }], estimateMicroUsd: 100 + m });
+const write = (m: number): CostModel => ({
+  components: [
+    { source: "compute", basis: "per-call", microUsd: 100 },
+    { source: "db-write", basis: "per-call", microUsd: m },
+  ],
+  estimateMicroUsd: 100 + m,
+});
 
-interface LineItem { productId?: number; variantId?: number; qty?: number; priceCents?: number }
-interface ResolvedDiscount { valid: boolean; discountType?: "percent" | "fixed"; discountValue?: number; reason?: string; maxDiscountCents?: number; minSubtotalCents?: number }
+interface LineItem {
+  productId?: number;
+  variantId?: number;
+  qty?: number;
+  priceCents?: number;
+}
+interface ResolvedDiscount {
+  valid: boolean;
+  discountType?: "percent" | "fixed";
+  discountValue?: number;
+  reason?: string;
+  maxDiscountCents?: number;
+  minSubtotalCents?: number;
+}
 /** A server-re-priced order line — the client's priceCents is NEVER trusted; every cent comes from the product/variant row. */
-interface PricedLine { productId: number; variantId?: number; qty: number; priceCents: number; name: string; image?: string; variantLabel?: string; stripePriceId?: string; inventory: number; requiresShipping: boolean; downloadUrl?: string }
+interface PricedLine {
+  productId: number;
+  variantId?: number;
+  qty: number;
+  priceCents: number;
+  name: string;
+  image?: string;
+  variantLabel?: string;
+  stripePriceId?: string;
+  inventory: number;
+  requiresShipping: boolean;
+  downloadUrl?: string;
+}
 
 /** The first stock problem in the cart (sold-out / over-qty), or null if everything is available. */
 function stockError(lines: PricedLine[]): string | null {
@@ -423,59 +712,270 @@ function jsonOp(
   opts: { body?: unknown; params?: unknown; status?: number; contentType?: string; response?: unknown } = {},
 ): Record<string, unknown> {
   return {
-    method, summary, tags: ["Operations"],
+    method,
+    summary,
+    tags: ["Operations"],
     ...(opts.body ? { contentType: "application/json", contentSchema: opts.body } : {}),
     ...(opts.params ? { parameterSchema: opts.params } : {}),
-    responses: { ok: { status: opts.status ?? 200, description: summary, contentType: opts.contentType ?? "application/json", contentSchema: opts.response ?? { type: "object" } } },
+    responses: {
+      ok: {
+        status: opts.status ?? 200,
+        description: summary,
+        contentType: opts.contentType ?? "application/json",
+        contentSchema: opts.response ?? { type: "object" },
+      },
+    },
   };
 }
 
 /** The per-operation cost models — merged into the contract's cost map so these are metered like CRUD. */
 export const OPERATION_COSTS: Record<string, CostModel> = {
-  checkout: write(80), validateDiscount: read(10), search: read(14), markReviewHelpful: write(20), submitReview: write(25), setOrderStatus: write(30),
-  analyticsSummary: read(20), analyticsRevenue: read(20), analyticsTopProducts: read(24),
-  recommendRelated: read(16), subscribeNewsletter: write(20), unsubscribeNewsletter: read(8), submitContact: write(20), subscribeStock: write(20), orderInvoice: read(12), generateAvatar: read(2),
-  createToken: write(30), revokeToken: write(20),
-  payCheckout: write(90), confirmCheckout: read(30), quoteCheckout: read(12),
-  connectBilling: write(60), reportUsage: write(40), openBillingPortal: write(40), exportAccount: read(20),
+  checkout: write(80),
+  validateDiscount: read(10),
+  search: read(14),
+  markReviewHelpful: write(20),
+  submitReview: write(25),
+  setOrderStatus: write(30),
+  analyticsSummary: read(20),
+  analyticsRevenue: read(20),
+  analyticsTopProducts: read(24),
+  recommendRelated: read(16),
+  subscribeNewsletter: write(20),
+  unsubscribeNewsletter: read(8),
+  submitContact: write(20),
+  subscribeStock: write(20),
+  orderInvoice: read(12),
+  generateAvatar: read(2),
+  createToken: write(30),
+  revokeToken: write(20),
+  payCheckout: write(90),
+  confirmCheckout: read(30),
+  quoteCheckout: read(12),
+  connectBilling: write(60),
+  reportUsage: write(40),
+  openBillingPortal: write(40),
+  exportAccount: read(20),
 };
 
 // typed input bodies for the custom ops with REAL bounds (validations.ts) — a bare {type:"object"} is a free-form bag.
-const obj = (properties: Record<string, unknown>, required?: string[]) => ({ type: "object", additionalProperties: false, properties, ...(required ? { required } : {}) });
+const obj = (properties: Record<string, unknown>, required?: string[]) => ({
+  type: "object",
+  additionalProperties: false,
+  properties,
+  ...(required ? { required } : {}),
+});
 const ID = 1_000_000_000_000;
 const cartLine = obj({ productId: v.int(1, ID), variantId: v.int(1, ID), qty: v.int(1, 1000), priceCents: v.cents() });
 const payLine = obj({ productId: v.int(1, ID), variantId: v.int(1, ID), qty: v.int(1, 1000) });
 // shipping address captured at checkout for physical goods — a JSON snapshot stored on the order. line2/state optional;
 // the rest are required IF an address is supplied (a digital-only order simply omits the whole object).
-const shipAddress = obj({ name: v.line(120), line1: v.line(160), line2: v.line(160), city: v.line(100), state: v.line(100), postalCode: v.line(20), country: v.line(56) }, ["name", "line1", "city", "postalCode", "country"]);
+const shipAddress = obj(
+  {
+    name: v.line(120),
+    line1: v.line(160),
+    line2: v.line(160),
+    city: v.line(100),
+    state: v.line(100),
+    postalCode: v.line(20),
+    country: v.line(56),
+  },
+  ["name", "line1", "city", "postalCode", "country"],
+);
 
 /** The v4 path fragment for the custom operations — merged into the contract document (then hardened below). */
 export const OPERATION_PATHS: Record<string, unknown> = {
-  "checkout/order": { requests: { checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", { body: obj({ cartId: v.int(1, ID), items: { type: "array", maxItems: 200, items: cartLine }, discountCode: v.code(40), email: v.email(), shippingMethod: v.line(40), shippingAddress: shipAddress }), status: 201 }) } },
-  "discount/validate": { requests: { validateDiscount: jsonOp("post", "Validate a discount code", { body: obj({ code: v.code(40), subtotalCents: v.cents(100_000_000_000) }, ["code"]) }) } },
-  "search": { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
+  "checkout/order": {
+    requests: {
+      checkout: jsonOp("post", "Create an order from a cart (apply discount, total)", {
+        body: obj({
+          cartId: v.int(1, ID),
+          items: { type: "array", maxItems: 200, items: cartLine },
+          discountCode: v.code(40),
+          email: v.email(),
+          shippingMethod: v.line(40),
+          shippingAddress: shipAddress,
+        }),
+        status: 201,
+      }),
+    },
+  },
+  "discount/validate": {
+    requests: {
+      validateDiscount: jsonOp("post", "Validate a discount code", {
+        body: obj({ code: v.code(40), subtotalCents: v.cents(100_000_000_000) }, ["code"]),
+      }),
+    },
+  },
+  search: { requests: { search: jsonOp("get", "Search products + blog posts", { params: { query: obj({ q: v.line(200) }) } }) } },
   "review/{id}/helpful": { requests: { markReviewHelpful: jsonOp("post", "Mark a review helpful (+1)", { params: idParam }) } },
-  "review/submit": { requests: { submitReview: jsonOp("post", "Submit a product review — auto-flags verified-purchase when the reviewer has a paid order for the product", { body: obj({ productId: v.int(1, ID), rating: v.int(1, 5), title: v.line(160), body: v.rich(5000) }, ["productId", "rating"]), status: 201 }) } },
-  "order/{id}/status": { requests: { setOrderStatus: jsonOp("post", "Admin: advance an order's fulfillment status (paid/shipped/cancelled) + record tracking; emails the buyer on shipped/cancelled", { params: idParam, body: obj({ status: v.line(20), carrier: v.line(60), trackingNumber: v.line(80) }, ["status"]) }) } },
+  "review/submit": {
+    requests: {
+      submitReview: jsonOp(
+        "post",
+        "Submit a product review — auto-flags verified-purchase when the reviewer has a paid order for the product",
+        {
+          body: obj({ productId: v.int(1, ID), rating: v.int(1, 5), title: v.line(160), body: v.rich(5000) }, ["productId", "rating"]),
+          status: 201,
+        },
+      ),
+    },
+  },
+  "order/{id}/status": {
+    requests: {
+      setOrderStatus: jsonOp(
+        "post",
+        "Admin: advance an order's fulfillment status (paid/shipped/cancelled) + record tracking; emails the buyer on shipped/cancelled",
+        { params: idParam, body: obj({ status: v.line(20), carrier: v.line(60), trackingNumber: v.line(80) }, ["status"]) },
+      ),
+    },
+  },
   "analytics/summary": { requests: { analyticsSummary: jsonOp("get", "Store summary (orders, revenue, customers)") } },
   "analytics/revenue": { requests: { analyticsRevenue: jsonOp("get", "Revenue per day (last 30d)") } },
   "analytics/top-products": { requests: { analyticsTopProducts: jsonOp("get", "Best-selling products") } },
-  "recommendations/{productId}": { requests: { recommendRelated: jsonOp("get", "Related products", { params: { path: { type: "object", properties: { productId: { type: "string", maxLength: 16, pattern: "^[0-9]+$" } }, required: ["productId"] } } }) } },
-  "newsletter/subscribe": { requests: { subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", { body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
-  "contact/submit": { requests: { submitContact: jsonOp("post", "Submit the contact form (persists + notifies the store owner)", { body: obj({ name: v.line(120), email: v.email(), subject: v.line(160), message: v.line(4000) }, ["name", "email", "subject", "message"]), status: 201 }) } },
-  "product/{id}/notify-stock": { requests: { subscribeStock: jsonOp("post", "Join a sold-out product's back-in-stock waitlist", { params: idParam, body: obj({ email: v.email() }, ["email"]), status: 201 }) } },
-  "order/{id}/invoice": { requests: { orderInvoice: jsonOp("get", "Printable HTML invoice for an order (owner or admin)", { params: idParam, contentType: "text/html", response: { type: "string" } }) } },
-  "newsletter/unsubscribe": { requests: { unsubscribeNewsletter: jsonOp("get", "Unsubscribe from the newsletter via a tokenized one-click link", { params: { query: obj({ t: v.line(400) }) }, contentType: "text/html", response: { type: "string" } }) } },
-  "avatar": { requests: { generateAvatar: jsonOp("get", "Deterministic identicon SVG", { params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) }, contentType: "image/svg+xml", response: { type: "string" } }) } },
-  "tokens/create": { requests: { createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", { body: obj({ name: v.line(80) }, ["name"]), status: 201 }) } },
+  "recommendations/{productId}": {
+    requests: {
+      recommendRelated: jsonOp("get", "Related products", {
+        params: {
+          path: {
+            type: "object",
+            properties: { productId: { type: "string", maxLength: 16, pattern: "^[0-9]+$" } },
+            required: ["productId"],
+          },
+        },
+      }),
+    },
+  },
+  "newsletter/subscribe": {
+    requests: {
+      subscribeNewsletter: jsonOp("post", "Subscribe to the newsletter (idempotent)", {
+        body: obj({ email: v.email() }, ["email"]),
+        status: 201,
+      }),
+    },
+  },
+  "contact/submit": {
+    requests: {
+      submitContact: jsonOp("post", "Submit the contact form (persists + notifies the store owner)", {
+        body: obj({ name: v.line(120), email: v.email(), subject: v.line(160), message: v.line(4000) }, [
+          "name",
+          "email",
+          "subject",
+          "message",
+        ]),
+        status: 201,
+      }),
+    },
+  },
+  "product/{id}/notify-stock": {
+    requests: {
+      subscribeStock: jsonOp("post", "Join a sold-out product's back-in-stock waitlist", {
+        params: idParam,
+        body: obj({ email: v.email() }, ["email"]),
+        status: 201,
+      }),
+    },
+  },
+  "order/{id}/invoice": {
+    requests: {
+      orderInvoice: jsonOp("get", "Printable HTML invoice for an order (owner or admin)", {
+        params: idParam,
+        contentType: "text/html",
+        response: { type: "string" },
+      }),
+    },
+  },
+  "newsletter/unsubscribe": {
+    requests: {
+      unsubscribeNewsletter: jsonOp("get", "Unsubscribe from the newsletter via a tokenized one-click link", {
+        params: { query: obj({ t: v.line(400) }) },
+        contentType: "text/html",
+        response: { type: "string" },
+      }),
+    },
+  },
+  avatar: {
+    requests: {
+      generateAvatar: jsonOp("get", "Deterministic identicon SVG", {
+        params: { query: obj({ seed: v.line(100, "^[\\w .@-]{0,100}$") }) },
+        contentType: "image/svg+xml",
+        response: { type: "string" },
+      }),
+    },
+  },
+  "tokens/create": {
+    requests: {
+      createToken: jsonOp("post", "Create an API token (returns the secret ONCE)", {
+        body: obj({ name: v.line(80) }, ["name"]),
+        status: 201,
+      }),
+    },
+  },
   "tokens/{id}/revoke": { requests: { revokeToken: jsonOp("post", "Revoke an API token", { params: idParam }) } },
-  "checkout/pay": { requests: { payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40), email: v.email(), shippingMethod: v.line(40), shippingAddress: shipAddress }) }) } },
-  "checkout/quote": { requests: { quoteCheckout: jsonOp("post", "Quote the live order total — subtotal − discount + shipping + tax (via the pluggable @suluk/stripe adapters)", { body: obj({ items: { type: "array", maxItems: 200, items: payLine }, discountCode: v.code(40), shippingMethod: v.line(40), shippingAddress: shipAddress }) }) } },
-  "checkout/confirm": { requests: { confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", { body: obj({ orderId: v.int(1, ID), sessionId: v.line(255, "^[A-Za-z0-9_]+$") }, ["orderId", "sessionId"]) }) } },
-  "billing/connect": { requests: { connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", { body: obj({ email: v.email() }) }) } },
-  "billing/report": { requests: { reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", { body: { type: "object", additionalProperties: false } }) } },
-  "billing/portal": { requests: { openBillingPortal: jsonOp("post", "Open the Stripe customer billing portal (manage saved cards + invoices)", { body: { type: "object", additionalProperties: false } }) } },
-  "account/export": { requests: { exportAccount: jsonOp("get", "Export all your account data (GDPR) — orders, wishlist, reviews, token metadata — as a downloadable JSON") } },
+  "checkout/pay": {
+    requests: {
+      payCheckout: jsonOp("post", "Create a pending order + a Stripe Checkout Session (returns the hosted URL)", {
+        body: obj({
+          items: { type: "array", maxItems: 200, items: payLine },
+          discountCode: v.code(40),
+          email: v.email(),
+          shippingMethod: v.line(40),
+          shippingAddress: shipAddress,
+        }),
+      }),
+    },
+  },
+  "checkout/quote": {
+    requests: {
+      quoteCheckout: jsonOp(
+        "post",
+        "Quote the live order total — subtotal − discount + shipping + tax (via the pluggable @suluk/stripe adapters)",
+        {
+          body: obj({
+            items: { type: "array", maxItems: 200, items: payLine },
+            discountCode: v.code(40),
+            shippingMethod: v.line(40),
+            shippingAddress: shipAddress,
+          }),
+        },
+      ),
+    },
+  },
+  "checkout/confirm": {
+    requests: {
+      confirmCheckout: jsonOp("post", "Confirm payment by retrieving the Stripe session; mark the order paid", {
+        body: obj({ orderId: v.int(1, ID), sessionId: v.line(255, "^[A-Za-z0-9_]+$") }, ["orderId", "sessionId"]),
+      }),
+    },
+  },
+  "billing/connect": {
+    requests: {
+      connectBilling: jsonOp("post", "Start usage-based billing: a Stripe customer + a metered subscription", {
+        body: obj({ email: v.email() }),
+      }),
+    },
+  },
+  "billing/report": {
+    requests: {
+      reportUsage: jsonOp("post", "Report your accrued @suluk/cost usage to the Stripe Billing Meter", {
+        body: { type: "object", additionalProperties: false },
+      }),
+    },
+  },
+  "billing/portal": {
+    requests: {
+      openBillingPortal: jsonOp("post", "Open the Stripe customer billing portal (manage saved cards + invoices)", {
+        body: { type: "object", additionalProperties: false },
+      }),
+    },
+  },
+  "account/export": {
+    requests: {
+      exportAccount: jsonOp(
+        "get",
+        "Export all your account data (GDPR) — orders, wishlist, reviews, token metadata — as a downloadable JSON",
+      ),
+    },
+  },
 };
 
 // HARDEN the custom-op inputs (the answer to @suluk/harden's findings): bound strings/numbers/arrays + close objects.
@@ -493,8 +993,14 @@ const fmtUsd = (cents: number) => "$" + (Math.max(0, Math.round(cents)) / 100).t
  *  its date window (startsAt..expiresAt), under its global + per-customer usage caps, above its minimum subtotal, and
  *  in scope for the cart's products. `opts` carries the live cart context the data-dependent checks need. Returns the
  *  cap (maxDiscountCents) + minimum so applyDiscount can clamp exactly. Reasons are human + actionable. */
-async function resolveDiscount(dz: Dz, raw: string, opts: { subtotalCents?: number; principal?: string; productIds?: number[] } = {}): Promise<ResolvedDiscount> {
-  const code = String(raw ?? "").toUpperCase().trim();
+async function resolveDiscount(
+  dz: Dz,
+  raw: string,
+  opts: { subtotalCents?: number; principal?: string; productIds?: number[] } = {},
+): Promise<ResolvedDiscount> {
+  const code = String(raw ?? "")
+    .toUpperCase()
+    .trim();
   if (!code) return { valid: false, reason: "Enter a discount code." };
   const d = await dz.select().from(discountCode).where(eq(discountCode.code, code)).get();
   if (!d) return { valid: false, reason: "That code isn’t recognized." };
@@ -502,35 +1008,65 @@ async function resolveDiscount(dz: Dz, raw: string, opts: { subtotalCents?: numb
   const now = Date.now();
   if (d.startsAt != null && now < Number(d.startsAt)) return { valid: false, reason: "This code isn’t active yet." };
   if (d.expiresAt != null && Number(d.expiresAt) < now) return { valid: false, reason: "This code has expired." };
-  if (d.maxUses != null && Number(d.currentUses) >= Number(d.maxUses)) return { valid: false, reason: "This code has reached its usage limit." };
-  if (d.minSubtotalCents != null && opts.subtotalCents != null && opts.subtotalCents < Number(d.minSubtotalCents)) return { valid: false, reason: `Spend at least ${fmtUsd(Number(d.minSubtotalCents))} to use this code.` };
+  if (d.maxUses != null && Number(d.currentUses) >= Number(d.maxUses))
+    return { valid: false, reason: "This code has reached its usage limit." };
+  if (d.minSubtotalCents != null && opts.subtotalCents != null && opts.subtotalCents < Number(d.minSubtotalCents))
+    return { valid: false, reason: `Spend at least ${fmtUsd(Number(d.minSubtotalCents))} to use this code.` };
   // product scope — the cart must contain at least one eligible product
   if (d.appliesToProductIds && opts.productIds?.length) {
     let scope: number[] = [];
-    try { scope = JSON.parse(d.appliesToProductIds as string); } catch { scope = []; }
-    if (Array.isArray(scope) && scope.length && !opts.productIds.some((id) => scope.includes(id))) return { valid: false, reason: "This code doesn’t apply to the items in your cart." };
+    try {
+      scope = JSON.parse(d.appliesToProductIds as string);
+    } catch {
+      scope = [];
+    }
+    if (Array.isArray(scope) && scope.length && !opts.productIds.some((id) => scope.includes(id)))
+      return { valid: false, reason: "This code doesn’t apply to the items in your cart." };
   }
   // per-customer cap — count this principal's prior PAID/shipped orders that used this code
   if (d.maxUsesPerCustomer != null && opts.principal) {
-    const prior = (await dz.select({ id: order.id }).from(order)
-      .where(and(eq(order.customerId, opts.principal), eq(order.discountCode, code), or(eq(order.status, "paid"), eq(order.status, "shipped")))).all()) as unknown[];
+    const prior = (await dz
+      .select({ id: order.id })
+      .from(order)
+      .where(
+        and(eq(order.customerId, opts.principal), eq(order.discountCode, code), or(eq(order.status, "paid"), eq(order.status, "shipped"))),
+      )
+      .all()) as unknown[];
     if (prior.length >= Number(d.maxUsesPerCustomer)) return { valid: false, reason: "You’ve already redeemed this code." };
   }
-  return { valid: true, discountType: d.discountType, discountValue: Number(d.discountValue), maxDiscountCents: d.maxDiscountCents != null ? Number(d.maxDiscountCents) : undefined, minSubtotalCents: d.minSubtotalCents != null ? Number(d.minSubtotalCents) : undefined };
+  return {
+    valid: true,
+    discountType: d.discountType,
+    discountValue: Number(d.discountValue),
+    maxDiscountCents: d.maxDiscountCents != null ? Number(d.maxDiscountCents) : undefined,
+    minSubtotalCents: d.minSubtotalCents != null ? Number(d.minSubtotalCents) : undefined,
+  };
 }
 
 /** Apply a resolved discount to a cents total via @suluk/stripe's tested money primitive — poison-guarded, CLAMPED to
  *  [0, total], and now CAPPED at maxDiscountCents (e.g. "30% off, up to $50"). One shared conformance-tested core. */
 function applyDiscount(totalCents: number, d: ResolvedDiscount): number {
   if (!d.valid || !d.discountType) return totalCents;
-  const discount: Discount = { type: d.discountType, value: d.discountValue ?? 0, maxDiscountCents: d.maxDiscountCents, minSubtotalCents: d.minSubtotalCents };
+  const discount: Discount = {
+    type: d.discountType,
+    value: d.discountValue ?? 0,
+    maxDiscountCents: d.maxDiscountCents,
+    minSubtotalCents: d.minSubtotalCents,
+  };
   return totalCents - computeDiscountAmount(totalCents, discount);
 }
 
 /** The primary display image for a product (preferring a selected variant's gallery, then the product gallery). */
 function firstImage(p: { imageUrl?: string | null; images?: string | null }, v?: { images?: string | null }): string | undefined {
   for (const src of [v?.images, p.images]) {
-    if (typeof src === "string" && src) { try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr[0]?.url) return arr[0].url as string; } catch { /* ignore */ } }
+    if (typeof src === "string" && src) {
+      try {
+        const arr = JSON.parse(src);
+        if (Array.isArray(arr) && arr[0]?.url) return arr[0].url as string;
+      } catch {
+        /* ignore */
+      }
+    }
   }
   return p.imageUrl ?? undefined;
 }
@@ -556,14 +1092,45 @@ async function repriceLines(dz: Dz, items: LineItem[]): Promise<PricedLine[]> {
     const vrow = i.variantId != null ? byVid.get(Number(i.variantId)) : undefined;
     const vmatch = vrow && Number(vrow.productId) === Number(p.id) ? vrow : undefined;
     const priceCents = vmatch && vmatch.priceCentsEnabled ? Number(vmatch.priceCents) : Number(p.priceCents);
-    out.push({ productId: Number(p.id), variantId: vmatch ? Number(vmatch.id) : undefined, qty, priceCents, name: String(p.name), image: firstImage(p as never, vmatch as never), variantLabel: vmatch ? String(vmatch.title) : undefined, stripePriceId: (p.stripePriceId as string) ?? undefined, inventory: Number(vmatch ? vmatch.inventory : p.inventory), requiresShipping: !!p.requiresShipping, downloadUrl: (p.downloadUrl as string) ?? undefined });
+    out.push({
+      productId: Number(p.id),
+      variantId: vmatch ? Number(vmatch.id) : undefined,
+      qty,
+      priceCents,
+      name: String(p.name),
+      image: firstImage(p as never, vmatch as never),
+      variantLabel: vmatch ? String(vmatch.title) : undefined,
+      stripePriceId: (p.stripePriceId as string) ?? undefined,
+      inventory: Number(vmatch ? vmatch.inventory : p.inventory),
+      requiresShipping: !!p.requiresShipping,
+      downloadUrl: (p.downloadUrl as string) ?? undefined,
+    });
   }
   return out;
 }
 const linesSubtotal = (lines: PricedLine[]) => lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
-const orderItemsJson = (lines: PricedLine[]) => JSON.stringify(lines.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, priceCents: l.priceCents, name: l.name, image: l.image, variantLabel: l.variantLabel, downloadUrl: l.downloadUrl })));
+const orderItemsJson = (lines: PricedLine[]) =>
+  JSON.stringify(
+    lines.map((l) => ({
+      productId: l.productId,
+      variantId: l.variantId,
+      qty: l.qty,
+      priceCents: l.priceCents,
+      name: l.name,
+      image: l.image,
+      variantLabel: l.variantLabel,
+      downloadUrl: l.downloadUrl,
+    })),
+  );
 
-export interface OrderTotals { subtotalCents: number; discountCents: number; shippingCents: number; taxCents: number; totalCents: number; shippingMethod: string | null }
+export interface OrderTotals {
+  subtotalCents: number;
+  discountCents: number;
+  shippingCents: number;
+  taxCents: number;
+  totalCents: number;
+  shippingMethod: string | null;
+}
 /**
  * The authoritative full total — subtotal − discount + shipping + tax — via the pluggable @suluk/stripe adapters
  * (./commerce). Shipping is quoted off the POST-discount goods total (so "free over $X" tracks what's actually spent)
@@ -571,7 +1138,11 @@ export interface OrderTotals { subtotalCents: number; discountCents: number; shi
  * composed, so checkout, the live quote, and the stored order can never disagree. Server-authoritative (the client
  * only proposes a shipping-method id; everything else is recomputed here).
  */
-async function computeOrderTotals(lines: PricedLine[], disc: ResolvedDiscount, opts: { address?: ShipTo; shippingMethod?: string } = {}): Promise<OrderTotals> {
+async function computeOrderTotals(
+  lines: PricedLine[],
+  disc: ResolvedDiscount,
+  opts: { address?: ShipTo; shippingMethod?: string } = {},
+): Promise<OrderTotals> {
   const subtotalCents = linesSubtotal(lines);
   const discountedGoods = applyDiscount(subtotalCents, disc); // subtotal − discount, already clamped to [0, subtotal]
   const discountCents = subtotalCents - discountedGoods;
@@ -579,23 +1150,58 @@ async function computeOrderTotals(lines: PricedLine[], disc: ResolvedDiscount, o
   // physical shipping. Use the shippable-only subtotal (discounted proportionally) for the threshold check.
   const shippableSubtotal = lines.filter((l) => l.requiresShipping).reduce((s, l) => s + l.priceCents * l.qty, 0);
   const shippableForThreshold = subtotalCents > 0 ? Math.round(shippableSubtotal * (discountedGoods / subtotalCents)) : 0;
-  const ship = await resolveShipping(shippingProvider, { subtotalCents: shippableForThreshold, lines: lines.map((l) => ({ id: l.productId, qty: l.qty, requiresShipping: l.requiresShipping })), address: opts.address }, opts.shippingMethod);
+  const ship = await resolveShipping(
+    shippingProvider,
+    {
+      subtotalCents: shippableForThreshold,
+      lines: lines.map((l) => ({ id: l.productId, qty: l.qty, requiresShipping: l.requiresShipping })),
+      address: opts.address,
+    },
+    opts.shippingMethod,
+  );
   const shippingCents = ship ? ship.amountCents : 0;
   const tax = await resolveTax(taxProvider, { subtotalCents: discountedGoods, shippingCents, address: opts.address }); // tax stays on the full discounted base
   const totalCents = composeTotal({ subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents }).totalCents;
   // persist a method only when a fee is actually charged — a free/digital order has no method (matches shippingCents 0).
-  return { subtotalCents, discountCents, shippingCents, taxCents: tax.taxCents, totalCents, shippingMethod: shippingCents > 0 && ship ? ship.id : null };
+  return {
+    subtotalCents,
+    discountCents,
+    shippingCents,
+    taxCents: tax.taxCents,
+    totalCents,
+    shippingMethod: shippingCents > 0 && ship ? ship.id : null,
+  };
 }
 
 /** Shipping address shape (the checkout form / contract); stored as a JSON snapshot on the order for physical goods. */
-export interface ShipTo { name?: string; line1?: string; line2?: string; city?: string; state?: string; postalCode?: string; country?: string }
+export interface ShipTo {
+  name?: string;
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
 /** Strip <> + control chars (stored-XSS guard — this renders in the receipt + dashboard) and length-cap each field. */
-const cleanField = (x: unknown, max: number) => String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, max);
+const cleanField = (x: unknown, max: number) =>
+  String(x ?? "")
+    .replace(/[<> -]/g, "")
+    .trim()
+    .slice(0, max);
 /** Server-authoritative address sanitize: returns a JSON snapshot, or null if absent/incomplete (digital orders skip it). */
 function cleanAddress(a: unknown): string | null {
   if (!a || typeof a !== "object") return null;
   const r = a as ShipTo;
-  const out = { name: cleanField(r.name, 120), line1: cleanField(r.line1, 160), line2: cleanField(r.line2, 160), city: cleanField(r.city, 100), state: cleanField(r.state, 100), postalCode: cleanField(r.postalCode, 20), country: cleanField(r.country, 56) };
+  const out = {
+    name: cleanField(r.name, 120),
+    line1: cleanField(r.line1, 160),
+    line2: cleanField(r.line2, 160),
+    city: cleanField(r.city, 100),
+    state: cleanField(r.state, 100),
+    postalCode: cleanField(r.postalCode, 20),
+    country: cleanField(r.country, 56),
+  };
   if (!out.name || !out.line1 || !out.city || !out.postalCode || !out.country) return null; // incomplete → treat as no address
   return JSON.stringify(out);
 }
@@ -604,20 +1210,45 @@ function cleanAddress(a: unknown): string | null {
 export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: (...a: unknown[]) => unknown }, dbFor: DbFor): void {
   const checkout = async (c: Context) => {
     const dz = dbFor(c);
-    const body = (await c.req.json().catch(() => ({}))) as { cartId?: number; items?: LineItem[]; discountCode?: string; email?: string; shippingAddress?: ShipTo; shippingMethod?: string };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      cartId?: number;
+      items?: LineItem[];
+      discountCode?: string;
+      email?: string;
+      shippingAddress?: ShipTo;
+      shippingMethod?: string;
+    };
     let rawItems: LineItem[] = Array.isArray(body.items) ? body.items : [];
     let codeUsed: string | null = body.discountCode ?? null;
     if (body.cartId) {
-      const ct = await dz.select().from(cart).where(eq(cart.id, Number(body.cartId))).get();
-      if (ct) { try { rawItems = JSON.parse(ct.items || "[]"); } catch { rawItems = []; } codeUsed = codeUsed ?? ct.discountCode ?? null; }
+      const ct = await dz
+        .select()
+        .from(cart)
+        .where(eq(cart.id, Number(body.cartId)))
+        .get();
+      if (ct) {
+        try {
+          rawItems = JSON.parse(ct.items || "[]");
+        } catch {
+          rawItems = [];
+        }
+        codeUsed = codeUsed ?? ct.discountCode ?? null;
+      }
     }
     // SERVER-AUTHORITATIVE: re-price every line from the product/variant rows (the client's priceCents is ignored).
     const lines = await repriceLines(dz, rawItems);
     if (!lines.length) return c.json({ error: "Your cart is empty." }, 422);
-    const stock = stockError(lines); if (stock) return c.json({ error: stock }, 409); // never oversell
+    const stock = stockError(lines);
+    if (stock) return c.json({ error: stock }, 409); // never oversell
     const subtotal = linesSubtotal(lines);
     const who = principal(c);
-    const disc = codeUsed ? await resolveDiscount(dz, codeUsed, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
+    const disc = codeUsed
+      ? await resolveDiscount(dz, codeUsed, {
+          subtotalCents: subtotal,
+          principal: who ?? undefined,
+          productIds: lines.map((l) => l.productId),
+        })
+      : ({ valid: false } as ResolvedDiscount);
     // FULL total via the pluggable shipping + tax adapters: subtotal − discount + shipping + tax.
     const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
     const total = totals.totalCents;
@@ -627,14 +1258,32 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not create a second one.
     if (!requiresStripe(total)) {
       const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
-      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ order: publicOrderShape(o), ...totals, discountApplied: disc.valid, free: true, duplicate: true }, 200); }
+      if (dupId != null) {
+        const o = await dz.select().from(order).where(eq(order.id, dupId)).get();
+        return c.json({ order: publicOrderShape(o), ...totals, discountApplied: disc.valid, free: true, duplicate: true }, 200);
+      }
     }
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeFinal, shippingAddress: cleanAddress(body.shippingAddress), shippingCents: totals.shippingCents, taxCents: totals.taxCents, shippingMethod: totals.shippingMethod, createdAt: Date.now() }).returning();
+    const created = await dz
+      .insert(order)
+      .values({
+        customerId: who,
+        customerEmail: email,
+        items: itemsJson,
+        totalCents: total,
+        status: "pending",
+        discountCode: codeFinal,
+        shippingAddress: cleanAddress(body.shippingAddress),
+        shippingCents: totals.shippingCents,
+        taxCents: totals.taxCents,
+        shippingMethod: totals.shippingMethod,
+        createdAt: Date.now(),
+      })
+      .returning();
     const orderId = created[0].id;
     // FREE ORDER ($0 product or a 100%-off code): complete it immediately — there is nothing to charge. markOrderPaid
     // is the SINGLE place discount usage is incremented, so usage stays correct and isn't double-counted.
     const free = !requiresStripe(total);
-    if (free && await markOrderPaid(c, dz, orderId)) await sendOrderReceipt(c, dz, orderId);
+    if (free && (await markOrderPaid(c, dz, orderId))) await sendOrderReceipt(c, dz, orderId);
     const final = await dz.select().from(order).where(eq(order.id, orderId)).get();
     return c.json({ order: final, ...totals, discountApplied: disc.valid, free }, 201);
   };
@@ -644,18 +1293,43 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   // shipping-method id + address; everything is recomputed here (never trusts a client amount).
   const quoteCheckout = async (c: Context) => {
     const dz = dbFor(c);
-    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string; shippingAddress?: ShipTo; shippingMethod?: string };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      items?: LineItem[];
+      discountCode?: string;
+      shippingAddress?: ShipTo;
+      shippingMethod?: string;
+    };
     const lines = await repriceLines(dz, Array.isArray(body.items) ? body.items : []);
     const subtotal = linesSubtotal(lines);
-    const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: principal(c), productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
+    const disc = body.discountCode
+      ? await resolveDiscount(dz, body.discountCode, {
+          subtotalCents: subtotal,
+          principal: principal(c) ?? undefined,
+          productIds: lines.map((l) => l.productId),
+        })
+      : ({ valid: false } as ResolvedDiscount);
     const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
-    return c.json({ ...totals, discountApplied: disc.valid, discountCode: disc.valid ? (body.discountCode ?? "").toUpperCase().trim() : null, needsShipping: lines.some((l) => l.requiresShipping), stockError: stockError(lines), free: !requiresStripe(totals.totalCents) }, 200);
+    return c.json(
+      {
+        ...totals,
+        discountApplied: disc.valid,
+        discountCode: disc.valid ? (body.discountCode ?? "").toUpperCase().trim() : null,
+        needsShipping: lines.some((l) => l.requiresShipping),
+        stockError: stockError(lines),
+        free: !requiresStripe(totals.totalCents),
+      },
+      200,
+    );
   };
 
   const validateDiscount = async (c: Context) => {
     const body = (await c.req.json().catch(() => ({}))) as { code?: string; subtotalCents?: number; items?: LineItem[] };
     const productIds = Array.isArray(body.items) ? body.items.map((i) => Number(i.productId)).filter(Boolean) : undefined;
-    const d = await resolveDiscount(dbFor(c), body.code ?? "", { subtotalCents: body.subtotalCents, principal: principal(c), productIds });
+    const d = await resolveDiscount(dbFor(c), body.code ?? "", {
+      subtotalCents: body.subtotalCents,
+      principal: principal(c) ?? undefined,
+      productIds,
+    });
     const preview = d.valid && typeof body.subtotalCents === "number" ? applyDiscount(body.subtotalCents, d) : undefined;
     // 200 even when invalid (a {valid:false, reason} is not an HTTP error — the client shows the reason inline).
     return c.json({ ...d, ...(preview !== undefined ? { newTotalCents: preview } : {}) }, 200);
@@ -667,8 +1341,18 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const dz = dbFor(c);
     const term = `%${q}%`;
     // match the product NAME or DESCRIPTION (was name-only), and posts on title or excerpt — a real store search.
-    const products = await dz.select().from(product).where(and(eq(product.status, "published"), or(like(product.name, term), like(product.description, term)))).limit(10).all();
-    const posts = await dz.select().from(post).where(and(eq(post.status, "published"), or(like(post.title, term), like(post.excerpt, term)))).limit(10).all();
+    const products = await dz
+      .select()
+      .from(product)
+      .where(and(eq(product.status, "published"), or(like(product.name, term), like(product.description, term))))
+      .limit(10)
+      .all();
+    const posts = await dz
+      .select()
+      .from(post)
+      .where(and(eq(post.status, "published"), or(like(post.title, term), like(post.excerpt, term))))
+      .limit(10)
+      .all();
     return c.json({ products: publicProducts(products as Record<string, unknown>[]), posts });
   };
 
@@ -682,19 +1366,36 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // ONE vote per (review, principal), TOGGLEABLE. The vote row is the source of truth; helpfulCount mirrors it.
     // Read-then-write keeps it driver-agnostic (bun:sqlite sync + D1 async differ on .run() affected-row reporting);
     // the (review_id, principal) UNIQUE index (migration 0003 / SCHEMA_SQL) is the race backstop via onConflictDoNothing.
-    const existing = await dz.select().from(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).get();
+    const existing = await dz
+      .select()
+      .from(reviewHelpfulVote)
+      .where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who)))
+      .get();
     let voted: boolean;
     if (!existing) {
       // Gate the +1 on the INSERT actually creating a row (rowsChanged): two concurrent first-clicks both pass the
       // read-check, but the unique index makes one insert a no-op (onConflictDoNothing → 0 rows) — only the winner
       // increments, so the counter never drifts above the vote-row count.
       const ins = await dz.insert(reviewHelpfulVote).values({ reviewId: id, principal: who }).onConflictDoNothing().run();
-      if (rowsChanged(ins) > 0) await dz.update(review).set({ helpfulCount: sql`${review.helpfulCount} + 1` }).where(eq(review.id, id)).run();
+      if (rowsChanged(ins) > 0)
+        await dz
+          .update(review)
+          .set({ helpfulCount: sql`${review.helpfulCount} + 1` })
+          .where(eq(review.id, id))
+          .run();
       voted = true;
     } else {
       // Symmetrically gate the −1 on the DELETE removing a row, so a double un-vote decrements at most once.
-      const del = await dz.delete(reviewHelpfulVote).where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who))).run();
-      if (rowsChanged(del) > 0) await dz.update(review).set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` }).where(eq(review.id, id)).run();
+      const del = await dz
+        .delete(reviewHelpfulVote)
+        .where(and(eq(reviewHelpfulVote.reviewId, id), eq(reviewHelpfulVote.principal, who)))
+        .run();
+      if (rowsChanged(del) > 0)
+        await dz
+          .update(review)
+          .set({ helpfulCount: sql`MAX(0, ${review.helpfulCount} - 1)` })
+          .where(eq(review.id, id))
+          .run();
       voted = false;
     }
     const r = await dz.select().from(review).where(eq(review.id, id)).get();
@@ -711,11 +1412,40 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const productId = Number(b.productId);
     const rating = Math.max(1, Math.min(5, Math.floor(Number(b.rating) || 0)));
     if (!productId || !rating) return c.json({ error: "A product and a 1–5 rating are required." }, 422);
-    const myOrders = (await dz.select().from(order).where(and(eq(order.customerId, who), or(eq(order.status, "paid"), eq(order.status, "shipped")))).all()) as { items?: string }[];
-    const verified = myOrders.some((o) => { try { return (JSON.parse(o.items || "[]") as { productId?: number }[]).some((it) => Number(it.productId) === productId); } catch { return false; } });
-    const title = String(b.title ?? "").replace(/[<> -]/g, "").trim().slice(0, 160) || "Review";
-    const reviewBody = String(b.body ?? "").replace(/[ --]/g, "").trim().slice(0, 5000);
-    const row = await dz.insert(review).values({ productId, customerId: who, rating, title, body: reviewBody, verifiedPurchase: verified, status: "pending", createdAt: Date.now() }).returning();
+    const myOrders = (await dz
+      .select()
+      .from(order)
+      .where(and(eq(order.customerId, who), or(eq(order.status, "paid"), eq(order.status, "shipped"))))
+      .all()) as { items?: string }[];
+    const verified = myOrders.some((o) => {
+      try {
+        return (JSON.parse(o.items || "[]") as { productId?: number }[]).some((it) => Number(it.productId) === productId);
+      } catch {
+        return false;
+      }
+    });
+    const title =
+      String(b.title ?? "")
+        .replace(/[<> -]/g, "")
+        .trim()
+        .slice(0, 160) || "Review";
+    const reviewBody = String(b.body ?? "")
+      .replace(/[ --]/g, "")
+      .trim()
+      .slice(0, 5000);
+    const row = await dz
+      .insert(review)
+      .values({
+        productId,
+        customerId: who,
+        rating,
+        title,
+        body: reviewBody,
+        verifiedPurchase: verified,
+        status: "pending",
+        createdAt: Date.now(),
+      })
+      .returning();
     return c.json({ ...row[0], verified }, 201);
   };
 
@@ -735,9 +1465,17 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (o.status === status) return c.json(o); // idempotent no-op — never re-email the buyer on a replayed call (email-bomb guard)
     // legal transitions: ship only a paid order; cancel only a still-open (pending/paid) order.
     if (status === "shipped" && o.status !== "paid") return c.json({ error: "Only a paid order can be shipped." }, 409);
-    if (status === "cancelled" && !["pending", "paid"].includes(o.status)) return c.json({ error: `A ${o.status} order can't be cancelled.` }, 409);
-    const clean = (x: unknown, n: number) => { const s = String(x ?? "").replace(/[<> -]/g, "").trim().slice(0, n); return s || null; };
-    const carrier = clean(b.carrier, 60), trackingNumber = clean(b.trackingNumber, 80);
+    if (status === "cancelled" && !["pending", "paid"].includes(o.status))
+      return c.json({ error: `A ${o.status} order can't be cancelled.` }, 409);
+    const clean = (x: unknown, n: number) => {
+      const s = String(x ?? "")
+        .replace(/[<> -]/g, "")
+        .trim()
+        .slice(0, n);
+      return s || null;
+    };
+    const carrier = clean(b.carrier, 60),
+      trackingNumber = clean(b.trackingNumber, 80);
     const isRefund = status === "cancelled" && o.status === "paid"; // cancelling a PAID order reverses the money
     const needsRefund = isRefund && !!o.stripePaymentIntentId; // a free/$0 paid order has no charge to reverse
     const key = needsRefund ? secret(c, "STRIPE_SECRET_KEY") : undefined;
@@ -745,11 +1483,21 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (needsRefund && !key) return c.json({ error: "Stripe is not configured — cannot refund; the order was NOT cancelled." }, 503);
     // CONDITIONAL flip FIRST (compare-and-swap on the pre-read status) — the once-only gate. Claiming the transition
     // atomically BEFORE the irreversible refund means a concurrent ship/cancel can't slip in: only the winner refunds.
-    if (!(await claimOnce(dz, order, and(eq(order.id, id), eq(order.status, o.status))!, { status: status as never, ...(status === "shipped" ? { carrier, trackingNumber } : {}) }))) return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no refund, no restock, no email
+    if (
+      !(await claimOnce(dz, order, and(eq(order.id, id), eq(order.status, o.status))!, {
+        status: status as never,
+        ...(status === "shipped" ? { carrier, trackingNumber } : {}),
+      }))
+    )
+      return c.json(await dz.select().from(order).where(eq(order.id, id)).get()); // lost the race — no refund, no restock, no email
     // the winner of paid→cancelled reverses the money (idempotent). If the refund FAILS, ROLL BACK the flip so the order
     // is never left cancelled-while-still-charged, and abort 502 so the owner retries.
     if (needsRefund && key && !(await stripeRefund(key, o.stripePaymentIntentId!, `refund_${id}`))) {
-      await dz.update(order).set({ status: "paid" as never }).where(and(eq(order.id, id), eq(order.status, "cancelled"))).run();
+      await dz
+        .update(order)
+        .set({ status: "paid" as never })
+        .where(and(eq(order.id, id), eq(order.status, "cancelled")))
+        .run();
       return c.json({ error: "Stripe refund failed — the order was NOT cancelled. Refund it in the Stripe dashboard, then retry." }, 502);
     }
     // restock + return the discount use (this racer won the flip exactly once; the money is now reversed).
@@ -758,8 +1506,14 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
       const origin = new URL(c.req.url).origin;
       const emailStatus = isRefund ? "refunded" : status; // a refunded buyer should be told their money is coming back, not just "cancelled"
       const trackUrl = status === "shipped" ? (carrierTrackingUrl(carrier, trackingNumber) ?? `${origin}/dashboard/s/orders`) : undefined;
-      const m = orderStatusEmail({ orderNumber: String(id), status: emailStatus, ...(trackUrl ? { trackingUrl: trackUrl } : {}) }, { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } });
-      sendEmailAsync({ to: o.customerEmail, subject: m.subject, html: m.html }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
+      const m = orderStatusEmail(
+        { orderNumber: String(id), status: emailStatus, ...(trackUrl ? { trackingUrl: trackUrl } : {}) },
+        { brand: { brandName: "saasuluk", baseUrl: origin, accentFrom: "#ef8e5f", accentTo: "#f5a97f" } },
+      );
+      sendEmailAsync(
+        { to: o.customerEmail, subject: m.subject, html: m.html },
+        { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") },
+      );
     }
     const row = await dz.select().from(order).where(eq(order.id, id)).get();
     return c.json(row);
@@ -771,8 +1525,17 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const paid = orders.filter((o: { status: string }) => o.status === "paid" || o.status === "shipped");
     const revenueCents = paid.reduce((s: number, o: { totalCents: number }) => s + Number(o.totalCents), 0);
     const customers = new Set(orders.map((o: { customerId?: string }) => o.customerId).filter(Boolean));
-    const products = await dz.select({ n: sql<number>`count(*)` }).from(product).get();
-    return c.json({ orders: orders.length, paidOrders: paid.length, revenueCents, customers: customers.size, products: Number(products?.n ?? 0) });
+    const products = await dz
+      .select({ n: sql<number>`count(*)` })
+      .from(product)
+      .get();
+    return c.json({
+      orders: orders.length,
+      paidOrders: paid.length,
+      revenueCents,
+      customers: customers.size,
+      products: Number(products?.n ?? 0),
+    });
   };
 
   const analyticsRevenue = async (c: Context) => {
@@ -794,14 +1557,20 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const qtyById = new Map<number, number>();
     for (const o of orders as { items: string }[]) {
       let items: LineItem[] = [];
-      try { items = JSON.parse(o.items || "[]"); } catch { /* skip */ }
+      try {
+        items = JSON.parse(o.items || "[]");
+      } catch {
+        /* skip */
+      }
       for (const it of items) if (it.productId != null) qtyById.set(it.productId, (qtyById.get(it.productId) ?? 0) + (Number(it.qty) || 1));
     }
     const top = [...qtyById.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-    const rows = await Promise.all(top.map(async ([productId, qty]) => {
-      const p = await dz.select().from(product).where(eq(product.id, productId)).get();
-      return { productId, qty, name: p?.name ?? `#${productId}`, priceCents: p?.priceCents ?? 0 };
-    }));
+    const rows = await Promise.all(
+      top.map(async ([productId, qty]) => {
+        const p = await dz.select().from(product).where(eq(product.id, productId)).get();
+        return { productId, qty, name: p?.name ?? `#${productId}`, priceCents: p?.priceCents ?? 0 };
+      }),
+    );
     return c.json({ topProducts: rows });
   };
 
@@ -810,23 +1579,38 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const productId = Number(c.req.param("productId"));
     const p = await dz.select().from(product).where(eq(product.id, productId)).get();
     if (!p) return c.json({ related: [] });
-    const related = await dz.select().from(product)
+    const related = await dz
+      .select()
+      .from(product)
       .where(and(eq(product.status, "published"), p.categoryId != null ? eq(product.categoryId, p.categoryId) : lt(product.id, productId)))
-      .limit(8).all();
+      .limit(8)
+      .all();
     return c.json({ related: publicProducts((related as Record<string, unknown>[]).filter((r) => r.id !== productId).slice(0, 8)) });
   };
 
   const subscribeNewsletter = async (c: Context) => {
     const dz = dbFor(c);
     const body = (await c.req.json().catch(() => ({}))) as { email?: string };
-    const email = String(body.email ?? "").trim().toLowerCase();
+    const email = String(body.email ?? "")
+      .trim()
+      .toLowerCase();
     if (!email || !email.includes("@")) return c.json({ error: "a valid email is required" }, 422);
     const existing = await dz.select().from(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).get();
     if (existing) return c.json({ subscribed: true, already: true });
     await dz.insert(newsletterSubscriber).values({ email, subscribedAt: Date.now() }).run();
     resendAudienceSync(c, email, false); // mirror into the Resend audience (where broadcasts are sent)
     const unsubUrl = `${new URL(c.req.url).origin}/newsletter/unsubscribe?t=${unsubToken(email)}`;
-    sendEmailAsync({ to: email, subject: "Welcome to saasuluk", html: brandedEmail("You're subscribed 🎉", `<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p><p style="font-size:12px;color:#8a8a8a;margin-top:24px">Not interested? <a href="${unsubUrl}" style="color:#8a8a8a">Unsubscribe</a> any time.</p>`) }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
+    sendEmailAsync(
+      {
+        to: email,
+        subject: "Welcome to saasuluk",
+        html: brandedEmail(
+          "You're subscribed 🎉",
+          `<p>Thanks for joining the saasuluk newsletter. You'll hear from us when there's something worth your time.</p><p style="font-size:12px;color:#8a8a8a;margin-top:24px">Not interested? <a href="${unsubUrl}" style="color:#8a8a8a">Unsubscribe</a> any time.</p>`,
+        ),
+      },
+      { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") },
+    );
     return c.json({ subscribed: true, already: false }, 201);
   };
 
@@ -835,13 +1619,18 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   const submitContact = async (c: Context) => {
     const dz = dbFor(c);
     const body = (await c.req.json().catch(() => ({}))) as { name?: string; email?: string; subject?: string; message?: string };
-    const name = String(body.name ?? "").trim(), email = String(body.email ?? "").trim().toLowerCase();
-    const subject = String(body.subject ?? "").trim(), message = String(body.message ?? "").trim();
+    const name = String(body.name ?? "").trim(),
+      email = String(body.email ?? "")
+        .trim()
+        .toLowerCase();
+    const subject = String(body.subject ?? "").trim(),
+      message = String(body.message ?? "").trim();
     // Custom ops bypass the CRUD zValidator, so bound the input HERE — restoring the line()/email() limits the generic
     // ContactSubmission route enforced before the form moved to this op (length caps + email shape + no <>/control chars).
     const badLine = (s: string) => /[<> -]/.test(s);
     if (!name || name.length > 120 || badLine(name)) return c.json({ error: "name is required (max 120 chars)" }, 422);
-    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ error: "a valid email is required" }, 422);
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return c.json({ error: "a valid email is required" }, 422);
     if (!subject || subject.length > 200 || badLine(subject)) return c.json({ error: "subject is required (max 200 chars)" }, 422);
     if (!message || message.length > 5000) return c.json({ error: "message is required (max 5000 chars)" }, 422);
     const row = await dz.insert(contactSubmission).values({ name, email, subject, message, createdAt: Date.now() }).returning(); // persist FIRST — survives a mail outage
@@ -849,8 +1638,21 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     // (they land in the owner's inbox as HTML). sendEmailAsync is itself fire-and-forget; the try guards arg-building.
     try {
       const to = superadminEmails(secret(c, "SUPERADMIN_EMAILS"))[0] ?? secret(c, "EMAIL_FROM");
-      if (to) sendEmailAsync({ to, subject: `New contact: ${subject}`.slice(0, 180), html: brandedEmail("New contact submission", `<p><b>${escHtml(name)}</b> &lt;${escHtml(email)}&gt; wrote:</p><p><b>${escHtml(subject)}</b></p><p style="white-space:pre-wrap">${escHtml(message)}</p>`) }, { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") });
-    } catch { /* notification is best-effort; the submission already persisted */ }
+      if (to)
+        sendEmailAsync(
+          {
+            to,
+            subject: `New contact: ${subject}`.slice(0, 180),
+            html: brandedEmail(
+              "New contact submission",
+              `<p><b>${escHtml(name)}</b> &lt;${escHtml(email)}&gt; wrote:</p><p><b>${escHtml(subject)}</b></p><p style="white-space:pre-wrap">${escHtml(message)}</p>`,
+            ),
+          },
+          { apiKey: secret(c, "RESEND_API_KEY"), from: secret(c, "EMAIL_FROM") },
+        );
+    } catch {
+      /* notification is best-effort; the submission already persisted */
+    }
     return c.json(row[0] ?? { ok: true }, 201);
   };
 
@@ -860,12 +1662,19 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     const dz = dbFor(c);
     const productId = Number(c.req.param("id"));
     const body = (await c.req.json().catch(() => ({}))) as { email?: string };
-    const email = String(body.email ?? "").trim().toLowerCase();
+    const email = String(body.email ?? "")
+      .trim()
+      .toLowerCase();
     if (!productId) return c.json({ error: "unknown product" }, 422);
-    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ error: "a valid email is required" }, 422);
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return c.json({ error: "a valid email is required" }, 422);
     const p = await dz.select().from(product).where(eq(product.id, productId)).get();
     if (!p) return c.json({ error: "unknown product" }, 404);
-    const existing = await dz.select().from(stockNotification).where(and(eq(stockNotification.productId, productId), eq(stockNotification.email, email), isNull(stockNotification.notifiedAt))).get();
+    const existing = await dz
+      .select()
+      .from(stockNotification)
+      .where(and(eq(stockNotification.productId, productId), eq(stockNotification.email, email), isNull(stockNotification.notifiedAt)))
+      .get();
     if (!existing) await dz.insert(stockNotification).values({ productId, email, createdAt: Date.now() }).run();
     return c.json({ subscribed: true }, 201);
   };
@@ -875,8 +1684,11 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
   const orderInvoice = async (c: Context) => {
     const who = principal(c);
     const page = (title: string, body: string, status: 200 | 401 | 403 | 404 = 200) =>
-      c.html(`<!doctype html><meta charset=utf-8><title>${title}</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;text-align:center;padding:0 20px">${body}</body>`, status);
-    if (!who) return page("Sign in", "<h1>Sign in to view your invoice</h1><p><a href=\"/login\">Sign in →</a></p>", 401);
+      c.html(
+        `<!doctype html><meta charset=utf-8><title>${title}</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;text-align:center;padding:0 20px">${body}</body>`,
+        status,
+      );
+    if (!who) return page("Sign in", '<h1>Sign in to view your invoice</h1><p><a href="/login">Sign in →</a></p>', 401);
     const dz = dbFor(c);
     const id = Number(c.req.param("id"));
     const o = (await dz.select().from(order).where(eq(order.id, id)).get()) as Record<string, unknown> | undefined;
@@ -884,17 +1696,54 @@ export function mountOperations(app: { get: (...a: unknown[]) => unknown; post: 
     if (String(o.customerId) !== String(who) && !c.get("isAdmin")) return page("Forbidden", "<h1>This isn't your invoice</h1>", 403);
     const m = (cents: unknown) => "$" + (Number(cents) / 100 || 0).toFixed(2);
     let items: { name?: string; qty?: number; priceCents?: number; variantLabel?: string }[] = [];
-    try { items = JSON.parse(String(o.items ?? "[]")); } catch { /* */ }
+    try {
+      items = JSON.parse(String(o.items ?? "[]"));
+    } catch {
+      /* */
+    }
     const sub = items.reduce((s, i) => s + (Number(i.priceCents) || 0) * (Number(i.qty) || 1), 0);
-    const shipC = Number(o.shippingCents) || 0, taxC = Number(o.taxCents) || 0, disc = sub - ((Number(o.totalCents) || 0) - shipC - taxC);
-    let addr = ""; try { const a = o.shippingAddress ? JSON.parse(String(o.shippingAddress)) : null; if (a) addr = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country].filter((x: unknown) => x && String(x).trim()).map((x: unknown) => escHtml(String(x))).join("<br>"); } catch { /* */ }
-    const date = o.createdAt ? new Date(Number(o.createdAt)).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
-    const rows = items.map((it) => "<tr><td>" + escHtml(String(it.name ?? "Item")) + (it.variantLabel ? " <span style=\"color:#888\">(" + escHtml(String(it.variantLabel)) + ")</span>" : "") + "</td><td style=\"text-align:center\">" + (Number(it.qty) || 1) + "</td><td style=\"text-align:right\">" + m(it.priceCents) + "</td><td style=\"text-align:right\">" + m((Number(it.priceCents) || 0) * (Number(it.qty) || 1)) + "</td></tr>").join("");
-    const line = (label: string, val: string) => "<tr class=tl><td colspan=2></td><td style=\"text-align:right;color:#666\">" + label + "</td><td style=\"text-align:right\">" + val + "</td></tr>";
+    const shipC = Number(o.shippingCents) || 0,
+      taxC = Number(o.taxCents) || 0,
+      disc = sub - ((Number(o.totalCents) || 0) - shipC - taxC);
+    let addr = "";
+    try {
+      const a = o.shippingAddress ? JSON.parse(String(o.shippingAddress)) : null;
+      if (a)
+        addr = [a.name, a.line1, a.line2, [a.city, a.state, a.postalCode].filter(Boolean).join(", "), a.country]
+          .filter((x: unknown) => x && String(x).trim())
+          .map((x: unknown) => escHtml(String(x)))
+          .join("<br>");
+    } catch {
+      /* */
+    }
+    const date = o.createdAt
+      ? new Date(Number(o.createdAt)).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "";
+    const rows = items
+      .map(
+        (it) =>
+          "<tr><td>" +
+          escHtml(String(it.name ?? "Item")) +
+          (it.variantLabel ? ' <span style="color:#888">(' + escHtml(String(it.variantLabel)) + ")</span>" : "") +
+          '</td><td style="text-align:center">' +
+          (Number(it.qty) || 1) +
+          '</td><td style="text-align:right">' +
+          m(it.priceCents) +
+          '</td><td style="text-align:right">' +
+          m((Number(it.priceCents) || 0) * (Number(it.qty) || 1)) +
+          "</td></tr>",
+      )
+      .join("");
+    const line = (label: string, val: string) =>
+      '<tr class=tl><td colspan=2></td><td style="text-align:right;color:#666">' +
+      label +
+      '</td><td style="text-align:right">' +
+      val +
+      "</td></tr>";
     const html = `<!doctype html><html lang=en><head><meta charset=utf-8><title>Invoice #${o.id} — saasuluk</title><meta name=viewport content="width=device-width,initial-scale=1">
 <style>body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:32px auto;padding:0 24px;color:#1a1a1a}.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a1a1a;padding-bottom:16px}h1{margin:0;font-size:26px}.muted{color:#666;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}th{text-align:left;border-bottom:1px solid #ddd;padding:8px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#666}td{padding:8px 6px;border-bottom:1px solid #f0f0f0}.tl td{border:0;padding:4px 6px}.g td{font-weight:700;font-size:16px;border-top:2px solid #1a1a1a;padding-top:10px}.print{margin-top:28px;padding:10px 18px;border:1px solid #1a1a1a;border-radius:8px;background:#1a1a1a;color:#fff;cursor:pointer;font:inherit}@media print{.print{display:none}body{margin:0}}</style></head>
 <body><div class=hd><div><h1>Invoice</h1><div class=muted>saasuluk</div></div><div style="text-align:right"><div><b>#${o.id}</b></div><div class=muted>${escHtml(date)}</div><div class=muted>${escHtml(String(o.status ?? ""))}</div></div></div>
-${o.customerEmail || addr ? `<div style="margin-top:18px;font-size:13px">${o.customerEmail ? "<div class=muted>Billed to</div><div>" + escHtml(String(o.customerEmail)) + "</div>" : ""}${addr ? "<div class=muted style=\"margin-top:8px\">Ship to</div><div>" + addr + "</div>" : ""}</div>` : ""}
+${o.customerEmail || addr ? `<div style="margin-top:18px;font-size:13px">${o.customerEmail ? "<div class=muted>Billed to</div><div>" + escHtml(String(o.customerEmail)) + "</div>" : ""}${addr ? '<div class=muted style="margin-top:8px">Ship to</div><div>' + addr + "</div>" : ""}</div>` : ""}
 <table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody><tbody>
 ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discountCode)) + ")" : ""), "−" + m(disc)) : ""}${shipC > 0 ? line("Shipping", m(shipC)) : ""}${taxC > 0 ? line("Tax", m(taxC)) : ""}<tr class=g><td colspan=2></td><td style="text-align:right">Total</td><td style="text-align:right">${m(o.totalCents)}</td></tr></tbody></table>
 <button class=print onclick="window.print()">Print / Save as PDF</button></body></html>`;
@@ -905,12 +1754,24 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
   // failed/forged token just 400s. (For high-security lists, sign the token with a secret; this is the starter default.)
   const unsubscribeNewsletter = async (c: Context) => {
     let email = "";
-    try { email = atob((c.req.query("t") ?? "").replace(/-/g, "+").replace(/_/g, "/")).trim().toLowerCase(); } catch { email = ""; }
-    if (!email || !email.includes("@")) return c.html("<!doctype html><meta charset=utf-8><title>Invalid link</title><body style=\"font-family:system-ui;max-width:520px;margin:80px auto;text-align:center\"><h1>Invalid unsubscribe link</h1><p><a href=\"/\">Back to saasuluk</a></p></body>", 400);
+    try {
+      email = atob((c.req.query("t") ?? "").replace(/-/g, "+").replace(/_/g, "/"))
+        .trim()
+        .toLowerCase();
+    } catch {
+      email = "";
+    }
+    if (!email || !email.includes("@"))
+      return c.html(
+        '<!doctype html><meta charset=utf-8><title>Invalid link</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;text-align:center"><h1>Invalid unsubscribe link</h1><p><a href="/">Back to saasuluk</a></p></body>',
+        400,
+      );
     await dbFor(c).delete(newsletterSubscriber).where(eq(newsletterSubscriber.email, email)).run();
     resendAudienceSync(c, email, true); // flag unsubscribed:true in the Resend audience (broadcasts will skip them)
     const safe = email.replace(/[<>&"]/g, "");
-    return c.html(`<!doctype html><meta charset=utf-8><title>Unsubscribed</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:0 20px;text-align:center"><h1>You're unsubscribed</h1><p style="color:#666"><b>${safe}</b> won't receive the saasuluk newsletter anymore. Changed your mind? Re-subscribe from the footer on <a href="/">saasuluk</a>.</p></body>`);
+    return c.html(
+      `<!doctype html><meta charset=utf-8><title>Unsubscribed</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:0 20px;text-align:center"><h1>You're unsubscribed</h1><p style="color:#666"><b>${safe}</b> won't receive the saasuluk newsletter anymore. Changed your mind? Re-subscribe from the footer on <a href="/">saasuluk</a>.</p></body>`,
+    );
   };
 
   const createToken = async (c: Context) => {
@@ -921,8 +1782,14 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     const secret = "sk_" + crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
     const hashedKey = await hashKey(secret);
     const userId = principal(c);
-    const created = await dz.insert(apiToken).values({ userId, name, prefix: secret.slice(0, 10), hashedKey, createdAt: Date.now() }).returning();
-    return c.json({ id: created[0].id, name, token: secret, prefix: created[0].prefix, note: "Copy this now — it will not be shown again." }, 201);
+    const created = await dz
+      .insert(apiToken)
+      .values({ userId, name, prefix: secret.slice(0, 10), hashedKey, createdAt: Date.now() })
+      .returning();
+    return c.json(
+      { id: created[0].id, name, token: secret, prefix: created[0].prefix, note: "Copy this now — it will not be shown again." },
+      201,
+    );
   };
 
   const revokeToken = async (c: Context) => {
@@ -931,7 +1798,7 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     const who = principal(c);
     // SCOPED: you can only revoke YOUR OWN token (eq id AND userId) — without this any caller could revoke any
     // user's token by id. A foreign/anonymous caller matches nothing → 404 (honest: it wasn't yours to revoke).
-    const changed = await claimOnce(dz, apiToken, and(eq(apiToken.id, id), eq(apiToken.userId, who))!, { revokedAt: Date.now() }); // owner-scoped: a foreign id matches nothing → 404
+    const changed = await claimOnce(dz, apiToken, and(eq(apiToken.id, id), eq(apiToken.userId, who ?? ""))!, { revokedAt: Date.now() }); // owner-scoped: a foreign id matches nothing → 404 (null principal → "" matches no real userId)
     return changed ? c.json({ revoked: true, id }) : c.json({ error: "not found" }, 404);
   };
 
@@ -939,15 +1806,28 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
   // hosted Checkout Session; the success page calls confirmCheckout, which retrieves the session from Stripe
   // (the source of truth) and marks the order paid — so it works WITHOUT a configured webhook endpoint.
   const payCheckout = async (c: Context) => {
-    const body = (await c.req.json().catch(() => ({}))) as { items?: LineItem[]; discountCode?: string; email?: string; shippingAddress?: ShipTo; shippingMethod?: string };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      items?: LineItem[];
+      discountCode?: string;
+      email?: string;
+      shippingAddress?: ShipTo;
+      shippingMethod?: string;
+    };
     const dz = dbFor(c);
     const who = principal(c);
     // SERVER-AUTHORITATIVE, variant-aware re-pricing (the same path the free checkout uses) — client priceCents ignored.
     const lines = await repriceLines(dz, Array.isArray(body.items) ? body.items : []);
     if (!lines.length) return c.json({ error: "No purchasable items in the cart." }, 422);
-    const stock = stockError(lines); if (stock) return c.json({ error: stock }, 409); // never oversell
+    const stock = stockError(lines);
+    if (stock) return c.json({ error: stock }, 409); // never oversell
     const subtotal = linesSubtotal(lines);
-    const disc = body.discountCode ? await resolveDiscount(dz, body.discountCode, { subtotalCents: subtotal, principal: who, productIds: lines.map((l) => l.productId) }) : { valid: false } as ResolvedDiscount;
+    const disc = body.discountCode
+      ? await resolveDiscount(dz, body.discountCode, {
+          subtotalCents: subtotal,
+          principal: who ?? undefined,
+          productIds: lines.map((l) => l.productId),
+        })
+      : ({ valid: false } as ResolvedDiscount);
     // FULL total via the pluggable shipping + tax adapters: subtotal − discount + shipping + tax (what Stripe charges).
     const totals = await computeOrderTotals(lines, disc, { address: body.shippingAddress, shippingMethod: body.shippingMethod });
     const total = totals.totalCents;
@@ -957,10 +1837,28 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     // IDEMPOTENCY: a retry/double-submit of a FREE order must reuse the existing paid order, not mint a second one.
     if (!requiresStripe(total)) {
       const dupId = await recentPaidDuplicate(dz, { who, email, itemsJson, total });
-      if (dupId != null) { const o = await dz.select().from(order).where(eq(order.id, dupId)).get(); return c.json({ free: true, paid: true, order: publicOrderShape(o), orderId: dupId, totalCents: total, duplicate: true }); }
+      if (dupId != null) {
+        const o = await dz.select().from(order).where(eq(order.id, dupId)).get();
+        return c.json({ free: true, paid: true, order: publicOrderShape(o), orderId: dupId, totalCents: total, duplicate: true });
+      }
     }
     // the order records the SERVER prices + the SERVER total (authoritative — matches what Stripe charges).
-    const created = await dz.insert(order).values({ customerId: who, customerEmail: email, items: itemsJson, totalCents: total, status: "pending", discountCode: codeUsed, shippingAddress: cleanAddress(body.shippingAddress), shippingCents: totals.shippingCents, taxCents: totals.taxCents, shippingMethod: totals.shippingMethod, createdAt: Date.now() }).returning();
+    const created = await dz
+      .insert(order)
+      .values({
+        customerId: who,
+        customerEmail: email,
+        items: itemsJson,
+        totalCents: total,
+        status: "pending",
+        discountCode: codeUsed,
+        shippingAddress: cleanAddress(body.shippingAddress),
+        shippingCents: totals.shippingCents,
+        taxCents: totals.taxCents,
+        shippingMethod: totals.shippingMethod,
+        createdAt: Date.now(),
+      })
+      .returning();
     const orderId = created[0].id;
     // FREE ORDER: a $0 product or a 100%-off code drops the total below Stripe's $0.50 floor → complete it NOW (mark
     // paid, increment usage once via markOrderPaid) and skip Stripe entirely. This is the unified $0 outcome.
@@ -988,16 +1886,28 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
         const customerId = await ensureStripeCustomer(dz, key, who);
         form.set("customer", customerId);
         form.set("payment_intent_data[setup_future_usage]", "on_session");
-      } catch { /* anonymous checkout — the sale still completes, just without a saved card */ }
+      } catch {
+        /* anonymous checkout — the sale still completes, just without a saved card */
+      }
     }
     // no discount + every line has a catalog Price → charge the real Prices (Stripe shows the products). Otherwise
     // a single line item at the SERVER-recomputed (discounted) total — never a client-supplied amount.
     const useCatalog = !disc.valid && lines.every((l) => l.stripePriceId);
     if (useCatalog) {
-      lines.forEach((l, idx) => { form.set(`line_items[${idx}][price]`, l.stripePriceId as string); form.set(`line_items[${idx}][quantity]`, String(l.qty)); });
+      lines.forEach((l, idx) => {
+        form.set(`line_items[${idx}][price]`, l.stripePriceId as string);
+        form.set(`line_items[${idx}][quantity]`, String(l.qty));
+      });
       // append shipping + tax as their own line items so the catalog charge ALSO collects them (total stays authoritative).
       let extra = lines.length;
-      const addLine = (cents: number, name: string) => { if (cents <= 0) return; form.set(`line_items[${extra}][quantity]`, "1"); form.set(`line_items[${extra}][price_data][currency]`, "usd"); form.set(`line_items[${extra}][price_data][unit_amount]`, String(cents)); form.set(`line_items[${extra}][price_data][product_data][name]`, name); extra++; };
+      const addLine = (cents: number, name: string) => {
+        if (cents <= 0) return;
+        form.set(`line_items[${extra}][quantity]`, "1");
+        form.set(`line_items[${extra}][price_data][currency]`, "usd");
+        form.set(`line_items[${extra}][price_data][unit_amount]`, String(cents));
+        form.set(`line_items[${extra}][price_data][product_data][name]`, name);
+        extra++;
+      };
       addLine(totals.shippingCents, "Shipping");
       addLine(totals.taxCents, "Sales tax");
     } else {
@@ -1006,7 +1916,11 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
       form.set("line_items[0][price_data][unit_amount]", String(total));
       form.set("line_items[0][price_data][product_data][name]", `saasuluk order #${orderId}${codeUsed ? ` · ${codeUsed} applied` : ""}`);
     }
-    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body: form.toString() });
+    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
     const session = (await r.json().catch(() => ({}))) as { id?: string; url?: string; error?: { message?: string } };
     if (!r.ok || !session.url) return c.json({ error: session.error?.message ?? "Stripe error", orderId }, 502);
     await dz.update(order).set({ stripePaymentIntentId: session.id }).where(eq(order.id, orderId)).run();
@@ -1021,10 +1935,16 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     const dz = dbFor(c);
     const ord = await dz.select().from(order).where(eq(order.id, orderId)).get();
     if (!ord) return c.json({ paid: false, reason: "unknown order" }, 404);
-    const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(body.sessionId)}`, { headers: { authorization: `Bearer ${key}` } });
+    const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(body.sessionId)}`, {
+      headers: { authorization: `Bearer ${key}` },
+    });
     const session = (await r.json().catch(() => ({}))) as { payment_status?: string; client_reference_id?: string; amount_total?: number };
     // Stripe is the source of truth: payment cleared, the session is THIS order's, AND the amount matches our total.
-    const paid = r.ok && session.payment_status === "paid" && String(session.client_reference_id) === String(orderId) && Number(session.amount_total) === Number(ord.totalCents);
+    const paid =
+      r.ok &&
+      session.payment_status === "paid" &&
+      String(session.client_reference_id) === String(orderId) &&
+      Number(session.amount_total) === Number(ord.totalCents);
     // CAPABILITY CHECK: the order body is returned ONLY when Stripe validates this session as paid-for-THIS-order.
     // The session id is the secret (Stripe hands it to the buyer at redirect), so this gates the receipt to the buyer
     // alone — a bogus/guessed session against a sequential orderId yields {paid:false} and NO order (no email/address leak).
@@ -1049,7 +1969,15 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     if (acct?.subscriptionId) return c.json({ connected: true, already: true, customerId, subscriptionId: acct.subscriptionId });
     let subscriptionId: string | null = null;
     // metered subs bill at period end; default_incomplete avoids an upfront charge so it works without a card (test mode)
-    try { const sub = await restStripe(key).subscriptions.create({ ...subscriptionParams({ customerId, priceId }), payment_behavior: "default_incomplete" }); subscriptionId = (sub as { id: string }).id; } catch { /* customer still meters */ }
+    try {
+      const sub = await restStripe(key).subscriptions.create({
+        ...subscriptionParams({ customerId, priceId }),
+        payment_behavior: "default_incomplete",
+      });
+      subscriptionId = (sub as { id: string }).id;
+    } catch {
+      /* customer still meters */
+    }
     await dz.update(billingAccount).set({ subscriptionId }).where(eq(billingAccount.principal, who)).run();
     return c.json({ connected: true, customerId, subscriptionId });
   };
@@ -1089,19 +2017,30 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     const who = principal(c);
     if (!who) return c.json({ error: "Sign in to export your data." }, 401);
     const dz = dbFor(c);
-    const [orders, wishlist, reviews, tokens] = await Promise.all([
+    const [orders, wishlist, reviews, tokens] = (await Promise.all([
       dz.select().from(order).where(eq(order.customerId, who)).all(),
       dz.select().from(wishlistItem).where(eq(wishlistItem.customerId, who)).all(),
       dz.select().from(review).where(eq(review.customerId, who)).all(),
       dz.select().from(apiToken).where(eq(apiToken.userId, who)).all(),
-    ]) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]];
+    ])) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]];
     const data = {
       exportedAt: new Date(Date.now()).toISOString(),
       account: { id: who, email: (c.get("sessionEmail") as string | undefined) ?? null },
-      orders, wishlist, reviews,
-      apiTokens: tokens.map((t) => ({ id: t.id, name: t.name, prefix: t.prefix, createdAt: t.createdAt, lastUsedAt: t.lastUsedAt, revokedAt: t.revokedAt })), // metadata only — no hashedKey
+      orders,
+      wishlist,
+      reviews,
+      apiTokens: tokens.map((t) => ({
+        id: t.id,
+        name: t.name,
+        prefix: t.prefix,
+        createdAt: t.createdAt,
+        lastUsedAt: t.lastUsedAt,
+        revokedAt: t.revokedAt,
+      })), // metadata only — no hashedKey
     };
-    return c.json(data, 200, { "content-disposition": `attachment; filename="saasuluk-data-${String(who).replace(/[^a-zA-Z0-9_-]/g, "")}.json"` });
+    return c.json(data, 200, {
+      "content-disposition": `attachment; filename="saasuluk-data-${String(who).replace(/[^a-zA-Z0-9_-]/g, "")}.json"`,
+    });
   };
 
   // a deterministic identicon SVG from a seed — saastarter pulls @dicebear; here it is derived, dependency-free.
@@ -1110,14 +2049,19 @@ ${disc > 0 ? line("Discount" + (o.discountCode ? " (" + escHtml(String(o.discoun
     const photo = PERSONA_PHOTOS[seed.toLowerCase()]; // demo personas → real headshot; everyone else → identicon
     if (photo) return c.redirect(photo, 302);
     let h = 2166136261;
-    for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
-    const hue = h % 360;
-    const fg = `hsl(${hue} 65% 55%)`, bg = `hsl(${hue} 30% 95%)`;
-    let cells = "";
-    for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++) {
-      if (!((h >> (y * 3 + x)) & 1)) continue;
-      for (const cx of new Set([x, 4 - x])) cells += `<rect x="${cx * 20}" y="${y * 20}" width="20" height="20"/>`;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
     }
+    const hue = h % 360;
+    const fg = `hsl(${hue} 65% 55%)`,
+      bg = `hsl(${hue} 30% 95%)`;
+    let cells = "";
+    for (let y = 0; y < 5; y++)
+      for (let x = 0; x < 3; x++) {
+        if (!((h >> (y * 3 + x)) & 1)) continue;
+        for (const cx of new Set([x, 4 - x])) cells += `<rect x="${cx * 20}" y="${y * 20}" width="20" height="20"/>`;
+      }
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" fill="${bg}"/><g fill="${fg}">${cells}</g></svg>`;
     return c.body(svg, 200, { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" });
   };

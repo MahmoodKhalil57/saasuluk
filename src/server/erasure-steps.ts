@@ -5,7 +5,7 @@
  * and Worker (D1) auth configs over their own Drizzle instance — `.run()` executes on both. Wired via
  * @suluk/better-auth's beforeDeleteCascade orchestrator.
  */
-import { eq } from "drizzle-orm";
+import { eq, type Column } from "drizzle-orm";
 import { deleteStep, type CascadeStep } from "@suluk/better-auth";
 import * as s from "./schema";
 
@@ -32,7 +32,12 @@ const OWNED: [name: string, table: Record<string, unknown>, ownerCol: string][] 
 export function buildErasureSteps(db: Deletable): CascadeStep<AuthUser>[] {
   return OWNED.map(([name, table, col]) =>
     deleteStep<AuthUser>(name, async (user) => {
-      await db.delete(table).where(eq(table[col], user.id)).run();
+      // table[col] is typed `unknown` (table is Record<string, unknown>) but is a drizzle Column at runtime — cast
+      // so eq()'s Column overload matches.
+      await db
+        .delete(table)
+        .where(eq(table[col] as Column, user.id))
+        .run();
     }),
   );
 }

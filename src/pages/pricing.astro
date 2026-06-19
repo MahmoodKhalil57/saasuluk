@@ -2,37 +2,102 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 const tiers = [
-  { name: "Frontend Lite", price: "$29", popular: false, blurb: "The marketing surface.", feats: ["Landing + marketing pages", "SEO + Open Graph", "shadcn UI components", "Light / dark themes", "i18n — en · es · ar (RTL)"] },
-  { name: "Frontend Pro", price: "$99", popular: false, blurb: "Add accounts.", feats: ["Everything in Lite", "Better Auth pages", "Magic-link sign-in", "PWA + offline shell", "Derived avatars"] },
-  { name: "Full-Stack Lite", price: "$199", popular: false, blurb: "Add the backend.", feats: ["Admin cockpit (/superadmin)", "Products · cart · checkout", "Cloudflare D1 + the v4 contract", "Typed Nano-Stores client", "Generated shadcn forms/tables"] },
-  { name: "Full-Stack Pro", price: "$299", popular: true, blurb: "The whole platform.", feats: ["Everything in Lite", "Stripe billing meters", "Orders · discounts · reviews · wishlist", "Live cost ledger (/cost)", "API tokens + developer portal"] },
+  {
+    name: "Frontend Lite",
+    price: "$29",
+    popular: false,
+    blurb: "The marketing surface.",
+    feats: ["Landing + marketing pages", "SEO + Open Graph", "shadcn UI components", "Light / dark themes", "i18n — en · es · ar (RTL)"],
+  },
+  {
+    name: "Frontend Pro",
+    price: "$99",
+    popular: false,
+    blurb: "Add accounts.",
+    feats: ["Everything in Lite", "Better Auth pages", "Magic-link sign-in", "PWA + offline shell", "Derived avatars"],
+  },
+  {
+    name: "Full-Stack Lite",
+    price: "$199",
+    popular: false,
+    blurb: "Add the backend.",
+    feats: [
+      "Admin cockpit (/superadmin)",
+      "Products · cart · checkout",
+      "Cloudflare D1 + the v4 contract",
+      "Typed Nano-Stores client",
+      "Generated shadcn forms/tables",
+    ],
+  },
+  {
+    name: "Full-Stack Pro",
+    price: "$299",
+    popular: true,
+    blurb: "The whole platform.",
+    feats: [
+      "Everything in Lite",
+      "Stripe billing meters",
+      "Orders · discounts · reviews · wishlist",
+      "Live cost ledger (/cost)",
+      "API tokens + developer portal",
+    ],
+  },
 ];
 ---
-<Layout title="Pricing — saasuluk" description="Simple, transparent saasuluk pricing — one-time licenses and usage-based plans metered straight from the contract. Start free, upgrade when you ship.">
+
+<Layout
+  title="Pricing — saasuluk"
+  description="Simple, transparent saasuluk pricing — one-time licenses and usage-based plans metered straight from the contract. Start free, upgrade when you ship."
+>
   <section class="hero" style="padding:48px 0 8px">
     <h1>Pay once. <span class="gradient">Own the source.</span></h1>
-    <p class="tag center">Every tier is a real slice of this starter — and the products in the <a href="/products">store</a>. Checkout is metered by <b>@suluk/cost</b> and billed through Stripe <b>Billing Meters</b>: you see your real cost, the price is cost + your margin.</p>
+    <p class="tag center">
+      Every tier is a real slice of this starter — and the products in the <a href="/products">store</a>. Checkout is metered by <b
+        >@suluk/cost</b
+      > and billed through Stripe <b>Billing Meters</b>: you see your real cost, the price is cost + your margin.
+    </p>
   </section>
   <div class="tiers">
-    {tiers.map((t) => (
-      <div class={t.popular ? "tier popular" : "tier"}>
-        {t.popular && <span class="badge">Most popular</span>}
-        <h3>{t.name}</h3>
-        <span style="color:var(--muted);font-size:13.5px">{t.blurb}</span>
-        <div class="price">{t.price}</div>
-        <span style="color:var(--muted);font-size:13px">one-time · lifetime updates</span>
-        <ul>{t.feats.map((f) => <li>{f}</li>)}</ul>
-        <div class="spacer"></div>
-        <a class={t.popular ? "btn" : "btn ghost"} href="/products" style="margin-top:20px; justify-content:center">Get {t.name}</a>
-      </div>
-    ))}
+    {
+      tiers.map((t) => (
+        <div class={t.popular ? "tier popular" : "tier"}>
+          {t.popular && <span class="badge">Most popular</span>}
+          <h3>{t.name}</h3>
+          <span style="color:var(--muted);font-size:13.5px">{t.blurb}</span>
+          <div class="price">{t.price}</div>
+          <span style="color:var(--muted);font-size:13px">one-time · lifetime updates</span>
+          <ul>
+            {t.feats.map((f) => (
+              <li>{f}</li>
+            ))}
+          </ul>
+          <div class="spacer" />
+          <a class={t.popular ? "btn" : "btn ghost"} href="/products" style="margin-top:20px; justify-content:center">
+            Get {t.name}
+          </a>
+        </div>
+      ))
+    }
   </div>
   <section class="section" style="margin-top:30px">
     <div class="center"><h3 style="font-size:24px">Honest, metered billing</h3></div>
     <div class="grid">
-      <div class="card"><h3>1 · Cost is traced</h3><p>Each request's cost is attributed from the <b>frontend action</b> → the <b>operation</b> → the <b>third party</b>. Nothing is hidden — see it raw at <a href="/cost">/cost</a>.</p></div>
-      <div class="card"><h3>2 · Metered to Stripe</h3><p>Those events become Stripe <b>Billing Meter</b> events via <b>@suluk/stripe</b>. Usage-based pricing without spreadsheet math.</p></div>
-      <div class="card"><h3>3 · Price = cost + margin</h3><p>You charge the metered cost plus your markup. The ledger is the source of truth; the invoice is a projection of it.</p></div>
+      <div class="card">
+        <h3>1 · Cost is traced</h3><p>
+          Each request's cost is attributed from the <b>frontend action</b> → the <b>operation</b> → the <b>third party</b>. Nothing is
+          hidden — see it raw at <a href="/cost">/cost</a>.
+        </p>
+      </div>
+      <div class="card">
+        <h3>2 · Metered to Stripe</h3><p>
+          Those events become Stripe <b>Billing Meter</b> events via <b>@suluk/stripe</b>. Usage-based pricing without spreadsheet math.
+        </p>
+      </div>
+      <div class="card">
+        <h3>3 · Price = cost + margin</h3><p>
+          You charge the metered cost plus your markup. The ledger is the source of truth; the invoice is a projection of it.
+        </p>
+      </div>
     </div>
   </section>
   <section class="section center" style="padding:40px 0">

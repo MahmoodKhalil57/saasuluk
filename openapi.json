@@ -460,10 +460,46 @@
                         }
                       ]
                     },
+                    "longDescription": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "priceCents": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 1000000000
+                    },
+                    "compareAtCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "downloadUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "categoryId": {
                       "anyOf": [
@@ -494,6 +530,24 @@
                         }
                       ]
                     },
+                    "images": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "featured": {
+                      "type": "boolean"
+                    },
+                    "requiresShipping": {
+                      "type": "boolean"
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -512,6 +566,9 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "lowStockAlerted": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -614,10 +671,46 @@
                       }
                     ]
                   },
+                  "longDescription": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "priceCents": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000000
+                  },
+                  "compareAtCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "downloadUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "categoryId": {
                     "anyOf": [
@@ -648,6 +741,24 @@
                       }
                     ]
                   },
+                  "images": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "featured": {
+                    "type": "boolean"
+                  },
+                  "requiresShipping": {
+                    "type": "boolean"
+                  },
                   "status": {
                     "type": "string",
                     "enum": [
@@ -666,6 +777,9 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "lowStockAlerted": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -719,10 +833,46 @@
                   }
                 ]
               },
+              "longDescription": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "priceCents": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000000000
+              },
+              "compareAtCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "downloadUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "categoryId": {
                 "anyOf": [
@@ -753,6 +903,24 @@
                   }
                 ]
               },
+              "images": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "featured": {
+                "type": "boolean"
+              },
+              "requiresShipping": {
+                "type": "boolean"
+              },
               "status": {
                 "type": "string",
                 "enum": [
@@ -771,6 +939,9 @@
                     "type": "null"
                   }
                 ]
+              },
+              "lowStockAlerted": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -836,10 +1007,46 @@
                       }
                     ]
                   },
+                  "longDescription": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "priceCents": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000000
+                  },
+                  "compareAtCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "downloadUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "categoryId": {
                     "anyOf": [
@@ -870,6 +1077,24 @@
                       }
                     ]
                   },
+                  "images": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "featured": {
+                    "type": "boolean"
+                  },
+                  "requiresShipping": {
+                    "type": "boolean"
+                  },
                   "status": {
                     "type": "string",
                     "enum": [
@@ -888,6 +1113,9 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "lowStockAlerted": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -976,10 +1204,46 @@
                       }
                     ]
                   },
+                  "longDescription": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "priceCents": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000000
+                  },
+                  "compareAtCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "downloadUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "categoryId": {
                     "anyOf": [
@@ -1010,6 +1274,24 @@
                       }
                     ]
                   },
+                  "images": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "featured": {
+                    "type": "boolean"
+                  },
+                  "requiresShipping": {
+                    "type": "boolean"
+                  },
                   "status": {
                     "type": "string",
                     "enum": [
@@ -1028,6 +1310,9 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "lowStockAlerted": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -1081,10 +1366,46 @@
                   }
                 ]
               },
+              "longDescription": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "priceCents": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000000000
+              },
+              "compareAtCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "downloadUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "categoryId": {
                 "anyOf": [
@@ -1115,6 +1436,24 @@
                   }
                 ]
               },
+              "images": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "featured": {
+                "type": "boolean"
+              },
+              "requiresShipping": {
+                "type": "boolean"
+              },
               "status": {
                 "type": "string",
                 "enum": [
@@ -1133,6 +1472,9 @@
                     "type": "null"
                   }
                 ]
+              },
+              "lowStockAlerted": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -1252,15 +1594,45 @@
                       "maxLength": 160,
                       "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                     },
+                    "options": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "images": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "priceCents": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 1000000000
                     },
+                    "priceCentsEnabled": {
+                      "type": "boolean"
+                    },
                     "inventory": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 1000000
+                    },
+                    "lowStockAlerted": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -1351,15 +1723,45 @@
                     "maxLength": 160,
                     "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
+                  "options": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "images": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "priceCents": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000000
                   },
+                  "priceCentsEnabled": {
+                    "type": "boolean"
+                  },
                   "inventory": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000
+                  },
+                  "lowStockAlerted": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -1401,15 +1803,45 @@
                 "maxLength": 160,
                 "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
+              "options": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "images": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "priceCents": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000000000
               },
+              "priceCentsEnabled": {
+                "type": "boolean"
+              },
               "inventory": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000000
+              },
+              "lowStockAlerted": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -1463,15 +1895,45 @@
                     "maxLength": 160,
                     "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
+                  "options": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "images": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "priceCents": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000000
                   },
+                  "priceCentsEnabled": {
+                    "type": "boolean"
+                  },
                   "inventory": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000
+                  },
+                  "lowStockAlerted": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -1548,15 +2010,45 @@
                     "maxLength": 160,
                     "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
                   },
+                  "options": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "images": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "priceCents": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000000
                   },
+                  "priceCentsEnabled": {
+                    "type": "boolean"
+                  },
                   "inventory": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000000
+                  },
+                  "lowStockAlerted": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -1598,15 +2090,45 @@
                 "maxLength": 160,
                 "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
               },
+              "options": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "images": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "priceCents": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000000000
               },
+              "priceCentsEnabled": {
+                "type": "boolean"
+              },
               "inventory": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000000
+              },
+              "lowStockAlerted": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -1721,6 +2243,18 @@
                       "maxLength": 40,
                       "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                     },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "discountType": {
                       "type": "string",
                       "enum": [
@@ -1733,13 +2267,29 @@
                       "minimum": 0,
                       "maximum": 1000000000
                     },
-                    "isActive": {
-                      "type": "boolean"
+                    "minSubtotalCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
-                    "currentUses": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 1000000000
+                    "maxDiscountCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "maxUses": {
                       "anyOf": [
@@ -1752,6 +2302,50 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "maxUsesPerCustomer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "appliesToProductIds": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "startsAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "currentUses": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000
                     },
                     "expiresAt": {
                       "anyOf": [
@@ -1848,6 +2442,18 @@
                     "maxLength": 40,
                     "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                   },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "discountType": {
                     "type": "string",
                     "enum": [
@@ -1860,13 +2466,29 @@
                     "minimum": 0,
                     "maximum": 1000000000
                   },
-                  "isActive": {
-                    "type": "boolean"
+                  "minSubtotalCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
-                  "currentUses": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 1000000000
+                  "maxDiscountCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "maxUses": {
                     "anyOf": [
@@ -1879,6 +2501,50 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "maxUsesPerCustomer": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "appliesToProductIds": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "startsAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "currentUses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "expiresAt": {
                     "anyOf": [
@@ -1926,6 +2592,18 @@
                 "maxLength": 40,
                 "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
               },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "discountType": {
                 "type": "string",
                 "enum": [
@@ -1938,13 +2616,29 @@
                 "minimum": 0,
                 "maximum": 1000000000
               },
-              "isActive": {
-                "type": "boolean"
+              "minSubtotalCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
-              "currentUses": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 1000000000
+              "maxDiscountCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "maxUses": {
                 "anyOf": [
@@ -1957,6 +2651,50 @@
                     "type": "null"
                   }
                 ]
+              },
+              "maxUsesPerCustomer": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "appliesToProductIds": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startsAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isActive": {
+                "type": "boolean"
+              },
+              "currentUses": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "expiresAt": {
                 "anyOf": [
@@ -2016,6 +2754,18 @@
                     "maxLength": 40,
                     "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                   },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "discountType": {
                     "type": "string",
                     "enum": [
@@ -2028,13 +2778,29 @@
                     "minimum": 0,
                     "maximum": 1000000000
                   },
-                  "isActive": {
-                    "type": "boolean"
+                  "minSubtotalCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
-                  "currentUses": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 1000000000
+                  "maxDiscountCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "maxUses": {
                     "anyOf": [
@@ -2047,6 +2813,50 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "maxUsesPerCustomer": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "appliesToProductIds": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "startsAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "currentUses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "expiresAt": {
                     "anyOf": [
@@ -2129,6 +2939,18 @@
                     "maxLength": 40,
                     "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
                   },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "discountType": {
                     "type": "string",
                     "enum": [
@@ -2141,13 +2963,29 @@
                     "minimum": 0,
                     "maximum": 1000000000
                   },
-                  "isActive": {
-                    "type": "boolean"
+                  "minSubtotalCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
-                  "currentUses": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 1000000000
+                  "maxDiscountCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "maxUses": {
                     "anyOf": [
@@ -2160,6 +2998,50 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "maxUsesPerCustomer": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "appliesToProductIds": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "startsAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "currentUses": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000
                   },
                   "expiresAt": {
                     "anyOf": [
@@ -2207,6 +3089,18 @@
                 "maxLength": 40,
                 "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
               },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "discountType": {
                 "type": "string",
                 "enum": [
@@ -2219,13 +3113,29 @@
                 "minimum": 0,
                 "maximum": 1000000000
               },
-              "isActive": {
-                "type": "boolean"
+              "minSubtotalCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
-              "currentUses": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 1000000000
+              "maxDiscountCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "maxUses": {
                 "anyOf": [
@@ -2238,6 +3148,50 @@
                     "type": "null"
                   }
                 ]
+              },
+              "maxUsesPerCustomer": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "appliesToProductIds": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startsAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isActive": {
+                "type": "boolean"
+              },
+              "currentUses": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
               },
               "expiresAt": {
                 "anyOf": [
@@ -2922,10 +3876,34 @@
                         }
                       ]
                     },
+                    "customerEmail": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "items": {
                       "type": "string",
                       "maxLength": 100000,
                       "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                    },
+                    "shippingAddress": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "totalCents": {
                       "type": "integer",
@@ -2959,6 +3937,64 @@
                           "type": "string",
                           "maxLength": 1024,
                           "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "carrier": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "trackingNumber": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "shippingCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "taxCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "shippingMethod": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "recoveryEmailedAt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
                         },
                         {
                           "type": "null"
@@ -3064,10 +4100,34 @@
                       }
                     ]
                   },
+                  "customerEmail": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "items": {
                     "type": "string",
                     "maxLength": 100000,
                     "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                  },
+                  "shippingAddress": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "totalCents": {
                     "type": "integer",
@@ -3101,6 +4161,64 @@
                         "type": "string",
                         "maxLength": 1024,
                         "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "carrier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "trackingNumber": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "shippingCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "taxCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "shippingMethod": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "recoveryEmailedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       {
                         "type": "null"
@@ -3157,10 +4275,34 @@
                   }
                 ]
               },
+              "customerEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "items": {
                 "type": "string",
                 "maxLength": 100000,
                 "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+              },
+              "shippingAddress": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "totalCents": {
                 "type": "integer",
@@ -3194,6 +4336,64 @@
                     "type": "string",
                     "maxLength": 1024,
                     "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carrier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "trackingNumber": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "shippingCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "taxCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "shippingMethod": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recoveryEmailedAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   {
                     "type": "null"
@@ -3262,10 +4462,34 @@
                       }
                     ]
                   },
+                  "customerEmail": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "items": {
                     "type": "string",
                     "maxLength": 100000,
                     "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                  },
+                  "shippingAddress": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "totalCents": {
                     "type": "integer",
@@ -3299,6 +4523,64 @@
                         "type": "string",
                         "maxLength": 1024,
                         "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "carrier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "trackingNumber": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "shippingCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "taxCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "shippingMethod": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "recoveryEmailedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       {
                         "type": "null"
@@ -3390,10 +4672,34 @@
                       }
                     ]
                   },
+                  "customerEmail": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "items": {
                     "type": "string",
                     "maxLength": 100000,
                     "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+                  },
+                  "shippingAddress": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "totalCents": {
                     "type": "integer",
@@ -3427,6 +4733,64 @@
                         "type": "string",
                         "maxLength": 1024,
                         "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "carrier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "trackingNumber": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "shippingCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "taxCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "shippingMethod": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "recoveryEmailedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       {
                         "type": "null"
@@ -3483,10 +4847,34 @@
                   }
                 ]
               },
+              "customerEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "items": {
                 "type": "string",
                 "maxLength": 100000,
                 "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+              },
+              "shippingAddress": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "totalCents": {
                 "type": "integer",
@@ -3520,6 +4908,64 @@
                     "type": "string",
                     "maxLength": 1024,
                     "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carrier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "trackingNumber": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "shippingCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "taxCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "shippingMethod": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recoveryEmailedAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   {
                     "type": "null"
@@ -3681,6 +5127,9 @@
                         }
                       ]
                     },
+                    "verifiedPurchase": {
+                      "type": "boolean"
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -3823,6 +5272,9 @@
                       }
                     ]
                   },
+                  "verifiedPurchase": {
+                    "type": "boolean"
+                  },
                   "status": {
                     "type": "string",
                     "enum": [
@@ -3915,6 +5367,9 @@
                     "type": "null"
                   }
                 ]
+              },
+              "verifiedPurchase": {
+                "type": "boolean"
               },
               "status": {
                 "type": "string",
@@ -4020,6 +5475,9 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "verifiedPurchase": {
+                    "type": "boolean"
                   },
                   "status": {
                     "type": "string",
@@ -4149,6 +5607,9 @@
                       }
                     ]
                   },
+                  "verifiedPurchase": {
+                    "type": "boolean"
+                  },
                   "status": {
                     "type": "string",
                     "enum": [
@@ -4241,6 +5702,9 @@
                     "type": "null"
                   }
                 ]
+              },
+              "verifiedPurchase": {
+                "type": "boolean"
               },
               "status": {
                 "type": "string",
@@ -4916,6 +6380,828 @@
           "summary": "Delete WishlistItem",
           "tags": [
             "WishlistItem"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 15
+              }
+            ],
+            "estimateMicroUsd": 115
+          }
+        }
+      }
+    },
+    "address": {
+      "requests": {
+        "listAddress": {
+          "method": "get",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "ok",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "customerId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "line1": {
+                      "type": "string",
+                      "maxLength": 200,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                    },
+                    "line2": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "city": {
+                      "type": "string",
+                      "maxLength": 120,
+                      "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                    },
+                    "state": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "postalCode": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1024,
+                          "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "country": {
+                      "type": "string",
+                      "maxLength": 2,
+                      "pattern": "^[A-Za-z]{2}$"
+                    },
+                    "isDefault": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "line1",
+                    "city"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "List Address",
+          "tags": [
+            "Address"
+          ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "perPage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "sort": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                },
+                "q": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 8
+              }
+            ],
+            "estimateMicroUsd": 8
+          }
+        },
+        "createAddress": {
+          "method": "post",
+          "responses": {
+            "201": {
+              "status": 201,
+              "description": "created",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "customerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "line1": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line2": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "state": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "postalCode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 2,
+                    "pattern": "^[A-Za-z]{2}$"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "line1",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Create Address",
+          "tags": [
+            "Address"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "line1": {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "line2": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "city": {
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "postalCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "type": "string",
+                "maxLength": 2,
+                "pattern": "^[A-Za-z]{2}$"
+              },
+              "isDefault": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "line1",
+              "city"
+            ],
+            "additionalProperties": false
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 25
+              }
+            ],
+            "estimateMicroUsd": 125
+          }
+        }
+      }
+    },
+    "address/{id}": {
+      "requests": {
+        "getAddress": {
+          "method": "get",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "ok",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "customerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "line1": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line2": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "state": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "postalCode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 2,
+                    "pattern": "^[A-Za-z]{2}$"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "line1",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "404": {
+              "status": 404,
+              "description": "not found"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Get Address by id",
+          "tags": [
+            "Address"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 8
+              }
+            ],
+            "estimateMicroUsd": 8
+          }
+        },
+        "updateAddress": {
+          "method": "patch",
+          "responses": {
+            "200": {
+              "status": 200,
+              "description": "updated",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "customerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "line1": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line2": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "state": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "postalCode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1024,
+                        "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 2,
+                    "pattern": "^[A-Za-z]{2}$"
+                  },
+                  "isDefault": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "line1",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Update Address",
+          "tags": [
+            "Address"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "line1": {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "line2": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "city": {
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "postalCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "type": "string",
+                "maxLength": 2,
+                "pattern": "^[A-Za-z]{2}$"
+              },
+              "isDefault": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "line1",
+              "city"
+            ],
+            "additionalProperties": false
+          },
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 25
+              }
+            ],
+            "estimateMicroUsd": 125
+          }
+        },
+        "deleteAddress": {
+          "method": "delete",
+          "responses": {
+            "204": {
+              "status": 204,
+              "description": "deleted"
+            },
+            "500": {
+              "status": 500,
+              "description": "Internal server error",
+              "contentType": "application/problem+json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/ProblemDetails"
+              }
+            }
+          },
+          "summary": "Delete Address",
+          "tags": [
+            "Address"
           ],
           "parameterSchema": {
             "path": {
@@ -9785,6 +12071,11 @@
                       "minimum": 1,
                       "maximum": 1000000000000
                     },
+                    "variantId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000000
+                    },
                     "qty": {
                       "type": "integer",
                       "minimum": 1,
@@ -9802,6 +12093,64 @@
                 "type": "string",
                 "maxLength": 40,
                 "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
+              },
+              "shippingMethod": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "shippingAddress": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line1": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line2": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "city": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "state": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "postalCode": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 56,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  }
+                },
+                "required": [
+                  "name",
+                  "line1",
+                  "city",
+                  "postalCode",
+                  "country"
+                ]
               }
             }
           },
@@ -9976,6 +12325,150 @@
               }
             ],
             "estimateMicroUsd": 120
+          }
+        }
+      }
+    },
+    "review/submit": {
+      "requests": {
+        "submitReview": {
+          "method": "post",
+          "summary": "Submit a product review — auto-flags verified-purchase when the reviewer has a paid order for the product",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "productId": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000000000
+              },
+              "rating": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 5000,
+                "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]*$"
+              }
+            },
+            "required": [
+              "productId",
+              "rating"
+            ]
+          },
+          "responses": {
+            "ok": {
+              "status": 201,
+              "description": "Submit a product review — auto-flags verified-purchase when the reviewer has a paid order for the product",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 25
+              }
+            ],
+            "estimateMicroUsd": 125
+          }
+        }
+      }
+    },
+    "order/{id}/status": {
+      "requests": {
+        "setOrderStatus": {
+          "method": "post",
+          "summary": "Admin: advance an order's fulfillment status (paid/shipped/cancelled) + record tracking; emails the buyer on shipped/cancelled",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "maxLength": 20,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "carrier": {
+                "type": "string",
+                "maxLength": 60,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "trackingNumber": {
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Admin: advance an order's fulfillment status (paid/shipped/cancelled) + record tracking; emails the buyer on shipped/cancelled",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 30
+              }
+            ],
+            "estimateMicroUsd": 130
           }
         }
       }
@@ -10171,6 +12664,233 @@
         }
       }
     },
+    "contact/submit": {
+      "requests": {
+        "submitContact": {
+          "method": "post",
+          "summary": "Submit the contact form (persists + notifies the store owner)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 120,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
+              },
+              "subject": {
+                "type": "string",
+                "maxLength": 160,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 4000,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              }
+            },
+            "required": [
+              "name",
+              "email",
+              "subject",
+              "message"
+            ]
+          },
+          "responses": {
+            "ok": {
+              "status": 201,
+              "description": "Submit the contact form (persists + notifies the store owner)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 120
+          }
+        }
+      }
+    },
+    "product/{id}/notify-stock": {
+      "requests": {
+        "subscribeStock": {
+          "method": "post",
+          "summary": "Join a sold-out product's back-in-stock waitlist",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
+              }
+            },
+            "required": [
+              "email"
+            ]
+          },
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 201,
+              "description": "Join a sold-out product's back-in-stock waitlist",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 120
+          }
+        }
+      }
+    },
+    "order/{id}/invoice": {
+      "requests": {
+        "orderInvoice": {
+          "method": "get",
+          "summary": "Printable HTML invoice for an order (owner or admin)",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]*$"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Printable HTML invoice for an order (owner or admin)",
+              "contentType": "text/html",
+              "contentSchema": {
+                "type": "string"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 12
+              }
+            ],
+            "estimateMicroUsd": 12
+          }
+        }
+      }
+    },
+    "newsletter/unsubscribe": {
+      "requests": {
+        "unsubscribeNewsletter": {
+          "method": "get",
+          "summary": "Unsubscribe from the newsletter via a tokenized one-click link",
+          "tags": [
+            "Operations"
+          ],
+          "parameterSchema": {
+            "query": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "t": {
+                  "type": "string",
+                  "maxLength": 400,
+                  "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                }
+              }
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Unsubscribe from the newsletter via a tokenized one-click link",
+              "contentType": "text/html",
+              "contentSchema": {
+                "type": "string"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 8
+              }
+            ],
+            "estimateMicroUsd": 8
+          }
+        }
+      }
+    },
     "avatar": {
       "requests": {
         "generateAvatar": {
@@ -10343,6 +13063,11 @@
                       "minimum": 1,
                       "maximum": 1000000000000
                     },
+                    "variantId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000000
+                    },
                     "qty": {
                       "type": "integer",
                       "minimum": 1,
@@ -10355,6 +13080,64 @@
                 "type": "string",
                 "maxLength": 40,
                 "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "maxLength": 254
+              },
+              "shippingMethod": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "shippingAddress": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line1": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line2": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "city": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "state": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "postalCode": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 56,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  }
+                },
+                "required": [
+                  "name",
+                  "line1",
+                  "city",
+                  "postalCode",
+                  "country"
+                ]
               }
             }
           },
@@ -10382,6 +13165,127 @@
               }
             ],
             "estimateMicroUsd": 190
+          }
+        }
+      }
+    },
+    "checkout/quote": {
+      "requests": {
+        "quoteCheckout": {
+          "method": "post",
+          "summary": "Quote the live order total — subtotal − discount + shipping + tax (via the pluggable @suluk/stripe adapters)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "maxItems": 200,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "productId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000000
+                    },
+                    "variantId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000000
+                    },
+                    "qty": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    }
+                  }
+                }
+              },
+              "discountCode": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+              },
+              "shippingMethod": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+              },
+              "shippingAddress": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line1": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "line2": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "city": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "state": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "postalCode": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 56,
+                    "pattern": "^[^<>\\u0000-\\u001f\\u007f]*$"
+                  }
+                },
+                "required": [
+                  "name",
+                  "line1",
+                  "city",
+                  "postalCode",
+                  "country"
+                ]
+              }
+            }
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Quote the live order total — subtotal − discount + shipping + tax (via the pluggable @suluk/stripe adapters)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 12
+              }
+            ],
+            "estimateMicroUsd": 12
           }
         }
       }
@@ -10526,6 +13430,78 @@
           }
         }
       }
+    },
+    "billing/portal": {
+      "requests": {
+        "openBillingPortal": {
+          "method": "post",
+          "summary": "Open the Stripe customer billing portal (manage saved cards + invoices)",
+          "tags": [
+            "Operations"
+          ],
+          "contentType": "application/json",
+          "contentSchema": {
+            "type": "object",
+            "additionalProperties": false
+          },
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Open the Stripe customer billing portal (manage saved cards + invoices)",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "compute",
+                "basis": "per-call",
+                "microUsd": 100
+              },
+              {
+                "source": "db-write",
+                "basis": "per-call",
+                "microUsd": 40
+              }
+            ],
+            "estimateMicroUsd": 140
+          }
+        }
+      }
+    },
+    "account/export": {
+      "requests": {
+        "exportAccount": {
+          "method": "get",
+          "summary": "Export all your account data (GDPR) — orders, wishlist, reviews, token metadata — as a downloadable JSON",
+          "tags": [
+            "Operations"
+          ],
+          "responses": {
+            "ok": {
+              "status": 200,
+              "description": "Export all your account data (GDPR) — orders, wishlist, reviews, token metadata — as a downloadable JSON",
+              "contentType": "application/json",
+              "contentSchema": {
+                "type": "object"
+              }
+            }
+          },
+          "x-suluk-cost": {
+            "components": [
+              {
+                "source": "db-read",
+                "basis": "per-call",
+                "microUsd": 20
+              }
+            ],
+            "estimateMicroUsd": 20
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10614,10 +13590,42 @@
               }
             ]
           },
+          "longDescription": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "priceCents": {
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "compareAtCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "downloadUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "categoryId": {
             "anyOf": [
@@ -10646,6 +13654,22 @@
               }
             ]
           },
+          "images": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "requiresShipping": {
+            "type": "boolean"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -10662,6 +13686,9 @@
                 "type": "null"
               }
             ]
+          },
+          "lowStockAlerted": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -10669,12 +13696,19 @@
           "name",
           "slug",
           "description",
+          "longDescription",
           "priceCents",
+          "compareAtCents",
+          "downloadUrl",
           "categoryId",
           "inventory",
           "imageUrl",
+          "images",
+          "featured",
+          "requiresShipping",
           "status",
-          "stripePriceId"
+          "stripePriceId",
+          "lowStockAlerted"
         ],
         "additionalProperties": false
       },
@@ -10694,23 +13728,53 @@
           "title": {
             "type": "string"
           },
+          "options": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "images": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "priceCents": {
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "priceCentsEnabled": {
+            "type": "boolean"
+          },
           "inventory": {
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "lowStockAlerted": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
           "productId",
           "title",
+          "options",
+          "images",
           "priceCents",
-          "inventory"
+          "priceCentsEnabled",
+          "inventory",
+          "lowStockAlerted"
         ],
         "additionalProperties": false
       },
@@ -10725,6 +13789,16 @@
           "code": {
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "discountType": {
             "type": "string",
             "enum": [
@@ -10737,13 +13811,29 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
-          "isActive": {
-            "type": "boolean"
+          "minSubtotalCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "currentUses": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
+          "maxDiscountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "maxUses": {
             "anyOf": [
@@ -10756,6 +13846,48 @@
                 "type": "null"
               }
             ]
+          },
+          "maxUsesPerCustomer": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appliesToProductIds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startsAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "currentUses": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           },
           "expiresAt": {
             "anyOf": [
@@ -10773,11 +13905,17 @@
         "required": [
           "id",
           "code",
+          "description",
           "discountType",
           "discountValue",
+          "minSubtotalCents",
+          "maxDiscountCents",
+          "maxUses",
+          "maxUsesPerCustomer",
+          "appliesToProductIds",
+          "startsAt",
           "isActive",
           "currentUses",
-          "maxUses",
           "expiresAt"
         ],
         "additionalProperties": false
@@ -10849,8 +13987,28 @@
               }
             ]
           },
+          "customerEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "items": {
             "type": "string"
+          },
+          "shippingAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "totalCents": {
             "type": "integer",
@@ -10886,6 +14044,58 @@
               }
             ]
           },
+          "carrier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trackingNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shippingCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "taxCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "shippingMethod": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recoveryEmailedAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "anyOf": [
               {
@@ -10902,11 +14112,19 @@
         "required": [
           "id",
           "customerId",
+          "customerEmail",
           "items",
+          "shippingAddress",
           "totalCents",
           "status",
           "discountCode",
           "stripePaymentIntentId",
+          "carrier",
+          "trackingNumber",
+          "shippingCents",
+          "taxCents",
+          "shippingMethod",
+          "recoveryEmailedAt",
           "createdAt"
         ],
         "additionalProperties": false
@@ -10952,6 +14170,9 @@
               }
             ]
           },
+          "verifiedPurchase": {
+            "type": "boolean"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -10984,6 +14205,7 @@
           "rating",
           "title",
           "body",
+          "verifiedPurchase",
           "status",
           "helpfulCount",
           "createdAt"
@@ -11044,6 +14266,91 @@
           "productId",
           "variantId",
           "addedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "line1": {
+            "type": "string"
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "customerId",
+          "name",
+          "line1",
+          "line2",
+          "city",
+          "state",
+          "postalCode",
+          "country",
+          "isDefault"
         ],
         "additionalProperties": false
       },

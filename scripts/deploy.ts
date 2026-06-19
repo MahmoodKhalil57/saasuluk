@@ -26,10 +26,26 @@ if (!existsSync(workerPath) || !existsSync(assetsDir)) {
 }
 
 const CONTENT_TYPE: Record<string, string> = {
-  ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json",
-  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
-  ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".txt": "text/plain", ".xml": "application/xml",
-  ".webmanifest": "application/manifest+json", ".map": "application/json", ".wasm": "application/wasm",
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain",
+  ".xml": "application/xml",
+  ".webmanifest": "application/manifest+json",
+  ".map": "application/json",
+  ".wasm": "application/wasm",
 };
 const ctype = (p: string): string => CONTENT_TYPE[p.slice(p.lastIndexOf(".")).toLowerCase()] ?? "application/octet-stream";
 
@@ -39,7 +55,12 @@ function collectAssets(dir: string): AssetFile[] {
     for (const name of readdirSync(d)) {
       const full = join(d, name);
       if (statSync(full).isDirectory()) walk(full);
-      else out.push({ path: "/" + relative(dir, full).split(sep).join("/"), bytes: new Uint8Array(readFileSync(full)), contentType: ctype(full) });
+      else
+        out.push({
+          path: "/" + relative(dir, full).split(sep).join("/"),
+          bytes: new Uint8Array(readFileSync(full)),
+          contentType: ctype(full),
+        });
     }
   })(dir);
   return out;
@@ -47,7 +68,10 @@ function collectAssets(dir: string): AssetFile[] {
 
 const migrationsDir = join(root, "migrations");
 const migrations = existsSync(migrationsDir)
-  ? readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort().map((f) => ({ name: f, sql: readFileSync(join(migrationsDir, f), "utf8") }))
+  ? readdirSync(migrationsDir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => ({ name: f, sql: readFileSync(join(migrationsDir, f), "utf8") }))
   : [];
 
 const assets = collectAssets(assetsDir);
@@ -102,5 +126,7 @@ if (res.d1?.id) {
 }
 
 console.log(`\n✓ Deployed "${res.scriptName}" to account ${res.accountId}`);
-console.log(`  D1: ${res.d1?.id ?? "—"} · assets: ${res.assetsUploaded} · secrets: ${res.secretsSet.join(", ") || "none"} · crons: ${res.crons.join(" ") || "none"}`);
+console.log(
+  `  D1: ${res.d1?.id ?? "—"} · assets: ${res.assetsUploaded} · secrets: ${res.secretsSet.join(", ") || "none"} · crons: ${res.crons.join(" ") || "none"}`,
+);
 console.log("  Live at your configured route (e.g. https://saasuluk.saastemly.com).");

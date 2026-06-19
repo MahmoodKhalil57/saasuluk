@@ -20,8 +20,7 @@ export const fmtMoney = (cents: number, currency = CURRENCY): string =>
 export const fmtNum = (n: number): string => formatNumber(LOCALE_CONFIG, lang(), Number(n) || 0);
 
 /** a timestamp/date → a localized medium date. */
-export const fmtDate = (value: number | string | Date): string =>
-  formatDate(LOCALE_CONFIG, lang(), value, { dateStyle: "medium" });
+export const fmtDate = (value: number | string | Date): string => formatDate(LOCALE_CONFIG, lang(), value, { dateStyle: "medium" });
 
 // bridge for the inline page scripts (no module imports there)
 const w = window as unknown as { fmtMoney?: typeof fmtMoney; fmtNum?: typeof fmtNum; fmtDate?: typeof fmtDate };

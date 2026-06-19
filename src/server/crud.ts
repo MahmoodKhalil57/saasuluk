@@ -14,9 +14,13 @@ export type { CrudHandlers } from "@suluk/drizzle";
 
 export function crudHandlers(table: SQLiteTable, ownerCol?: string, access?: AccessMode): CrudHandlers {
   return crudHandlersFactory(table, {
-    ownerCol, access,
-    db: () => db as never,                 // dev: the module-global bun:sqlite instance (sync; awaited transparently)
-    principal, isAdmin, redact: redactRow,
-    afterUpdate: crudAfterUpdate, afterUpdateTables: CRUD_AFTER_UPDATE_TABLES,
+    ownerCol,
+    access,
+    db: () => db as never, // dev: the module-global bun:sqlite instance (sync; awaited transparently)
+    principal,
+    isAdmin,
+    redact: redactRow,
+    afterUpdate: crudAfterUpdate,
+    afterUpdateTables: CRUD_AFTER_UPDATE_TABLES,
   });
 }

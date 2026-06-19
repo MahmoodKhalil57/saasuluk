@@ -21,9 +21,23 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 // (where assets are served before the worker and reject non-GET). Notably the checkout OPERATION is
 // `/checkout/order`, not `/checkout` — the latter is the checkout PAGE. So no path is both a page and an op.
 const HONO = [
-  "/api", "/scalar", "/openapi.json", "/superadmin", "/cost",
+  "/api",
+  "/scalar",
+  "/openapi.json",
+  "/superadmin",
+  "/cost",
   ...ENTITIES.map((e) => `/${lowerFirst(e.name)}`),
-  "/checkout/order", "/checkout/pay", "/checkout/confirm", "/billing", "/discount", "/search", "/analytics", "/recommendations", "/newsletter", "/avatar", "/tokens",
+  "/checkout/order",
+  "/checkout/pay",
+  "/checkout/confirm",
+  "/billing",
+  "/discount",
+  "/search",
+  "/analytics",
+  "/recommendations",
+  "/newsletter",
+  "/avatar",
+  "/tokens",
 ];
 
 export const onRequest = defineMiddleware(async (context, next) => {

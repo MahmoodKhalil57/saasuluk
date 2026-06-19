@@ -26,9 +26,14 @@ const [createFetcherStore, createMutatorStore, ctx] = nanoquery({
 });
 
 const json = (url: string, init?: RequestInit) =>
-  fetch(url, init).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+  fetch(url, init).then((r) => {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  });
 const jsonOr = <T>(url: string, fallback: T): Promise<T> =>
-  fetch(url).then((r) => (r.ok ? (r.json() as Promise<T>) : fallback)).catch(() => fallback);
+  fetch(url)
+    .then((r) => (r.ok ? (r.json() as Promise<T>) : fallback))
+    .catch(() => fallback);
 
 // URL-keyed list stores — the key IS the cache identity, so any page sharing a key shares one entry.
 const $products = createFetcherStore(["/product"], { fetcher: () => json("/product") });
@@ -56,14 +61,20 @@ const _productStores = new Map<string, ReturnType<typeof createFetcherStore>>();
 const productStore = (id: string | number) => {
   const k = String(id);
   let s = _productStores.get(k);
-  if (!s) { s = createFetcherStore(["/product/", k], { fetcher: () => json("/product/" + k, { headers: { accept: "application/json" } }) }); _productStores.set(k, s); }
+  if (!s) {
+    s = createFetcherStore(["/product/", k], { fetcher: () => json("/product/" + k, { headers: { accept: "application/json" } }) });
+    _productStores.set(k, s);
+  }
   return s;
 };
 const _recStores = new Map<string, ReturnType<typeof createFetcherStore>>();
 const recommendations = (id: string | number) => {
   const k = String(id);
   let s = _recStores.get(k);
-  if (!s) { s = createFetcherStore(["/recommendations/", k], { fetcher: () => json("/recommendations/" + k) }); _recStores.set(k, s); }
+  if (!s) {
+    s = createFetcherStore(["/recommendations/", k], { fetcher: () => json("/recommendations/" + k) });
+    _recStores.set(k, s);
+  }
   return s;
 };
 
@@ -82,10 +93,19 @@ function seedProduct(row: { id?: number | string } | null | undefined) {
 }
 
 const stores = {
-  ctx, cache,
-  $products, $categories, $posts, $faqs, $reviews, $session,
-  productStore, recommendations, seedProduct,
-  createFetcherStore, createMutatorStore,
+  ctx,
+  cache,
+  $products,
+  $categories,
+  $posts,
+  $faqs,
+  $reviews,
+  $session,
+  productStore,
+  recommendations,
+  seedProduct,
+  createFetcherStore,
+  createMutatorStore,
 };
 
 // Publish for the per-page is:inline readers and signal readiness (they run during parse, before this deferred module).

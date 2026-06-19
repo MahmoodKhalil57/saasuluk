@@ -1,0 +1,27 @@
+name: Deploy
+
+# LOCAL-ONLY: run on your machine by wrkflw after a push to master (scripts/post-push.ts runs it only if CI passed).
+# Cloudflare creds come from your local .env (bun auto-loads it for `wrangler deploy`) — nothing is stored in GitHub.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Configure git (for receipt tags)
+        run: |
+          git config user.name "github-actions[bot]" || true
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com" || true
+      - run: bun run stage build
+      # `bun run deploy:ci` → wrangler deploy; bun auto-loads .env so CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID
+      # are read from your local .env. No `${{ secrets.* }}` (that would be empty locally and clobber the .env value).
+      - run: bun run stage deploy

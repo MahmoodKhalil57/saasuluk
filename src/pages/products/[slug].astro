@@ -4,25 +4,37 @@ import Layout from "../../layouts/Layout.astro";
 import { SEED_PRODUCTS, SEED_VARIANTS, SEED_REVIEWS, type SeedImage } from "../../server/seed";
 import { product as productSchema, breadcrumb } from "@suluk/seo";
 export function getStaticPaths() {
-  return SEED_PRODUCTS.map((p) => ({ params: { slug: p.slug }, props: { product: p, variants: SEED_VARIANTS.filter((v) => v.productId === p.id) } }));
+  return SEED_PRODUCTS.map((p) => ({
+    params: { slug: p.slug },
+    props: { product: p, variants: SEED_VARIANTS.filter((v) => v.productId === p.id) },
+  }));
 }
 const { product, variants } = Astro.props;
 const money = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
 const moneyOrFree = (c: number) => (c === 0 ? "Free" : money(c));
 // gallery: the product's images (or the slug-derived single image as a fallback).
-const images: SeedImage[] = (product.images && product.images.length) ? product.images : [{ url: `/img/products/${product.slug}.jpg`, alt: product.name }];
+const images: SeedImage[] =
+  product.images && product.images.length ? product.images : [{ url: `/img/products/${product.slug}.jpg`, alt: product.name }];
 const hasVariants = variants.length > 0;
 // option DIMENSIONS (e.g. "Color" → [Black, White], "Tier" → [Personal, Team, Enterprise]) — preserve first-seen order.
 const dimMap = new Map<string, string[]>();
-for (const v of variants) for (const o of v.options) { const arr = dimMap.get(o.label) ?? []; if (!arr.includes(o.value)) arr.push(o.value); dimMap.set(o.label, arr); }
+for (const v of variants)
+  for (const o of v.options) {
+    const arr = dimMap.get(o.label) ?? [];
+    if (!arr.includes(o.value)) arr.push(o.value);
+    dimMap.set(o.label, arr);
+  }
 const dimList = [...dimMap.entries()].map(([label, values]) => ({ label, values }));
 const variantPrices = variants.filter((v) => v.priceCentsEnabled).map((v) => v.priceCents);
 const minPrice = variantPrices.length ? Math.min(...variantPrices) : product.priceCents;
 const maxPrice = variantPrices.length ? Math.max(...variantPrices) : product.priceCents;
 // a range when the variants span prices ("Free – $299.00"), a single price when they don't, else the base price.
-const priceLabel = hasVariants && variantPrices.length
-  ? (minPrice === maxPrice ? moneyOrFree(minPrice) : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`)
-  : moneyOrFree(product.priceCents);
+const priceLabel =
+  hasVariants && variantPrices.length
+    ? minPrice === maxPrice
+      ? moneyOrFree(minPrice)
+      : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`
+    : moneyOrFree(product.priceCents);
 // compare-at (sale) strikethrough — only for a single-price product (a price-varying-variant range has no single "was").
 const onSale = !!product.compareAtCents && product.compareAtCents > product.priceCents && variantPrices.length === 0;
 const savePct = onSale ? Math.round((1 - product.priceCents / (product.compareAtCents as number)) * 100) : 0;
@@ -35,22 +47,71 @@ const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews
 const rating = reviews.length ? { ratingValue: Number(avg.toFixed(1)), reviewCount: reviews.length } : undefined;
 const offerPrice = (variantPrices.length ? minPrice : product.priceCents) / 100;
 const productNodes = [
-  productSchema({ name: product.name, description: product.description, image: img, sku: `SAAS-${product.id}`, url,
-    offers: { price: offerPrice, currency: "USD", availability: product.inventory > 0 || hasVariants ? "InStock" : "OutOfStock", url }, rating }),
-  breadcrumb([{ name: "Store", url: `${base}/products` }, { name: product.name, url }]),
+  productSchema({
+    name: product.name,
+    description: product.description,
+    image: img,
+    sku: `SAAS-${product.id}`,
+    url,
+    offers: { price: offerPrice, currency: "USD", availability: product.inventory > 0 || hasVariants ? "InStock" : "OutOfStock", url },
+    rating,
+  }),
+  breadcrumb([
+    { name: "Store", url: `${base}/products` },
+    { name: product.name, url },
+  ]),
 ];
 ---
+
 <Layout title={`${product.name} — saasuluk`} description={product.description} image={img} ogType="product" jsonLd={productNodes}>
   <!-- is:global so the rules also apply to thumbnails the gallery REBUILDS via innerHTML at runtime (a scoped
        style only matches build-time elements; runtime-injected ones lack the scope attribute → would be unstyled). -->
   <style is:global>
-    .gthumb { width:60px; height:60px; border-radius:10px; overflow:hidden; border:2px solid var(--line); padding:0; cursor:pointer; background:none; flex:none; }
-    .gthumb.on { border-color:var(--accent); }
-    .gthumb img { width:100%; height:100%; object-fit:cover; display:block; }
-    .vopt { border:1px solid var(--line); background:var(--bg-soft); color:var(--fg); border-radius:9px; padding:8px 14px; font:inherit; font-size:14px; cursor:pointer; }
-    .vopt:hover { border-color:color-mix(in srgb,var(--accent) 40%,var(--line)); }
-    .vopt.on { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); font-weight:600; }
-    .vdim-label { font-size:13px; font-weight:600; color:var(--muted); margin-bottom:7px; }
+    .gthumb {
+      width: 60px;
+      height: 60px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid var(--line);
+      padding: 0;
+      cursor: pointer;
+      background: none;
+      flex: none;
+    }
+    .gthumb.on {
+      border-color: var(--accent);
+    }
+    .gthumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .vopt {
+      border: 1px solid var(--line);
+      background: var(--bg-soft);
+      color: var(--fg);
+      border-radius: 9px;
+      padding: 8px 14px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .vopt:hover {
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+    }
+    .vopt.on {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .vdim-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
   </style>
   <p style="margin:6px 0 14px"><a href="/products" class="pill">← Store</a></p>
   <div style="display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start">
@@ -58,45 +119,73 @@ const productNodes = [
       <div style="aspect-ratio:1; border-radius:18px; overflow:hidden; border:1px solid var(--line)">
         <img id="gmain-img" src={images[0].url} alt={product.name} style="width:100%; height:100%; object-fit:cover; display:block" />
       </div>
-      {images.length > 1 && (
-        <div id="gthumbs" style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
-          {images.map((im, i) => (
-            <button class:list={["gthumb", { on: i === 0 }]} data-i={i} aria-label={`View image ${i + 1}`}>
-              <img src={im.url} alt={im.alt ?? ""} loading="lazy" />
-            </button>
-          ))}
-        </div>
-      )}
+      {
+        images.length > 1 && (
+          <div id="gthumbs" style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+            {images.map((im, i) => (
+              <button class:list={["gthumb", { on: i === 0 }]} data-i={i} aria-label={`View image ${i + 1}`}>
+                <img src={im.url} alt={im.alt ?? ""} loading="lazy" />
+              </button>
+            ))}
+          </div>
+        )
+      }
     </div>
     <div style="flex:1; min-width:280px">
-      <span class="pill accent">{product.priceCents === 0 && !hasVariants ? "Open source" : hasVariants ? "Choose your options" : "One-time · lifetime"}</span>
+      <span class="pill accent"
+        >{product.priceCents === 0 && !hasVariants ? "Open source" : hasVariants ? "Choose your options" : "One-time · lifetime"}</span
+      >
       <h1 style="margin:12px 0 8px">{product.name}</h1>
       <p class="tag" style="font-size:17px">{product.description}</p>
       <p id="price" style="font-size:36px; font-weight:800; letter-spacing:-.03em; margin:16px 0 6px">{priceLabel}</p>
-      {onSale && <p style="margin:-2px 0 8px"><s style="color:var(--muted);font-size:18px">{moneyOrFree(product.compareAtCents)}</s> <span class="pill accent" style="font-size:12px;margin-inline-start:6px">Save {savePct}%</span></p>}
-      {hasVariants && (
-        <div id="variant-selector" style="margin:18px 0">
-          {dimList.map((d) => (
-            <div style="margin-bottom:12px">
-              <div class="vdim-label">{d.label}</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap">
-                {d.values.map((val) => <button class="vopt" data-label={d.label} data-value={val} type="button">{val}</button>)}
+      {
+        onSale && (
+          <p style="margin:-2px 0 8px">
+            <s style="color:var(--muted);font-size:18px">{moneyOrFree(product.compareAtCents as number)}</s>{" "}
+            <span class="pill accent" style="font-size:12px;margin-inline-start:6px">
+              Save {savePct}%
+            </span>
+          </p>
+        )
+      }
+      {
+        hasVariants && (
+          <div id="variant-selector" style="margin:18px 0">
+            {dimList.map((d) => (
+              <div style="margin-bottom:12px">
+                <div class="vdim-label">{d.label}</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                  {d.values.map((val) => (
+                    <button class="vopt" data-label={d.label} data-value={val} type="button">
+                      {val}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-          <p id="variant-stock" style="font-size:13px; color:var(--muted); margin-top:4px"></p>
-        </div>
-      )}
+            ))}
+            <p id="variant-stock" style="font-size:13px; color:var(--muted); margin-top:4px" />
+          </div>
+        )
+      }
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px">
         <button class="btn" id="add">{hasVariants ? "Select options" : "Add to cart"}</button>
-        <button class="btn ghost" id="wish" type="button" aria-pressed="false" title="Save to wishlist" disabled><span id="wishheart">♡</span> <span id="wishlabel">Save</span></button>
+        <button class="btn ghost" id="wish" type="button" aria-pressed="false" title="Save to wishlist" disabled
+          ><span id="wishheart">♡</span> <span id="wishlabel">Save</span></button
+        >
         <a class="btn ghost" href="/checkout">Go to checkout →</a>
       </div>
       <p id="cartmsg" style="color:var(--accent); font-size:14px; margin-top:10px"></p>
       <form id="bis-form" hidden style="margin-top:12px; max-width:360px">
         <p style="font-size:13px; color:var(--muted); margin:0 0 6px">Out of stock — get an email when it's back.</p>
         <div style="display:flex; gap:8px">
-          <input id="bis-email" type="email" required placeholder="you@example.com" aria-label="Email for back-in-stock alert" style="flex:1; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--bg-soft); color:var(--fg); font:inherit; font-size:14px" />
+          <input
+            id="bis-email"
+            type="email"
+            required
+            placeholder="you@example.com"
+            aria-label="Email for back-in-stock alert"
+            style="flex:1; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--bg-soft); color:var(--fg); font:inherit; font-size:14px"
+          />
           <button class="btn" type="submit">Notify me</button>
         </div>
         <p id="bis-msg" style="font-size:13px; margin:8px 0 0"></p>
@@ -104,17 +193,28 @@ const productNodes = [
     </div>
   </div>
 
-  {product.longDescription && (
-    <section style="margin-top:34px; max-width:760px">
-      <h2>Details</h2>
-      <p class="tag" style="font-size:16px; white-space:pre-line" set:html={product.longDescription.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")} />
-    </section>
-  )}
+  {
+    product.longDescription && (
+      <section style="margin-top:34px; max-width:760px">
+        <h2>Details</h2>
+        <p
+          class="tag"
+          style="font-size:16px; white-space:pre-line"
+          set:html={product.longDescription.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}
+        />
+      </section>
+    )
+  }
 
   <h2>Reviews</h2>
   <div id="reviews"><p style="color:var(--muted)">Loading reviews…</p></div>
   <form id="review" style="margin-top:14px; display:grid; gap:8px; max-width:480px">
-    <div style="display:flex; gap:8px"><input name="title" placeholder="Review title" aria-label="Review title" required style="flex:1" /><select name="rating" aria-label="Rating (1-5 stars)"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+    <div style="display:flex; gap:8px">
+      <input name="title" placeholder="Review title" aria-label="Review title" required style="flex:1" /><select
+        name="rating"
+        aria-label="Rating (1-5 stars)"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select
+      >
+    </div>
     <textarea name="body" placeholder="Your thoughts…" aria-label="Review text" rows="3"></textarea>
     <button class="btn" type="submit" style="justify-self:start">Submit review</button>
   </form>
@@ -127,209 +227,387 @@ const productNodes = [
     <div class="grid" id="recent" data-prefetch-list></div>
   </section>
 
-  <script type="application/json" id="pd-data" set:html={JSON.stringify({ product, variants, baseImages: images }).replaceAll("<", "\\u003c")}></script>
+  <script
+    type="application/json"
+    id="pd-data"
+    set:html={JSON.stringify({ product, variants, baseImages: images }).replaceAll("<", "\\u003c")}
+  />
   <!-- Swap-safe under ClientRouter: per-product data lives in the JSON tag above (part of the swapped <main>, so it
        differs per page), and run() executes on every astro:page-load reading the CURRENT page's data. This avoids the
        define:vars global-const collision that data-astro-rerun would hit when navigating between different products. -->
   <script is:inline>
-   (function () {
-    function run() {
-      var __el = document.getElementById("pd-data"); if (!__el) return; // this swap landed on a non-product page
-      var __d = JSON.parse(__el.textContent || "{}");
-      var product = __d.product, variants = __d.variants || [], baseImages = __d.baseImages || [];
-    const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
-    const moneyOrFree = (c) => (Number(c) === 0 ? "Free" : money(c));
-    const esc = (s) => String(s || "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
-    const dims = [...new Set(variants.flatMap((v) => v.options.map((o) => o.label)))];
-    const variantPrices = variants.filter((v) => v.priceCentsEnabled).map((v) => v.priceCents);
-    const minPrice = variantPrices.length ? Math.min(...variantPrices) : product.priceCents;
-    const maxPrice = variantPrices.length ? Math.max(...variantPrices) : product.priceCents;
-    const rangeLabel = () => (variantPrices.length ? (minPrice === maxPrice ? moneyOrFree(minPrice) : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`) : moneyOrFree(product.priceCents));
-    const sel = {};
-    let curImgs = baseImages;
+    (function () {
+      function run() {
+        var __el = document.getElementById("pd-data");
+        if (!__el) return; // this swap landed on a non-product page
+        var __d = JSON.parse(__el.textContent || "{}");
+        var product = __d.product,
+          variants = __d.variants || [],
+          baseImages = __d.baseImages || [];
+        const money = (c) => (window.fmtMoney ? window.fmtMoney(c) : "$" + (Number(c || 0) / 100).toFixed(2));
+        const moneyOrFree = (c) => (Number(c) === 0 ? "Free" : money(c));
+        const esc = (s) => String(s || "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
+        const dims = [...new Set(variants.flatMap((v) => v.options.map((o) => o.label)))];
+        const variantPrices = variants.filter((v) => v.priceCentsEnabled).map((v) => v.priceCents);
+        const minPrice = variantPrices.length ? Math.min(...variantPrices) : product.priceCents;
+        const maxPrice = variantPrices.length ? Math.max(...variantPrices) : product.priceCents;
+        const rangeLabel = () =>
+          variantPrices.length
+            ? minPrice === maxPrice
+              ? moneyOrFree(minPrice)
+              : `${moneyOrFree(minPrice)} – ${moneyOrFree(maxPrice)}`
+            : moneyOrFree(product.priceCents);
+        const sel = {};
+        let curImgs = baseImages;
 
-    const priceOf = (v) => (v && v.priceCentsEnabled ? v.priceCents : product.priceCents);
-    const matchVariant = () => {
-      if (!variants.length) return null;
-      if (dims.some((d) => !sel[d])) return null; // not every dimension chosen yet
-      return variants.find((v) => v.options.every((o) => sel[o.label] === o.value)) || null;
-    };
+        const priceOf = (v) => (v && v.priceCentsEnabled ? v.priceCents : product.priceCents);
+        const matchVariant = () => {
+          if (!variants.length) return null;
+          if (dims.some((d) => !sel[d])) return null; // not every dimension chosen yet
+          return variants.find((v) => v.options.every((o) => sel[o.label] === o.value)) || null;
+        };
 
-    const gmain = () => document.getElementById("gmain-img");
-    function setGallery(imgs) {
-      const next = (imgs && imgs.length) ? imgs : baseImages;
-      // only rebuild the thumb strip when the image SET actually changed (a variant with its own gallery) — this
-      // avoids churning the server-rendered thumbs on the initial render + on same-image variant picks.
-      const sameSet = next.length === curImgs.length && next.every((im, i) => im.url === curImgs[i].url);
-      curImgs = next;
-      if (gmain() && curImgs[0]) gmain().src = curImgs[0].url;
-      const tb = document.getElementById("gthumbs");
-      if (tb && !sameSet) {
-        tb.innerHTML = curImgs.map((im, i) => `<button class="gthumb${i === 0 ? " on" : ""}" data-i="${i}" aria-label="View image ${i + 1}"><img src="${esc(im.url)}" alt="${esc(im.alt || "")}" loading="lazy" /></button>`).join("");
+        const gmain = () => document.getElementById("gmain-img");
+        function setGallery(imgs) {
+          const next = imgs && imgs.length ? imgs : baseImages;
+          // only rebuild the thumb strip when the image SET actually changed (a variant with its own gallery) — this
+          // avoids churning the server-rendered thumbs on the initial render + on same-image variant picks.
+          const sameSet = next.length === curImgs.length && next.every((im, i) => im.url === curImgs[i].url);
+          curImgs = next;
+          if (gmain() && curImgs[0]) gmain().src = curImgs[0].url;
+          const tb = document.getElementById("gthumbs");
+          if (tb && !sameSet) {
+            tb.innerHTML = curImgs
+              .map(
+                (im, i) =>
+                  `<button class="gthumb${i === 0 ? " on" : ""}" data-i="${i}" aria-label="View image ${i + 1}"><img src="${esc(im.url)}" alt="${esc(im.alt || "")}" loading="lazy" /></button>`,
+              )
+              .join("");
+            bindThumbs();
+          }
+        }
+        function bindThumbs() {
+          document.querySelectorAll(".gthumb").forEach((b) =>
+            b.addEventListener("click", () => {
+              const i = Number(b.dataset.i);
+              if (gmain() && curImgs[i]) gmain().src = curImgs[i].url;
+              document.querySelectorAll(".gthumb").forEach((x) => x.classList.toggle("on", x === b));
+            }),
+          );
+        }
+
+        function update() {
+          const v = matchVariant();
+          const priceEl = document.getElementById("price");
+          if (variants.length) {
+            if (v) priceEl.textContent = moneyOrFree(priceOf(v));
+            else priceEl.textContent = rangeLabel();
+            setGallery(v && v.images && v.images.length ? v.images : baseImages);
+            const addBtn = document.getElementById("add"),
+              stockEl = document.getElementById("variant-stock");
+            if (!v) {
+              addBtn.disabled = true;
+              addBtn.textContent = "Select options";
+              if (stockEl) stockEl.textContent = "";
+              showBis(false);
+            } else if (Number(v.inventory) <= 0) {
+              addBtn.disabled = true;
+              addBtn.textContent = "Sold out";
+              if (stockEl) stockEl.textContent = "Out of stock";
+              showBis(true);
+            } else {
+              addBtn.disabled = false;
+              addBtn.textContent = "Add to cart";
+              if (stockEl) stockEl.textContent = Number(v.inventory) < 10 ? `Only ${v.inventory} left` : "In stock";
+              showBis(false);
+            }
+          }
+        }
+
+        // ── Back-in-stock waitlist (shown when sold out). The page is static (build-time inventory), so for a
+        //    non-variant product confirm the LIVE level; variant sold-out is driven from update() above. ──
+        function showBis(show) {
+          const f = document.getElementById("bis-form");
+          if (f) f.hidden = !show;
+        }
+        if (!variants.length) {
+          const soldOut = (p) => {
+            if (p && Number(p.inventory) <= 0) {
+              const a = document.getElementById("add");
+              if (a) {
+                a.disabled = true;
+                a.textContent = "Sold out";
+              }
+              showBis(true);
+            }
+          };
+          if (window.$stores) {
+            // Consume the list→detail seed: paints the live level instantly from cache, then revalidates inventory.
+            const ps = window.$stores.productStore(product.id);
+            const un = ps.subscribe((st) => {
+              if (st && st.data) soldOut(st.data);
+            });
+            document.addEventListener("astro:before-swap", () => un(), { once: true });
+          } else {
+            fetch(`/product/${product.id}`, { headers: { accept: "application/json" } })
+              .then((r) => (r.ok ? r.json() : null))
+              .then(soldOut)
+              .catch(() => {});
+          }
+        }
+        {
+          const bisForm = document.getElementById("bis-form");
+          if (bisForm)
+            bisForm.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              const email = (document.getElementById("bis-email").value || "").trim();
+              const msg = document.getElementById("bis-msg"),
+                btn = bisForm.querySelector("button[type=submit]");
+              btn.disabled = true;
+              try {
+                const r = await fetch(`/product/${product.id}/notify-stock`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ email }),
+                });
+                if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not subscribe.");
+                msg.style.color = "var(--accent)";
+                msg.textContent = "✓ We'll email you the moment it's back.";
+                if (window.toast) window.toast("You're on the list ✓", { type: "success" });
+                bisForm.querySelector("input").value = "";
+              } catch (err) {
+                msg.style.color = "var(--accent)";
+                msg.textContent = err.message || "Could not subscribe.";
+                if (window.toast) window.toast(err.message || "Could not subscribe.", { type: "error" });
+              } finally {
+                btn.disabled = false;
+              }
+            });
+        }
+
+        document.querySelectorAll(".vopt").forEach((b) =>
+          b.addEventListener("click", () => {
+            const { label, value } = b.dataset;
+            sel[label] = sel[label] === value ? undefined : value; // toggle
+            document
+              .querySelectorAll(`.vopt[data-label="${CSS.escape(label)}"]`)
+              .forEach((x) => x.classList.toggle("on", x.dataset.value === sel[label]));
+            update();
+          }),
+        );
         bindThumbs();
+
+        document.getElementById("add").addEventListener("click", () => {
+          const v = matchVariant();
+          if (variants.length && !v) return; // button is disabled in this state, defensive
+          const price = priceOf(v);
+          const imgs = v && v.images && v.images.length ? v.images : baseImages;
+          const image = imgs[0] && imgs[0].url;
+          const line = { productId: product.id, qty: 1, priceCents: price, name: product.name, image };
+          if (v) {
+            line.variantId = v.id;
+            line.variantLabel = v.title;
+          }
+          const c = JSON.parse(localStorage.getItem("cart") || "[]");
+          const ex = c.find((i) => i.productId === product.id && (i.variantId ?? null) === (line.variantId ?? null));
+          if (ex) ex.qty++;
+          else c.push(line);
+          localStorage.setItem("cart", JSON.stringify(c));
+          window.dispatchEvent(new Event("cart-changed"));
+          if (window.toast) window.toast(product.name + (v ? ` (${v.title})` : "") + " added to cart", { type: "success" });
+          document.getElementById("cartmsg").textContent = "Added to cart ✓ — go to checkout when ready.";
+        });
+
+        async function loadReviews() {
+          try {
+            const res = await fetch("/review");
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const rs = (await res.json()).filter((r) => r.productId === product.id && r.status === "published");
+            document.getElementById("reviews").innerHTML = rs.length
+              ? rs
+                  .map(
+                    (r) =>
+                      `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}${r.verifiedPurchase ? ' <span class="pill" style="font-size:11px">✓ Verified</span>' : ""}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`,
+                  )
+                  .join("")
+              : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
+            document.querySelectorAll("[data-h]").forEach((b) =>
+              b.addEventListener("click", async () => {
+                const res = await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" });
+                if (res.status === 401) {
+                  if (window.toast) window.toast("Sign in to vote a review helpful.", { type: "error" });
+                  return;
+                }
+                loadReviews();
+              }),
+            ); // one toggleable vote per signed-in user
+          } catch (e) {
+            // don't strand the buyer on "Loading reviews…" forever
+            document.getElementById("reviews").innerHTML =
+              `<p style="color:var(--muted)">Couldn't load reviews. <button class="pill" id="revRetry" style="cursor:pointer;border:0">Retry</button></p>`;
+            const rb = document.getElementById("revRetry");
+            if (rb) rb.addEventListener("click", loadReviews);
+          }
+        }
+        document.getElementById("review").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector("button[type=submit]");
+          btn.disabled = true;
+          try {
+            const r = await fetch("/review/submit", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              credentials: "same-origin",
+              body: JSON.stringify({
+                productId: product.id,
+                rating: Number(e.target.rating.value),
+                title: e.target.title.value,
+                body: e.target.body.value,
+              }),
+            });
+            if (!r.ok) throw new Error("Could not submit your review.");
+            e.target.reset();
+            loadReviews();
+            if (window.toast) window.toast("Review submitted ✓ — pending moderation.", { type: "success" });
+          } catch (err) {
+            if (window.toast) window.toast(err.message || "Could not submit your review.", { type: "error" });
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        (async () => {
+          const rel = await (await fetch(`/recommendations/${product.id}`)).json();
+          document.getElementById("related").innerHTML =
+            (rel.related || [])
+              .map(
+                (p) =>
+                  `<a href="/products/${p.slug}" class="card" style="display:block"><b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`,
+              )
+              .join("") || `<p style="color:var(--muted)">—</p>`;
+        })();
+
+        // Recently viewed — a localStorage MRU strip. Render the OTHERS first (what you saw BEFORE this page), then record
+        // this product at the front. Image src is scheme-guarded; all text goes through esc() (matches the related strip).
+        (function () {
+          const KEY = "recent_products",
+            MAX = 8;
+          const safe = (u) => (/^(https?:\/\/|\/)/i.test(String(u || "")) ? u : "");
+          let list = [];
+          try {
+            list = JSON.parse(localStorage.getItem(KEY) || "[]");
+          } catch (e) {}
+          const others = list.filter((p) => Number(p.id) !== Number(product.id)).slice(0, MAX);
+          if (others.length) {
+            document.getElementById("recent").innerHTML = others
+              .map(
+                (p) =>
+                  `<a href="/products/${esc(p.slug)}" class="card" style="display:block">${safe(p.image) ? `<img src="${esc(safe(p.image))}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;margin-bottom:8px"/>` : ""}<b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`,
+              )
+              .join("");
+            document.getElementById("recent-sec").hidden = false;
+          }
+          const entry = {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            image: (baseImages[0] && baseImages[0].url) || "",
+            priceCents: product.priceCents,
+          };
+          try {
+            localStorage.setItem(
+              KEY,
+              JSON.stringify([entry, ...list.filter((p) => Number(p.id) !== Number(product.id))].slice(0, MAX + 1)),
+            );
+          } catch (e) {}
+        })();
+        // Wishlist heart — COOKIE-authoritative (a 200 from /wishlistItem means signed-in, 401 means guest): the
+        // localStorage su_user hint is only a paint optimization elsewhere and is unreliable for an auth decision (it can
+        // be stale → dead button, or not-yet-set after a fresh sign-in → false guest). The button stays disabled until the
+        // initial GET settles (so a click can't race it into duplicate rows), and a 401 on write takes the sign-in path.
+        (function () {
+          const btn = document.getElementById("wish"),
+            heart = document.getElementById("wishheart"),
+            label = document.getElementById("wishlabel");
+          if (!btn) return;
+          let itemId = null,
+            guest = false,
+            ready = false;
+          const paint = (saved) => {
+            btn.setAttribute("aria-pressed", saved ? "true" : "false");
+            heart.textContent = saved ? "♥" : "♡";
+            label.textContent = saved ? "Saved" : "Save";
+            btn.style.color = saved ? "var(--accent)" : "";
+            btn.style.borderColor = saved ? "var(--accent)" : "";
+          };
+          const toLogin = () => {
+            if (window.toast) window.toast("Sign in to save items to your wishlist.", { type: "info" });
+            setTimeout(() => (location.href = "/login?next=" + encodeURIComponent(location.pathname)), 750);
+          };
+          fetch("/wishlistItem", { credentials: "same-origin" })
+            .then((r) => {
+              if (r.status === 401) {
+                guest = true;
+                return null;
+              }
+              return r.ok ? r.json() : null;
+            })
+            .then((items) => {
+              if (items) {
+                const hit = items.find((w) => Number(w.productId) === Number(product.id));
+                if (hit) {
+                  itemId = hit.id;
+                  paint(true);
+                }
+              }
+            })
+            .catch(() => {})
+            .finally(() => {
+              ready = true;
+              btn.disabled = false;
+            });
+          btn.addEventListener("click", async () => {
+            if (!ready) return;
+            if (guest) {
+              toLogin();
+              return;
+            }
+            btn.disabled = true;
+            try {
+              const r = itemId
+                ? await fetch("/wishlistItem/" + encodeURIComponent(itemId), { method: "DELETE", credentials: "same-origin" })
+                : await fetch("/wishlistItem", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({ productId: product.id }),
+                  });
+              if (r.status === 401) {
+                guest = true;
+                toLogin();
+                return;
+              } // session expired mid-visit → sign-in path, not a generic error
+              if (!r.ok) throw new Error("wishlist");
+              if (itemId) {
+                itemId = null;
+                paint(false);
+                if (window.toast) window.toast("Removed from wishlist", { type: "success" });
+              } else {
+                const row = await r.json().catch(() => ({}));
+                itemId = row && row.id;
+                paint(true);
+                if (window.toast) window.toast("Saved to wishlist ♥", { type: "success" });
+              }
+            } catch (e) {
+              if (window.toast) window.toast("Couldn't update your wishlist.", { type: "error" });
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        })();
+        update();
+        loadReviews();
       }
-    }
-    function bindThumbs() {
-      document.querySelectorAll(".gthumb").forEach((b) => b.addEventListener("click", () => {
-        const i = Number(b.dataset.i);
-        if (gmain() && curImgs[i]) gmain().src = curImgs[i].url;
-        document.querySelectorAll(".gthumb").forEach((x) => x.classList.toggle("on", x === b));
-      }));
-    }
-
-    function update() {
-      const v = matchVariant();
-      const priceEl = document.getElementById("price");
-      if (variants.length) {
-        if (v) priceEl.textContent = moneyOrFree(priceOf(v));
-        else priceEl.textContent = rangeLabel();
-        setGallery(v && v.images && v.images.length ? v.images : baseImages);
-        const addBtn = document.getElementById("add"), stockEl = document.getElementById("variant-stock");
-        if (!v) { addBtn.disabled = true; addBtn.textContent = "Select options"; if (stockEl) stockEl.textContent = ""; showBis(false); }
-        else if (Number(v.inventory) <= 0) { addBtn.disabled = true; addBtn.textContent = "Sold out"; if (stockEl) stockEl.textContent = "Out of stock"; showBis(true); }
-        else { addBtn.disabled = false; addBtn.textContent = "Add to cart"; if (stockEl) stockEl.textContent = Number(v.inventory) < 10 ? `Only ${v.inventory} left` : "In stock"; showBis(false); }
-      }
-    }
-
-    // ── Back-in-stock waitlist (shown when sold out). The page is static (build-time inventory), so for a
-    //    non-variant product confirm the LIVE level; variant sold-out is driven from update() above. ──
-    function showBis(show) { const f = document.getElementById("bis-form"); if (f) f.hidden = !show; }
-    if (!variants.length) {
-      const soldOut = (p) => { if (p && Number(p.inventory) <= 0) { const a = document.getElementById("add"); if (a) { a.disabled = true; a.textContent = "Sold out"; } showBis(true); } };
-      if (window.$stores) {
-        // Consume the list→detail seed: paints the live level instantly from cache, then revalidates inventory.
-        const ps = window.$stores.productStore(product.id);
-        const un = ps.subscribe((st) => { if (st && st.data) soldOut(st.data); });
-        document.addEventListener("astro:before-swap", () => un(), { once: true });
-      } else {
-        fetch(`/product/${product.id}`, { headers: { accept: "application/json" } })
-          .then((r) => (r.ok ? r.json() : null)).then(soldOut).catch(() => {});
-      }
-    }
-    {
-      const bisForm = document.getElementById("bis-form");
-      if (bisForm) bisForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = (document.getElementById("bis-email").value || "").trim();
-        const msg = document.getElementById("bis-msg"), btn = bisForm.querySelector("button[type=submit]");
-        btn.disabled = true;
-        try {
-          const r = await fetch(`/product/${product.id}/notify-stock`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
-          if (!r.ok) throw new Error(((await r.json().catch(() => ({}))).error) || "Could not subscribe.");
-          msg.style.color = "var(--accent)"; msg.textContent = "✓ We'll email you the moment it's back.";
-          if (window.toast) window.toast("You're on the list ✓", { type: "success" });
-          bisForm.querySelector("input").value = "";
-        } catch (err) {
-          msg.style.color = "var(--accent)"; msg.textContent = err.message || "Could not subscribe.";
-          if (window.toast) window.toast(err.message || "Could not subscribe.", { type: "error" });
-        } finally { btn.disabled = false; }
-      });
-    }
-
-    document.querySelectorAll(".vopt").forEach((b) => b.addEventListener("click", () => {
-      const { label, value } = b.dataset;
-      sel[label] = sel[label] === value ? undefined : value; // toggle
-      document.querySelectorAll(`.vopt[data-label="${CSS.escape(label)}"]`).forEach((x) => x.classList.toggle("on", x.dataset.value === sel[label]));
-      update();
-    }));
-    bindThumbs();
-
-    document.getElementById("add").addEventListener("click", () => {
-      const v = matchVariant();
-      if (variants.length && !v) return; // button is disabled in this state, defensive
-      const price = priceOf(v);
-      const imgs = (v && v.images && v.images.length) ? v.images : baseImages;
-      const image = imgs[0] && imgs[0].url;
-      const line = { productId: product.id, qty: 1, priceCents: price, name: product.name, image };
-      if (v) { line.variantId = v.id; line.variantLabel = v.title; }
-      const c = JSON.parse(localStorage.getItem("cart") || "[]");
-      const ex = c.find((i) => i.productId === product.id && (i.variantId ?? null) === (line.variantId ?? null));
-      if (ex) ex.qty++; else c.push(line);
-      localStorage.setItem("cart", JSON.stringify(c));
-      window.dispatchEvent(new Event("cart-changed"));
-      if (window.toast) window.toast(product.name + (v ? ` (${v.title})` : "") + " added to cart", { type: "success" });
-      document.getElementById("cartmsg").textContent = "Added to cart ✓ — go to checkout when ready.";
-    });
-
-    async function loadReviews() {
-      try {
-        const res = await fetch("/review");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const rs = (await res.json()).filter((r) => r.productId === product.id && r.status === "published");
-        document.getElementById("reviews").innerHTML = rs.length ? rs.map((r) => `<div class="card" style="margin-bottom:10px;display:flex;gap:12px;align-items:flex-start"><img src="/avatar?seed=${encodeURIComponent(r.customerId || "anon")}" width="40" height="40" style="border-radius:50%;object-fit:cover;flex-shrink:0" alt="" loading="lazy" /><div style="flex:1;min-width:0"><b style="font-family:inherit">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)} ${esc(r.title)}${r.verifiedPurchase ? ' <span class="pill" style="font-size:11px">✓ Verified</span>' : ""}</b><p>${esc(r.body)}</p><button class="pill" data-h="${r.id}" style="cursor:pointer;border:0">👍 helpful (${r.helpfulCount || 0})</button></div></div>`).join("") : `<p style="color:var(--muted)">No reviews yet — be the first.</p>`;
-        document.querySelectorAll("[data-h]").forEach((b) => b.addEventListener("click", async () => { const res = await fetch(`/review/${b.dataset.h}/helpful`, { method: "POST" }); if (res.status === 401) { if (window.toast) window.toast("Sign in to vote a review helpful.", { type: "error" }); return; } loadReviews(); })); // one toggleable vote per signed-in user
-      } catch (e) { // don't strand the buyer on "Loading reviews…" forever
-        document.getElementById("reviews").innerHTML = `<p style="color:var(--muted)">Couldn't load reviews. <button class="pill" id="revRetry" style="cursor:pointer;border:0">Retry</button></p>`;
-        const rb = document.getElementById("revRetry"); if (rb) rb.addEventListener("click", loadReviews);
-      }
-    }
-    document.getElementById("review").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
-      try {
-        const r = await fetch("/review/submit", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ productId: product.id, rating: Number(e.target.rating.value), title: e.target.title.value, body: e.target.body.value }) });
-        if (!r.ok) throw new Error("Could not submit your review.");
-        e.target.reset(); loadReviews();
-        if (window.toast) window.toast("Review submitted ✓ — pending moderation.", { type: "success" });
-      } catch (err) {
-        if (window.toast) window.toast(err.message || "Could not submit your review.", { type: "error" });
-      } finally { btn.disabled = false; }
-    });
-    (async () => {
-      const rel = await (await fetch(`/recommendations/${product.id}`)).json();
-      document.getElementById("related").innerHTML = (rel.related || []).map((p) => `<a href="/products/${p.slug}" class="card" style="display:block"><b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`).join("") || `<p style="color:var(--muted)">—</p>`;
+      document.addEventListener("astro:page-load", run);
     })();
-
-    // Recently viewed — a localStorage MRU strip. Render the OTHERS first (what you saw BEFORE this page), then record
-    // this product at the front. Image src is scheme-guarded; all text goes through esc() (matches the related strip).
-    (function () {
-      const KEY = "recent_products", MAX = 8;
-      const safe = (u) => (/^(https?:\/\/|\/)/i.test(String(u || "")) ? u : "");
-      let list = [];
-      try { list = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) {}
-      const others = list.filter((p) => Number(p.id) !== Number(product.id)).slice(0, MAX);
-      if (others.length) {
-        document.getElementById("recent").innerHTML = others.map((p) => `<a href="/products/${esc(p.slug)}" class="card" style="display:block">${safe(p.image) ? `<img src="${esc(safe(p.image))}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;margin-bottom:8px"/>` : ""}<b style="font-family:inherit">${esc(p.name)}</b><p>${moneyOrFree(p.priceCents)}</p></a>`).join("");
-        document.getElementById("recent-sec").hidden = false;
-      }
-      const entry = { id: product.id, name: product.name, slug: product.slug, image: (baseImages[0] && baseImages[0].url) || "", priceCents: product.priceCents };
-      try { localStorage.setItem(KEY, JSON.stringify([entry, ...list.filter((p) => Number(p.id) !== Number(product.id))].slice(0, MAX + 1))); } catch (e) {}
-    })();
-    // Wishlist heart — COOKIE-authoritative (a 200 from /wishlistItem means signed-in, 401 means guest): the
-    // localStorage su_user hint is only a paint optimization elsewhere and is unreliable for an auth decision (it can
-    // be stale → dead button, or not-yet-set after a fresh sign-in → false guest). The button stays disabled until the
-    // initial GET settles (so a click can't race it into duplicate rows), and a 401 on write takes the sign-in path.
-    (function () {
-      const btn = document.getElementById("wish"), heart = document.getElementById("wishheart"), label = document.getElementById("wishlabel");
-      if (!btn) return;
-      let itemId = null, guest = false, ready = false;
-      const paint = (saved) => { btn.setAttribute("aria-pressed", saved ? "true" : "false"); heart.textContent = saved ? "♥" : "♡"; label.textContent = saved ? "Saved" : "Save"; btn.style.color = saved ? "var(--accent)" : ""; btn.style.borderColor = saved ? "var(--accent)" : ""; };
-      const toLogin = () => { if (window.toast) window.toast("Sign in to save items to your wishlist.", { type: "info" }); setTimeout(() => (location.href = "/login?next=" + encodeURIComponent(location.pathname)), 750); };
-      fetch("/wishlistItem", { credentials: "same-origin" })
-        .then((r) => { if (r.status === 401) { guest = true; return null; } return r.ok ? r.json() : null; })
-        .then((items) => { if (items) { const hit = items.find((w) => Number(w.productId) === Number(product.id)); if (hit) { itemId = hit.id; paint(true); } } })
-        .catch(() => {})
-        .finally(() => { ready = true; btn.disabled = false; });
-      btn.addEventListener("click", async () => {
-        if (!ready) return;
-        if (guest) { toLogin(); return; }
-        btn.disabled = true;
-        try {
-          const r = itemId
-            ? await fetch("/wishlistItem/" + encodeURIComponent(itemId), { method: "DELETE", credentials: "same-origin" })
-            : await fetch("/wishlistItem", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ productId: product.id }) });
-          if (r.status === 401) { guest = true; toLogin(); return; } // session expired mid-visit → sign-in path, not a generic error
-          if (!r.ok) throw new Error("wishlist");
-          if (itemId) { itemId = null; paint(false); if (window.toast) window.toast("Removed from wishlist", { type: "success" }); }
-          else { const row = await r.json().catch(() => ({})); itemId = row && row.id; paint(true); if (window.toast) window.toast("Saved to wishlist ♥", { type: "success" }); }
-        } catch (e) { if (window.toast) window.toast("Couldn't update your wishlist.", { type: "error" }); }
-        finally { btn.disabled = false; }
-      });
-    })();
-    update();
-    loadReviews();
-    }
-    document.addEventListener("astro:page-load", run);
-   })();
   </script>
 </Layout>

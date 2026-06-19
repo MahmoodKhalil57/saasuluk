@@ -8,7 +8,10 @@ import { setupUsageBilling } from "@suluk/stripe";
 import { restStripe } from "../src/server/stripe-rest";
 
 const key = process.env.STRIPE_SECRET_KEY;
-if (!key) { console.error("set STRIPE_SECRET_KEY in .env"); process.exit(1); }
+if (!key) {
+  console.error("set STRIPE_SECRET_KEY in .env");
+  process.exit(1);
+}
 
 const ids = await setupUsageBilling(restStripe(key), {
   productName: "saasuluk usage",

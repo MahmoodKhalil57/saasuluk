@@ -1,0 +1,31 @@
+name: CI
+
+# LOCAL-ONLY: triggered manually (workflow_dispatch) so GitHub Actions never auto-runs in the cloud. The pipeline is
+# run on YOUR machine by wrkflw after a push — see `bun run push` / scripts/post-push.ts. (wrkflw runs this file by
+# path regardless of the trigger; the trigger only governs GitHub's cloud, which we intentionally leave idle.)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # no-op under wrkflw emulation (your working tree is already here)
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2  # no-op under wrkflw emulation (host bun is used)
+      - run: bun install --frozen-lockfile
+      - name: Configure git (for receipt tags)
+        run: |
+          git config user.name "github-actions[bot]" || true
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com" || true
+      # Each step runs a stage and tags the commit `passed/<stage>/<sha>` on success (stops on first failure).
+      - run: bun run stage format
+      - run: bun run stage lint
+      - run: bun run stage typecheck
+      - run: bun run stage suluk
+      - run: bun run stage test
+      - run: bun run stage build

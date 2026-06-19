@@ -2,93 +2,217 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
+
 <Layout title="Sign in — saasuluk" description="Sign in to saasuluk — email + password, or a passwordless magic link.">
   <section style="max-width:420px; margin:40px auto 0">
-    <div class="center"><h1 style="font-size:34px">Welcome back</h1><p class="tag center" style="font-size:16px">Real Better Auth, wired into the contract. Sign in, create an account, or use a magic link.</p></div>
+    <div class="center">
+      <h1 style="font-size:34px">Welcome back</h1><p class="tag center" style="font-size:16px">
+        Real Better Auth, wired into the contract. Sign in, create an account, or use a magic link.
+      </p>
+    </div>
     <div class="card" style="margin-top:24px; padding:22px">
       <div id="tabs" style="display:flex; gap:6px; background:var(--bg-soft); padding:4px; border-radius:11px; margin-bottom:18px">
-        <button class="tab on" data-tab="signin" style="flex:1; padding:8px; border:0; border-radius:8px; background:var(--panel); color:var(--fg); font-weight:600; cursor:pointer">Sign in</button>
-        <button class="tab" data-tab="signup" style="flex:1; padding:8px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:600; cursor:pointer">Create account</button>
-        <button class="tab" data-tab="magic" style="flex:1; padding:8px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:600; cursor:pointer">Magic link</button>
+        <button
+          class="tab on"
+          data-tab="signin"
+          style="flex:1; padding:8px; border:0; border-radius:8px; background:var(--panel); color:var(--fg); font-weight:600; cursor:pointer"
+          >Sign in</button
+        >
+        <button
+          class="tab"
+          data-tab="signup"
+          style="flex:1; padding:8px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:600; cursor:pointer"
+          >Create account</button
+        >
+        <button
+          class="tab"
+          data-tab="magic"
+          style="flex:1; padding:8px; border:0; border-radius:8px; background:transparent; color:var(--muted); font-weight:600; cursor:pointer"
+          >Magic link</button
+        >
       </div>
       <button id="google" class="btn ghost" style="width:100%; justify-content:center; margin-bottom:14px">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24"
+          ><path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"
+          ></path><path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"
+          ></path><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"></path><path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"
+          ></path></svg
+        >
         Continue with Google
       </button>
-      <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px; margin-bottom:14px"><span style="flex:1; height:1px; background:var(--line)"></span>or<span style="flex:1; height:1px; background:var(--line)"></span></div>
+      <div style="display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px; margin-bottom:14px">
+        <span style="flex:1; height:1px; background:var(--line)"></span>or<span style="flex:1; height:1px; background:var(--line)"></span>
+      </div>
       <form id="form" style="display:grid; gap:11px">
         <input id="name" name="name" placeholder="Your name" aria-label="Your name" autocomplete="name" style="display:none" />
-        <input id="email" name="email" type="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required />
-        <input id="password" name="password" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password" minlength="8" required />
+        <input
+          id="email"
+          name="email"
+          type="email"
+          placeholder="you@example.com"
+          aria-label="Email address"
+          autocomplete="email"
+          required
+        />
+        <input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="Password"
+          aria-label="Password"
+          autocomplete="current-password"
+          minlength="8"
+          required
+        />
         <button class="btn" type="submit" style="justify-content:center; margin-top:4px">Sign in</button>
       </form>
       <p id="msg" style="margin:14px 0 0; font-size:14px"></p>
-      <p id="forgotrow" style="text-align:center; margin-top:12px"><a href="#" id="forgotlink" style="font-size:13px">Forgot your password?</a></p>
-      <p id="backrow" style="text-align:center; margin-top:12px; display:none"><a href="#" id="backlink" style="font-size:13px">← Back to sign in</a></p>
+      <p id="forgotrow" style="text-align:center; margin-top:12px">
+        <a href="#" id="forgotlink" style="font-size:13px">Forgot your password?</a>
+      </p>
+      <p id="backrow" style="text-align:center; margin-top:12px; display:none">
+        <a href="#" id="backlink" style="font-size:13px">← Back to sign in</a>
+      </p>
     </div>
-    <p class="center" style="color:var(--muted); font-size:13px; margin-top:14px">By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+    <p class="center" style="color:var(--muted); font-size:13px; margin-top:14px">
+      By continuing you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.
+    </p>
   </section>
   <!-- data-astro-rerun + IIFE: rebind the auth form/tabs/OAuth on each swap-in and re-read ?redirectTo from the URL. -->
   <script is:inline data-astro-rerun>
-   (function () {
-    if (!document.getElementById("form")) return;
-    let mode = "signin";
-    const $ = (id) => document.getElementById(id);
-    const submitText = { signin: "Sign in", signup: "Create account", magic: "Email me a link", forgot: "Send reset link" };
-    function setMode(m) {
-      mode = m;
-      document.querySelectorAll(".tab").forEach((t) => {
-        const on = t.dataset.tab === m;
-        t.classList.toggle("on", on); t.style.background = on ? "var(--panel)" : "transparent"; t.style.color = on ? "var(--fg)" : "var(--muted)";
+    (function () {
+      if (!document.getElementById("form")) return;
+      let mode = "signin";
+      const $ = (id) => document.getElementById(id);
+      const submitText = { signin: "Sign in", signup: "Create account", magic: "Email me a link", forgot: "Send reset link" };
+      function setMode(m) {
+        mode = m;
+        document.querySelectorAll(".tab").forEach((t) => {
+          const on = t.dataset.tab === m;
+          t.classList.toggle("on", on);
+          t.style.background = on ? "var(--panel)" : "transparent";
+          t.style.color = on ? "var(--fg)" : "var(--muted)";
+        });
+        $("name").style.display = m === "signup" ? "block" : "none";
+        $("password").style.display = m === "magic" || m === "forgot" ? "none" : "block";
+        $("password").required = m !== "magic" && m !== "forgot";
+        $("form").querySelector("button").textContent = submitText[m];
+        $("forgotrow").style.display = m === "signin" ? "block" : "none";
+        $("backrow").style.display = m === "forgot" ? "block" : "none";
+        $("msg").textContent = "";
+      }
+      document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.tab)));
+      $("forgotlink").addEventListener("click", (e) => {
+        e.preventDefault();
+        setMode("forgot");
       });
-      $("name").style.display = m === "signup" ? "block" : "none";
-      $("password").style.display = (m === "magic" || m === "forgot") ? "none" : "block";
-      $("password").required = m !== "magic" && m !== "forgot";
-      $("form").querySelector("button").textContent = submitText[m];
-      $("forgotrow").style.display = m === "signin" ? "block" : "none";
-      $("backrow").style.display = m === "forgot" ? "block" : "none";
-      $("msg").textContent = "";
-    }
-    document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setMode(t.dataset.tab)));
-    $("forgotlink").addEventListener("click", (e) => { e.preventDefault(); setMode("forgot"); });
-    $("backlink").addEventListener("click", (e) => { e.preventDefault(); setMode("signin"); });
-    // preserve where the user came from (?redirectTo=… or ?next=…), open-redirect-guarded (same-origin relative only).
-    const redirectTo = (function () { try { const q = new URLSearchParams(location.search); const p = q.get("redirectTo") || q.get("next"); return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/dashboard"; } catch (e) { return "/dashboard"; } })();
-    // field-error feedback (mirrors @suluk/nano-stores markInvalid + clearInvalidOnInput): the base CSS rings
-    // [aria-invalid] red + .shake animates; editing a field clears it.
-    const invalid = (el) => { if (!el) return; el.setAttribute("aria-invalid", "true"); el.classList.add("shake"); setTimeout(() => el.classList.remove("shake"), 450); };
-    $("form").addEventListener("input", (e) => { if (e.target && e.target.removeAttribute) e.target.removeAttribute("aria-invalid"); });
-    document.getElementById("google").addEventListener("click", async () => {
-      try {
-        const r = await fetch("/api/auth/sign-in/social", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ provider: "google", callbackURL: redirectTo }) });
-        const d = await r.json();
-        if (d && d.url) location.href = d.url; else $("msg").innerHTML = '<span style="color:#e5484d">Google sign-in isn\'t configured for this site yet.</span>';
-      } catch (e) { $("msg").innerHTML = '<span style="color:#e5484d">Could not start Google sign-in.</span>'; }
-    });
-    const ok = (s) => { $("msg").innerHTML = `<span style="color:var(--accent)">${s}</span>`; };
-    const err = (s) => { $("msg").innerHTML = `<span class="rem" style="color:#e5484d">${s}</span>`; };
-    $("form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = $("email").value.trim(), password = $("password").value, name = $("name").value.trim();
-      const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "…";
-      try {
-        if (mode === "magic") {
-          const r = await fetch("/api/auth/sign-in/magic-link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, callbackURL: redirectTo }) });
-          if (r.ok) ok("Check your email for a sign-in link. (In dev it logs to the server console.)"); else { err("Could not send the link."); invalid($("email")); }
-        } else if (mode === "forgot") {
-          const r = await fetch("/api/auth/request-password-reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, redirectTo: "/reset-password" }) });
-          if (r.ok) ok("Check your email for a password-reset link."); else { err("Could not send the reset link."); invalid($("email")); }
-        } else {
-          const path = mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
-          const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(mode === "signup" ? { email, password, name: name || email.split("@")[0] } : { email, password }) });
-          const data = await r.json().catch(() => ({}));
-          if (r.ok && data.user) { ok("Signed in — redirecting…"); setTimeout(() => (location.href = redirectTo), 500); }
-          else { err(data.message || data.error?.message || "Invalid email or password."); invalid($("email")); if (mode !== "magic") invalid($("password")); }
+      $("backlink").addEventListener("click", (e) => {
+        e.preventDefault();
+        setMode("signin");
+      });
+      // preserve where the user came from (?redirectTo=… or ?next=…), open-redirect-guarded (same-origin relative only).
+      const redirectTo = (function () {
+        try {
+          const q = new URLSearchParams(location.search);
+          const p = q.get("redirectTo") || q.get("next");
+          return p && p.charAt(0) === "/" && p.charAt(1) !== "/" && p.indexOf("://") < 0 && p.indexOf("\\") < 0 ? p : "/dashboard";
+        } catch (e) {
+          return "/dashboard";
         }
-      } catch (x) { err("Something went wrong."); }
-      btn.disabled = false; btn.textContent = submitText[mode];
-    });
-    setMode("signin");
-   })();
+      })();
+      // field-error feedback (mirrors @suluk/nano-stores markInvalid + clearInvalidOnInput): the base CSS rings
+      // [aria-invalid] red + .shake animates; editing a field clears it.
+      const invalid = (el) => {
+        if (!el) return;
+        el.setAttribute("aria-invalid", "true");
+        el.classList.add("shake");
+        setTimeout(() => el.classList.remove("shake"), 450);
+      };
+      $("form").addEventListener("input", (e) => {
+        if (e.target && e.target.removeAttribute) e.target.removeAttribute("aria-invalid");
+      });
+      document.getElementById("google").addEventListener("click", async () => {
+        try {
+          const r = await fetch("/api/auth/sign-in/social", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ provider: "google", callbackURL: redirectTo }),
+          });
+          const d = await r.json();
+          if (d && d.url) location.href = d.url;
+          else $("msg").innerHTML = '<span style="color:#e5484d">Google sign-in isn\'t configured for this site yet.</span>';
+        } catch (e) {
+          $("msg").innerHTML = '<span style="color:#e5484d">Could not start Google sign-in.</span>';
+        }
+      });
+      const ok = (s) => {
+        $("msg").innerHTML = `<span style="color:var(--accent)">${s}</span>`;
+      };
+      const err = (s) => {
+        $("msg").innerHTML = `<span class="rem" style="color:#e5484d">${s}</span>`;
+      };
+      $("form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = $("email").value.trim(),
+          password = $("password").value,
+          name = $("name").value.trim();
+        const btn = e.target.querySelector("button");
+        btn.disabled = true;
+        btn.textContent = "…";
+        try {
+          if (mode === "magic") {
+            const r = await fetch("/api/auth/sign-in/magic-link", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ email, callbackURL: redirectTo }),
+            });
+            if (r.ok) ok("Check your email for a sign-in link. (In dev it logs to the server console.)");
+            else {
+              err("Could not send the link.");
+              invalid($("email"));
+            }
+          } else if (mode === "forgot") {
+            const r = await fetch("/api/auth/request-password-reset", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ email, redirectTo: "/reset-password" }),
+            });
+            if (r.ok) ok("Check your email for a password-reset link.");
+            else {
+              err("Could not send the reset link.");
+              invalid($("email"));
+            }
+          } else {
+            const path = mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
+            const r = await fetch(path, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(mode === "signup" ? { email, password, name: name || email.split("@")[0] } : { email, password }),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (r.ok && data.user) {
+              ok("Signed in — redirecting…");
+              setTimeout(() => (location.href = redirectTo), 500);
+            } else {
+              err(data.message || data.error?.message || "Invalid email or password.");
+              invalid($("email"));
+              if (mode !== "magic") invalid($("password"));
+            }
+          }
+        } catch (x) {
+          err("Something went wrong.");
+        }
+        btn.disabled = false;
+        btn.textContent = submitText[mode];
+      });
+      setMode("signin");
+    })();
   </script>
 </Layout>

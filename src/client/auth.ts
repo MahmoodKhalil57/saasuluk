@@ -31,14 +31,23 @@ function paintIn(u: User) {
   if (!btn || !signin) return; // header not in the DOM yet
   const name = u.name || (u.email || "").split("@")[0] || "Account";
   const img = u.image || "/avatar?seed=" + encodeURIComponent(u.email || name);
-  const av = el<HTMLImageElement>("authavatar"); if (av) av.src = img;
-  const nm = el("authname"); if (nm) nm.textContent = name;
-  const pav = el<HTMLImageElement>("authpopavatar"); if (pav) pav.src = img;
-  const pnm = el("authpopname"); if (pnm) pnm.textContent = name;
-  const pem = el("authpopemail"); if (pem) pem.textContent = u.email || "";
+  const av = el<HTMLImageElement>("authavatar");
+  if (av) av.src = img;
+  const nm = el("authname");
+  if (nm) nm.textContent = name;
+  const pav = el<HTMLImageElement>("authpopavatar");
+  if (pav) pav.src = img;
+  const pnm = el("authpopname");
+  if (pnm) pnm.textContent = name;
+  const pem = el("authpopemail");
+  if (pem) pem.textContent = u.email || "";
   btn.hidden = false;
   signin.hidden = true;
-  try { localStorage.setItem("su_user", JSON.stringify({ name, email: u.email, image: u.image })); } catch { /* private mode */ }
+  try {
+    localStorage.setItem("su_user", JSON.stringify({ name, email: u.email, image: u.image }));
+  } catch {
+    /* private mode */
+  }
 }
 
 function paintOut() {
@@ -48,7 +57,11 @@ function paintOut() {
   if (btn) btn.hidden = true;
   if (pop) pop.hidden = true;
   if (signin) signin.hidden = false;
-  try { localStorage.removeItem("su_user"); } catch { /* private mode */ }
+  try {
+    localStorage.removeItem("su_user");
+  } catch {
+    /* private mode */
+  }
 }
 
 /** Re-derive the header auth UI from the source of truth. Optimistic from the hint, authoritative from $session;
@@ -64,7 +77,10 @@ function render() {
   // No authoritative answer yet (loading or errored). Paint optimistically; do NOT sign out.
   const hint = readHint();
   if (hint && (hint.name || hint.email)) paintIn(hint);
-  else { const signin = el("authsignin"); if (signin) signin.hidden = false; }
+  else {
+    const signin = el("authsignin");
+    if (signin) signin.hidden = false;
+  }
 }
 
 /** Bind the dropdown toggle + sign-out. Guarded per element so a re-rendered header re-binds without double-binding a
@@ -87,8 +103,13 @@ function bindMenu() {
     so.addEventListener("click", () => {
       so.textContent = "Signing out…";
       fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" })
-        .then(() => { paintOut(); location.reload(); })
-        .catch(() => { location.href = "/login"; });
+        .then(() => {
+          paintOut();
+          location.reload();
+        })
+        .catch(() => {
+          location.href = "/login";
+        });
     });
   }
 }
@@ -111,7 +132,10 @@ function bindDocument() {
     const btn = el("authbtn");
     if (pop && !pop.hidden) {
       pop.hidden = true;
-      if (btn) { btn.setAttribute("aria-expanded", "false"); btn.focus(); }
+      if (btn) {
+        btn.setAttribute("aria-expanded", "false");
+        btn.focus();
+      }
     }
   });
 }
@@ -123,7 +147,10 @@ function init() {
   $session.subscribe(render); // keeps the store warm + repaints on confirm/revalidation
   // The crux: re-derive on EVERY navigation, regardless of whether the header persisted, was rebuilt, or the browser
   // activated a prerendered document. Auth state is therefore correct on every route, not just the first.
-  document.addEventListener("astro:page-load", () => { bindMenu(); render(); });
+  document.addEventListener("astro:page-load", () => {
+    bindMenu();
+    render();
+  });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

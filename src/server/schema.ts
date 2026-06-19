@@ -34,7 +34,9 @@ export const product = sqliteTable("product", {
   images: text("images"), // JSON gallery: [{ url, alt?, sortOrder? }] — the multi-image capability
   featured: integer("featured", { mode: "boolean" }).notNull().default(false),
   requiresShipping: integer("requires_shipping", { mode: "boolean" }).notNull().default(false), // PHYSICAL good → shipping applies
-  status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "published"] })
+    .notNull()
+    .default("draft"),
   stripePriceId: text("stripe_price_id"), // set by scripts/sync-catalog.ts — the real Stripe Price for checkout
   lowStockAlerted: integer("low_stock_alerted", { mode: "boolean" }).notNull().default(false), // once-only latch: owner already emailed about this low level (re-armed on restock)
 });
@@ -55,7 +57,9 @@ export const discountCode = sqliteTable("discount_code", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull(),
   description: text("description"),
-  discountType: text("discount_type", { enum: ["percent", "fixed"] }).notNull().default("percent"),
+  discountType: text("discount_type", { enum: ["percent", "fixed"] })
+    .notNull()
+    .default("percent"),
   discountValue: integer("discount_value").notNull().default(0),
   minSubtotalCents: integer("min_subtotal_cents"), // code only valid when cart subtotal ≥ this
   maxDiscountCents: integer("max_discount_cents"), // cap on a percentage discount (saastarter's maxDiscountAmount)
@@ -74,7 +78,9 @@ export const cart = sqliteTable("cart", {
   // a JSON array of { productId, variantId?, qty, priceCents } — the line items, kept atomic with the cart
   items: text("items").notNull().default("[]"),
   discountCode: text("discount_code"),
-  status: text("status", { enum: ["active", "converted", "abandoned"] }).notNull().default("active"),
+  status: text("status", { enum: ["active", "converted", "abandoned"] })
+    .notNull()
+    .default("active"),
 });
 
 export const order = sqliteTable("order", {
@@ -86,7 +92,9 @@ export const order = sqliteTable("order", {
   items: text("items").notNull().default("[]"),
   shippingAddress: text("shipping_address"), // JSON snapshot of the address at purchase time
   totalCents: integer("total_cents").notNull().default(0),
-  status: text("status", { enum: ["pending", "paid", "shipped", "cancelled"] }).notNull().default("pending"),
+  status: text("status", { enum: ["pending", "paid", "shipped", "cancelled"] })
+    .notNull()
+    .default("pending"),
   discountCode: text("discount_code"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   carrier: text("carrier"), // set on the shipped transition (admin fulfillment)
@@ -106,7 +114,9 @@ export const review = sqliteTable("review", {
   title: text("title").notNull(),
   body: text("body"),
   verifiedPurchase: integer("verified_purchase", { mode: "boolean" }).notNull().default(false),
-  status: text("status", { enum: ["pending", "published"] }).notNull().default("pending"),
+  status: text("status", { enum: ["pending", "published"] })
+    .notNull()
+    .default("pending"),
   helpfulCount: integer("helpful_count").notNull().default(0),
   createdAt: integer("created_at"),
 });
@@ -147,7 +157,9 @@ export const post = sqliteTable("post", {
   slug: text("slug").notNull(),
   excerpt: text("excerpt"),
   body: text("body"),
-  status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "published"] })
+    .notNull()
+    .default("draft"),
   publishedAt: integer("published_at"),
   authorId: text("author_id"),
   coverImageUrl: text("cover_image_url"),
@@ -233,7 +245,9 @@ export const project = sqliteTable("project", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   ownerId: text("owner_id"),
-  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  status: text("status", { enum: ["active", "archived"] })
+    .notNull()
+    .default("active"),
 });
 
 /**
@@ -247,7 +261,25 @@ export const project = sqliteTable("project", {
 // SCHEMA_SQL (same columns/types/notnull/defaults/pk for all 20 tables). Prod stays migration-driven (migrations/).
 export const SCHEMA_SQL = (
   schemaDDL([
-    category, product, variant, discountCode, cart, order, review, reviewHelpfulVote, address, wishlistItem,
-    post, faq, newsletterSubscriber, contactSubmission, stockNotification, media, apiToken, project, billingAccount, costEvent,
+    category,
+    product,
+    variant,
+    discountCode,
+    cart,
+    order,
+    review,
+    reviewHelpfulVote,
+    address,
+    wishlistItem,
+    post,
+    faq,
+    newsletterSubscriber,
+    contactSubmission,
+    stockNotification,
+    media,
+    apiToken,
+    project,
+    billingAccount,
+    costEvent,
   ]) + "\nCREATE UNIQUE INDEX IF NOT EXISTS review_helpful_vote_uniq ON review_helpful_vote (review_id, principal);"
 ).trim();

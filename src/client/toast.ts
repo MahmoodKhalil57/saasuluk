@@ -5,7 +5,10 @@
  * module — it runs before any click). Accessible: the live region announces, errors use role=alert.
  */
 type ToastType = "success" | "error" | "info";
-interface ToastOpts { type?: ToastType; duration?: number }
+interface ToastOpts {
+  type?: ToastType;
+  duration?: number;
+}
 
 const ICON: Record<ToastType, string> = { success: "✓", error: "✕", info: "ℹ" };
 
@@ -32,7 +35,12 @@ function toast(message: string, opts: ToastOpts = {}): void {
   (t.querySelector(".toast-msg") as HTMLElement).textContent = message; // textContent → no HTML injection
   c.appendChild(t);
   requestAnimationFrame(() => t.classList.add("in"));
-  const dismiss = () => { t.classList.remove("in"); t.classList.add("out"); window.clearTimeout(timer); window.setTimeout(() => t.remove(), 240); };
+  const dismiss = () => {
+    t.classList.remove("in");
+    t.classList.add("out");
+    window.clearTimeout(timer);
+    window.setTimeout(() => t.remove(), 240);
+  };
   const timer = window.setTimeout(dismiss, opts.duration ?? 3200);
   (t.querySelector(".toast-x") as HTMLElement).addEventListener("click", dismiss);
 }

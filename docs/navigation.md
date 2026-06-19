@@ -11,7 +11,7 @@ backend as the catalogue grows.
    `<a>` clicks and **swaps the DOM** instead of reloading. This is what kills the white flash.
 2. **Prefetch** (`astro.config.mjs` → `prefetch: { prefetchAll: true, defaultStrategy: "load" }` + `experimental.clientPrerender`).
    Every **server-rendered** internal link is **prerendered** (route + all assets, via the Speculation Rules API) the
-   moment a page loads, so the click resolves from a warm cache. This is what makes it *feel* instant.
+   moment a page loads, so the click resolves from a warm cache. This is what makes it _feel_ instant.
 3. **SWR data stores** ([`src/client/stores.ts`](../src/client/stores.ts), `@nanostores/query` on `window.$stores`) —
    dynamic data is cached across navigations, so a return visit paints from cache and revalidates in the background.
    Skeletons only show on a true cold cache.
@@ -24,29 +24,32 @@ Shared chrome (header, cart, popovers, toasts, chat, nav-progress) is kept alive
 ## Rules for growing safely
 
 ### 1. Adding a page with a client `<script>`
+
 Under ClientRouter, **bundled `<script>` modules run once per session** and **`<script is:inline>` does NOT re-run on
 swap** unless you opt in. So a naive page script will either not re-run (dead page after a soft nav) or, if it declares
 top-level `const`/`let`, throw "already declared" on re-run (those land in **global** scope). Pick the matching pattern:
 
-| Page script shape | Pattern |
-|---|---|
-| Pure fetch-render / form-bind, only touches its own elements | Wrap the body in an **IIFE** + add **`data-astro-rerun`** to the `<script>`. (IIFE is required — it scopes the declarations so re-run is safe.) |
-| Uses `define:vars` with per-page data | Emit the data as a `<script type="application/json">` tag (it's in `<main>`, so it swaps per page) and read it inside a function registered on **`astro:page-load`**. `data-astro-rerun` + `define:vars` collide across pages — don't. See [`products/[slug].astro`](../src/pages/products/[slug].astro). |
-| Binds `window`/`document` listeners (scroll, `cart-changed`, `keydown`) | **Never** `data-astro-rerun` (it stacks the listener every visit). Either persist the element it belongs to, or remove the listener on `astro:before-swap` (`{ once: true }`). See `checkout.astro`. |
-| Reads `window.$stores` | The stores module is deferred; page scripts run during parse first. Guard: `if (window.$stores) start(); else window.addEventListener("suluk:stores-ready", start, { once: true })`. |
+| Page script shape                                                       | Pattern                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pure fetch-render / form-bind, only touches its own elements            | Wrap the body in an **IIFE** + add **`data-astro-rerun`** to the `<script>`. (IIFE is required — it scopes the declarations so re-run is safe.)                                                                                                                                                           |
+| Uses `define:vars` with per-page data                                   | Emit the data as a `<script type="application/json">` tag (it's in `<main>`, so it swaps per page) and read it inside a function registered on **`astro:page-load`**. `data-astro-rerun` + `define:vars` collide across pages — don't. See [`products/[slug].astro`](../src/pages/products/[slug].astro). |
+| Binds `window`/`document` listeners (scroll, `cart-changed`, `keydown`) | **Never** `data-astro-rerun` (it stacks the listener every visit). Either persist the element it belongs to, or remove the listener on `astro:before-swap` (`{ once: true }`). See `checkout.astro`.                                                                                                      |
+| Reads `window.$stores`                                                  | The stores module is deferred; page scripts run during parse first. Guard: `if (window.$stores) start(); else window.addEventListener("suluk:stores-ready", start, { once: true })`.                                                                                                                      |
 
 Always tear down store subscriptions on leave: `const un = $x.subscribe(...); document.addEventListener("astro:before-swap", un, { once: true })`.
 
 ### 2. Adding a worker / non-Astro route (anything served by Hono, not `src/pages/`)
+
 ClientRouter can't DOM-swap a page it doesn't render (Scalar, the admin panel, `/api/*`, raw `.xml`/`.txt`). **Add its
 prefix to `WORKER_PREFIXES` in `Layout.astro`.** That single list drives both `data-astro-reload` (forces a clean full
 load) and `data-astro-prefetch="false"` (keeps the aggressive prerender from loading Scalar's whole bundle in the
 background). If you hardcode such a link in a page body, also stamp it: `<a href="/scalar" data-astro-reload data-astro-prefetch="false">`.
 
 ### 3. Adding a list of links — ⚠️ the one that bites at scale
+
 The global strategy is `load` + `clientPrerender`: it **prerenders every server-rendered link on the page**. Great for
 the **bounded, curated** chrome (nav, footer, a few CTAs). **Catastrophic for an unbounded list** — a server-rendered
-grid of 1,000 products would try to prerender 1,000 pages *and* fire each one's on-load data requests, on every view.
+grid of 1,000 products would try to prerender 1,000 pages _and_ fire each one's on-load data requests, on every view.
 
 - **Client-injected lists** (rendered via `innerHTML` after load, like the product/blog grids today) are invisible to
   the scan-based `load`/`viewport` strategies, so they don't trip the cliff. To make their clicks fast, drop them in a
@@ -59,6 +62,7 @@ grid of 1,000 products would try to prerender 1,000 pages *and* fire each one's 
 Rule of thumb: **prerender = curated & bounded; intent-prefetch = dynamic & unbounded.**
 
 ### 4. Adding persistent chrome (a new drawer, banner, widget)
+
 If it holds state or once-bound listeners and should survive navigation, give it a **unique** `transition:persist="<name>"`.
 Because it's persisted, its server-rendered content (e.g. an active-link class) **won't update on nav** — re-sync it in
 the `astro:page-load` handler in `Layout.astro` (that's how the active nav highlight + scroll state stay correct).
@@ -73,6 +77,7 @@ the cached `$session` store (authoritative), so the login state is correct on ev
 rebuilt, or prerender-activated — and a flaky `get-session` never signs you out.
 
 ### 5. Adding a dynamic data source
+
 Add a fetcher store to `stores.ts` (URL-keyed so pages sharing a key share one cache entry), expose it on
 `window.$stores`, and read it cache-first in the page (`subscribe` → render on `.data`, skeleton only on `.loading && !.data`).
 Mutations call the store's `.invalidate()`/`.revalidate()` instead of refetching cold.
@@ -80,16 +85,20 @@ Mutations call the store's `.invalidate()`/`.revalidate()` instead of refetching
 ---
 
 ## Backend cost knob (watch as traffic grows)
+
 `load` + `clientPrerender` prerenders curated routes on every page view, and prerendering **executes** each page —
-firing its on-load data requests in the background. That's bounded by the number of *routes* (grows slowly), not the
+firing its on-load data requests in the background. That's bounded by the number of _routes_ (grows slowly), not the
 catalogue, but it still multiplies API traffic per human page view. Mitigations, in order:
+
 1. Put cache headers on the API `GET`s so prerender fetches are cheap/served from cache.
 2. If it's still too much, lower `defaultStrategy` to `"viewport"` (only prerender what's actually visible).
 3. As a last resort, drop `experimental.clientPrerender` (falls back to HTML-only prefetch — instant nav, no early
    data fetches).
 
 ## Verifying a change didn't regress the SPA feel
+
 Build (`bun run build`), serve the build (`bun dist/server/entry.mjs`), open it, and check:
+
 - Set `window.__x = 1`, click an internal link, confirm `window.__x` is still `1` afterwards → it was a **swap, not a reload**.
 - The header is the same DOM node before/after (persist), the active-nav class tracks the URL, and there's no
   light/LTR/English flash with a dark + RTL locale set.

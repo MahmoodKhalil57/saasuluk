@@ -27,8 +27,12 @@ export function viewerOf(c: Context): ViewerId {
 
 /** A stable FNV-1a hash of the canonical document — the projection's integrity pointer. */
 export function docHash(doc: OpenAPIv4Document): string {
-  const s = JSON.stringify(doc); let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const s = JSON.stringify(doc);
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
   return h.toString(16);
 }
 
@@ -37,7 +41,7 @@ export function projectDocument(canonical: OpenAPIv4Document, viewer: ViewerId, 
   const v = VIEWER[viewer] ?? VIEWER.anon;
   const paths: Record<string, unknown> = {};
   for (const [uri, piRaw] of Object.entries(canonical.paths ?? {})) {
-    const pi = piRaw as { requests?: Record<string, Record<string, unknown>> };
+    const pi = piRaw as unknown as { requests?: Record<string, Record<string, unknown>> };
     const kept: Record<string, unknown> = {};
     for (const [name, req] of Object.entries(pi.requests ?? {})) {
       if (reachState(req["x-suluk-access"] as AccessFacet | undefined, v) !== "none") kept[name] = req; // keep iff reachable

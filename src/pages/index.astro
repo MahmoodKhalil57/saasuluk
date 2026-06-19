@@ -4,17 +4,51 @@ import Layout from "../layouts/Layout.astro";
 const tiers = [
   ["Frontend Lite", "$29", false, ["Marketing site + SEO", "shadcn UI components", "Light / dark themes", "i18n (en · es · ar + RTL)"]],
   ["Frontend Pro", "$99", false, ["Everything in Lite", "Auth pages (Better Auth)", "Magic-link sign-in", "PWA + offline shell"]],
-  ["Full-Stack Lite", "$199", false, ["Admin cockpit (/superadmin)", "Products · cart · checkout", "Cloudflare D1 database", "Typed client + the v4 contract"]],
-  ["Full-Stack Pro", "$299", true, ["Stripe billing meters", "Orders · discounts · reviews", "Live cost ledger", "API tokens + developer portal"]],
+  [
+    "Full-Stack Lite",
+    "$199",
+    false,
+    ["Admin cockpit (/superadmin)", "Products · cart · checkout", "Cloudflare D1 database", "Typed client + the v4 contract"],
+  ],
+  [
+    "Full-Stack Pro",
+    "$299",
+    true,
+    ["Stripe billing meters", "Orders · discounts · reviews", "Live cost ledger", "API tokens + developer portal"],
+  ],
 ];
 const stack = ["Astro", "Hono", "TypeScript", "Drizzle", "Better Auth", "Stripe", "Scalar", "Cloudflare"];
 // quantified proof — every number is true of this very document/app
-const stats: [string, string][] = [["17", "entities"], ["12", "operations"], ["8", "projected layers"], ["3", "locales · RTL"], ["43", "color schemes"], ["1", "typed contract"]];
+const stats: [string, string][] = [
+  ["17", "entities"],
+  ["12", "operations"],
+  ["8", "projected layers"],
+  ["3", "locales · RTL"],
+  ["43", "color schemes"],
+  ["1", "typed contract"],
+];
 // illustrative social proof (sample content — a template owner swaps in their own)
 const testimonials = [
-  { quote: "We deleted three services. The API, the docs, the SDK and the admin all came from one file — and they literally can't disagree anymore.", name: "Maya Okafor", role: "Founder, Ledgerly", handle: "maya" },
-  { quote: "The cost-as-a-fact ledger sold my CFO. Every request shows what it costs, down to the Stripe call. Nothing else does that out of the box.", name: "Daniel Reyes", role: "Eng Lead, Northbeam", handle: "daniel" },
-  { quote: "Arabic RTL, Eastern-Arabic numerals and a working CRUD admin on day one. It felt more finished than tools we'd paid for.", name: "Sara Haddad", role: "Product, Anwar", handle: "sara" },
+  {
+    quote:
+      "We deleted three services. The API, the docs, the SDK and the admin all came from one file — and they literally can't disagree anymore.",
+    name: "Maya Okafor",
+    role: "Founder, Ledgerly",
+    handle: "maya",
+  },
+  {
+    quote:
+      "The cost-as-a-fact ledger sold my CFO. Every request shows what it costs, down to the Stripe call. Nothing else does that out of the box.",
+    name: "Daniel Reyes",
+    role: "Eng Lead, Northbeam",
+    handle: "daniel",
+  },
+  {
+    quote: "Arabic RTL, Eastern-Arabic numerals and a working CRUD admin on day one. It felt more finished than tools we'd paid for.",
+    name: "Sara Haddad",
+    role: "Product, Anwar",
+    handle: "sara",
+  },
 ];
 const features = [
   ["✦", "One contract", "Declare your data + routes once. The OpenAPI v4 document is derived — and every layer reads from it."],
@@ -25,11 +59,17 @@ const features = [
   ["⎈", "Modules, not glue", "Add ecommerce, blog, billing as entities in a registry. 17 entities + 12 operations, one source."],
 ];
 ---
-<Layout description="saasuluk is a contract-projected SaaS + ecommerce starter on Cloudflare Workers — auth, Stripe payments, a real store, admin, and a typed OpenAPI v4 API with live docs, all from one source of truth.">
+
+<Layout
+  description="saasuluk is a contract-projected SaaS + ecommerce starter on Cloudflare Workers — auth, Stripe payments, a real store, admin, and a typed OpenAPI v4 API with live docs, all from one source of truth."
+>
   <section class="hero hero--photo">
     <span class="pill accent">OpenAPI v4 · Moonwalk candidate</span>
     <h1 style="margin-top:18px">The SaaS starter that<br /><span class="gradient">sells itself.</span></h1>
-    <p class="tag center">Auth, payments, eCommerce, an admin cockpit, a typed API + docs — every layer projected from <b>one contract</b>. This very store is the demo: it sells the code that renders it.</p>
+    <p class="tag center">
+      Auth, payments, eCommerce, an admin cockpit, a typed API + docs — every layer projected from <b>one contract</b>. This very store is
+      the demo: it sells the code that renders it.
+    </p>
     <div class="cta">
       <a class="btn" href="/products">Browse the store →</a>
       <a class="btn ghost" href="/pricing">See pricing</a>
@@ -39,74 +79,149 @@ const features = [
 
   <section class="section">
     <div class="statbento">
-      {stats.map(([n, label]) => (
-        <div class="stat" data-reveal><b>{n}</b><span>{label}</span></div>
-      ))}
+      {
+        stats.map(([n, label]) => (
+          <div class="stat" data-reveal>
+            <>
+              <b>{n}</b>
+              <span>{label}</span>
+            </>
+          </div>
+        ))
+      }
     </div>
   </section>
 
   <section class="section">
-    <div class="center"><span class="pill accent">Meta</span><h3 style="font-size:26px;margin-top:12px">A store that sells its own source code</h3>
-    <p class="tag center" style="margin:6px auto 0">Each product below is a real tier of <b>this</b> starter. Add one to the cart, run the metered checkout, and watch the cost ledger move — all powered by the contract you just bought.</p></div>
+    <div class="center">
+      <span class="pill accent">Meta</span><h3 style="font-size:26px;margin-top:12px">A store that sells its own source code</h3>
+      <p class="tag center" style="margin:6px auto 0">
+        Each product below is a real tier of <b>this</b> starter. Add one to the cart, run the metered checkout, and watch the cost ledger move
+        — all powered by the contract you just bought.
+      </p>
+    </div>
     <div class="tiers">
-      {tiers.map(([name, price, popular, feats]) => (
-        <div class={popular ? "tier popular" : "tier"} data-reveal>
-          {popular && <span class="badge">Most popular</span>}
-          <h3>{name}</h3>
-          <div class="price">{price}</div>
-          <span style="color:var(--muted);font-size:13px">one-time · lifetime</span>
-          <ul>{(feats as string[]).map((f) => <li>{f}</li>)}</ul>
-          <div class="spacer"></div>
-          <a class={popular ? "btn" : "btn ghost"} href="/products" style="margin-top:18px; justify-content:center">Get {name}</a>
-        </div>
-      ))}
+      {
+        tiers.map(([name, price, popular, feats]) => (
+          <div class={popular ? "tier popular" : "tier"} data-reveal>
+            {popular && <span class="badge">Most popular</span>}
+            <h3>{name}</h3>
+            <div class="price">{price}</div>
+            <span style="color:var(--muted);font-size:13px">one-time · lifetime</span>
+            <ul>
+              {(feats as string[]).map((f) => (
+                <li>{f}</li>
+              ))}
+            </ul>
+            <div class="spacer" />
+            <a class={popular ? "btn" : "btn ghost"} href="/products" style="margin-top:18px; justify-content:center">
+              Get {name}
+            </a>
+          </div>
+        ))
+      }
     </div>
   </section>
 
   <section class="section">
-    <div class="center"><h3 style="font-size:26px">Everything, from one source</h3><p class="tag center" style="margin:6px auto 0">The features saastarter glues from a dozen tools — here they are projections of one typed document.</p></div>
+    <div class="center">
+      <h3 style="font-size:26px">Everything, from one source</h3><p class="tag center" style="margin:6px auto 0">
+        The features saastarter glues from a dozen tools — here they are projections of one typed document.
+      </p>
+    </div>
     <div class="grid" style="margin-top:24px">
-      {features.map(([icon, title, body]) => (
-        <div class="card" data-reveal>
-          <div style="font-size:22px; color:var(--accent)">{icon}</div>
-          <h3 style="margin-top:8px">{title}</h3>
-          <p>{body}</p>
-        </div>
-      ))}
+      {
+        features.map(([icon, title, body]) => (
+          <div class="card" data-reveal>
+            <div style="font-size:22px; color:var(--accent)">{icon}</div>
+            <h3 style="margin-top:8px">{title}</h3>
+            <p>{body}</p>
+          </div>
+        ))
+      }
     </div>
   </section>
 
   <section class="section">
-    <div class="center"><span class="pill accent">Loved by builders</span><h3 style="font-size:26px;margin-top:12px">Ship a platform, not a pile of glue</h3>
-    <p class="tag center" style="margin:6px auto 0">What teams say after shipping on one contract.</p></div>
+    <div class="center">
+      <span class="pill accent">Loved by builders</span><h3 style="font-size:26px;margin-top:12px">Ship a platform, not a pile of glue</h3>
+      <p class="tag center" style="margin:6px auto 0">What teams say after shipping on one contract.</p>
+    </div>
     <div class="grid" style="margin-top:24px">
-      {testimonials.map((t) => (
-        <figure class="card" data-reveal style="margin:0">
-          <blockquote style="margin:0;font-size:15px;line-height:1.55">“{t.quote}”</blockquote>
-          <figcaption style="margin-top:16px;display:flex;gap:10px;align-items:center">
-            <img src={`/avatar?seed=${t.handle}`} width="36" height="36" alt="" style="border-radius:50%" loading="lazy" />
-            <span><b style="font-size:14px">{t.name}</b><br /><span style="color:var(--muted);font-size:12.5px">{t.role}</span></span>
-          </figcaption>
-        </figure>
-      ))}
+      {
+        testimonials.map((t) => (
+          <figure class="card" data-reveal style="margin:0">
+            <blockquote style="margin:0;font-size:15px;line-height:1.55">“{t.quote}”</blockquote>
+            <figcaption style="margin-top:16px;display:flex;gap:10px;align-items:center">
+              <img src={`/avatar?seed=${t.handle}`} width="36" height="36" alt="" style="border-radius:50%" loading="lazy" />
+              <span>
+                <>
+                  <b style="font-size:14px">{t.name}</b>
+                  <br />
+                  <span style="color:var(--muted);font-size:12.5px">{t.role}</span>
+                </>
+              </span>
+            </figcaption>
+          </figure>
+        ))
+      }
     </div>
   </section>
 
   <section class="section center" style="padding:50px 0">
     <h3 style="font-size:30px; letter-spacing:-.02em">Ship the contract. Get the platform.</h3>
-    <p class="tag center" style="margin:8px auto 0">Declare it once — the API, the docs, the client, the UI, the admin, and the billing follow.</p>
-    <div class="cta"><a class="btn" href="/products">Open the store →</a><a class="btn ghost" href="/scalar" data-astro-reload data-astro-prefetch="false">Read the API</a></div>
+    <p class="tag center" style="margin:8px auto 0">
+      Declare it once — the API, the docs, the client, the UI, the admin, and the billing follow.
+    </p>
+    <div class="cta">
+      <a class="btn" href="/products">Open the store →</a><a class="btn ghost" href="/scalar" data-astro-reload data-astro-prefetch="false"
+        >Read the API</a
+      >
+    </div>
   </section>
 
   <style is:global>
     /* Photographic hero band — a dark stock background with an overlay so the white text stays readable in every
        theme. Uses .hero.hero--photo (two classes) to outrank the layout's single-class .hero::before glow. */
-    .hero.hero--photo { position: relative; isolation: isolate; border-radius: 28px; overflow: hidden; padding: 96px 28px 84px; margin-top: 10px; }
-    .hero.hero--photo::before { content: ""; position: absolute; inset: 0; height: auto; background: #0a0e1a url("/img/site/hero.jpg") center / cover no-repeat; z-index: -2; }
-    .hero.hero--photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 10, 22, 0.72), rgba(6, 10, 22, 0.9)); z-index: -1; }
-    .hero.hero--photo h1, .hero.hero--photo .tag { color: #fff; }
-    .hero.hero--photo .tag { color: rgba(255, 255, 255, 0.85); }
-    .hero.hero--photo .pill { background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.24); }
-    .hero.hero--photo .btn.ghost { color: #fff; border-color: rgba(255, 255, 255, 0.32); background: rgba(255, 255, 255, 0.04); }
+    .hero.hero--photo {
+      position: relative;
+      isolation: isolate;
+      border-radius: 28px;
+      overflow: hidden;
+      padding: 96px 28px 84px;
+      margin-top: 10px;
+    }
+    .hero.hero--photo::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      height: auto;
+      background: #0a0e1a url("/img/site/hero.jpg") center / cover no-repeat;
+      z-index: -2;
+    }
+    .hero.hero--photo::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(6, 10, 22, 0.72), rgba(6, 10, 22, 0.9));
+      z-index: -1;
+    }
+    .hero.hero--photo h1,
+    .hero.hero--photo .tag {
+      color: #fff;
+    }
+    .hero.hero--photo .tag {
+      color: rgba(255, 255, 255, 0.85);
+    }
+    .hero.hero--photo .pill {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.24);
+    }
+    .hero.hero--photo .btn.ghost {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.32);
+      background: rgba(255, 255, 255, 0.04);
+    }
   </style>
 </Layout>

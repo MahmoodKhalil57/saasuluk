@@ -2,27 +2,40 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
-<Layout title="Blog — saasuluk" description="The saasuluk blog — notes on contract-first development, Cloudflare Workers, Stripe, and building a SaaS + ecommerce starter that ships itself.">
+
+<Layout
+  title="Blog — saasuluk"
+  description="The saasuluk blog — notes on contract-first development, Cloudflare Workers, Stripe, and building a SaaS + ecommerce starter that ships itself."
+>
   <h1>Blog</h1>
-  <p class="tag">Posts are a <b>Post</b> entity — authored in <a href="/superadmin">/superadmin</a>, served by the contract, rendered here.</p>
+  <p class="tag">
+    Posts are a <b>Post</b> entity — authored in <a href="/superadmin">/superadmin</a>, served by the contract, rendered here.
+  </p>
   <div id="posts" data-prefetch-list style="margin-top:18px"></div>
   <!-- data-astro-rerun + IIFE: re-render cache-first on every swap-in without global-const collisions. -->
   <script is:inline data-astro-rerun>
-   (function () {
-    function start() {
-    const S = window.$stores;
-    const when = (t) => t ? (window.fmtDate ? window.fmtDate(Number(t)) : new Date(Number(t)).toLocaleDateString()) : "";
-    function skeleton(n) {
-      document.getElementById("posts").innerHTML = Array.from({ length: n }, () => `<article class="card" style="margin-bottom:12px">
+    (function () {
+      function start() {
+        const S = window.$stores;
+        const when = (t) => (t ? (window.fmtDate ? window.fmtDate(Number(t)) : new Date(Number(t)).toLocaleDateString()) : "");
+        function skeleton(n) {
+          document.getElementById("posts").innerHTML = Array.from(
+            { length: n },
+            () => `<article class="card" style="margin-bottom:12px">
         <div class="skel" style="height:20px;width:55%;margin-bottom:9px"></div>
         <div class="skel" style="height:11px;width:90px;margin-bottom:11px"></div>
         <div class="skel" style="height:13px;width:97%;margin-bottom:6px"></div>
-        <div class="skel" style="height:13px;width:80%"></div></article>`).join("");
-    }
-    function render(list) {
-      const el = document.getElementById("posts"); if (!el) return;
-      const posts = (list || []).filter((p) => p.status === "published").sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
-      el.innerHTML = posts.length ? posts.map((p) => `
+        <div class="skel" style="height:13px;width:80%"></div></article>`,
+          ).join("");
+        }
+        function render(list) {
+          const el = document.getElementById("posts");
+          if (!el) return;
+          const posts = (list || []).filter((p) => p.status === "published").sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+          el.innerHTML = posts.length
+            ? posts
+                .map(
+                  (p) => `
         <article class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
           ${p.coverImageUrl ? `<a href="/blogs/${p.slug}" style="display:block;aspect-ratio:16/9;overflow:hidden"><img src="${p.coverImageUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" /></a>` : ""}
           <div style="padding:16px 18px">
@@ -30,20 +43,26 @@ import Layout from "../layouts/Layout.astro";
             <p style="color:var(--muted);font-size:12px;margin:3px 0">${when(p.publishedAt)}</p>
             <p>${p.excerpt || ""}</p><a href="/blogs/${p.slug}">Read more →</a>
           </div>
-        </article>`).join("") : `<p style="color:var(--muted)">No posts yet.</p>`;
-    }
-    const unsub = S.$posts.subscribe((st) => {
-      if (st.data) render(st.data);
-      else if (st.loading) skeleton(4);
-      else if (st.error) {
-        const el = document.getElementById("posts"); if (!el) return;
-        el.innerHTML = `<div class="card" style="text-align:center;padding:30px"><p style="margin:0 0 12px;color:var(--muted)">Couldn't load the blog. Check your connection and try again.</p><button class="btn ghost" id="blogRetry">Retry</button></div>`;
-        const rb = el.querySelector("#blogRetry"); if (rb) rb.addEventListener("click", () => S.$posts.revalidate());
+        </article>`,
+                )
+                .join("")
+            : `<p style="color:var(--muted)">No posts yet.</p>`;
+        }
+        const unsub = S.$posts.subscribe((st) => {
+          if (st.data) render(st.data);
+          else if (st.loading) skeleton(4);
+          else if (st.error) {
+            const el = document.getElementById("posts");
+            if (!el) return;
+            el.innerHTML = `<div class="card" style="text-align:center;padding:30px"><p style="margin:0 0 12px;color:var(--muted)">Couldn't load the blog. Check your connection and try again.</p><button class="btn ghost" id="blogRetry">Retry</button></div>`;
+            const rb = el.querySelector("#blogRetry");
+            if (rb) rb.addEventListener("click", () => S.$posts.revalidate());
+          }
+        });
+        document.addEventListener("astro:before-swap", () => unsub(), { once: true });
       }
-    });
-    document.addEventListener("astro:before-swap", () => unsub(), { once: true });
-    }
-    if (window.$stores) start(); else window.addEventListener("suluk:stores-ready", start, { once: true });
-   })();
+      if (window.$stores) start();
+      else window.addEventListener("suluk:stores-ready", start, { once: true });
+    })();
   </script>
 </Layout>

@@ -19,9 +19,18 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
   if (!userId) return [];
   try {
     const [orders, wl, toks] = await Promise.all([
-      db.select().from(order).where(eq(order.customerId as unknown as SQLiteColumn, userId)) as Promise<{ totalCents?: number }[]>,
-      db.select().from(wishlistItem).where(eq(wishlistItem.customerId as unknown as SQLiteColumn, userId)),
-      db.select().from(apiToken).where(and(eq(apiToken.userId as unknown as SQLiteColumn, userId), isNull(apiToken.revokedAt as unknown as SQLiteColumn))),
+      db
+        .select()
+        .from(order)
+        .where(eq(order.customerId as unknown as SQLiteColumn, userId)) as Promise<{ totalCents?: number }[]>,
+      db
+        .select()
+        .from(wishlistItem)
+        .where(eq(wishlistItem.customerId as unknown as SQLiteColumn, userId)),
+      db
+        .select()
+        .from(apiToken)
+        .where(and(eq(apiToken.userId as unknown as SQLiteColumn, userId), isNull(apiToken.revokedAt as unknown as SQLiteColumn))),
     ]);
     const spent = orders.reduce((n, o) => n + (Number(o.totalCents) || 0), 0);
     return [
@@ -30,7 +39,9 @@ export async function userStats(db: AnyDb, userId: string | null): Promise<StatC
       { label: "Wishlist", value: wl.length, href: "/dashboard/s/wishlist" },
       { label: "API keys", value: toks.length, href: "/dashboard/s/developer" },
     ];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 /** The sidebar grouping for the user dashboard (entities + sections). */
@@ -370,10 +381,7 @@ export const dashboardSections: PanelSection[] = [
 
 export async function adminStats(db: AnyDb): Promise<StatCard[]> {
   try {
-    const [prods, orders] = await Promise.all([
-      db.select().from(product),
-      db.select().from(order) as Promise<{ totalCents?: number }[]>,
-    ]);
+    const [prods, orders] = await Promise.all([db.select().from(product), db.select().from(order) as Promise<{ totalCents?: number }[]>]);
     const revenue = orders.reduce((n, o) => n + (Number(o.totalCents) || 0), 0);
     return [
       { label: "Products", value: prods.length, href: "/panel/Product" },
@@ -381,7 +389,9 @@ export async function adminStats(db: AnyDb): Promise<StatCard[]> {
       { label: "Revenue", value: "$" + (revenue / 100).toFixed(2), hint: "all orders" },
       { label: "Cost ledger", value: "View →", href: "/panel/s/cost" },
     ];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export const adminGroups = [
@@ -505,5 +515,11 @@ const FULFILL = `
 
 export const adminSections: PanelSection[] = [
   { id: "fulfillment", label: "Orders", summary: "Search, inspect, fulfill + refund", render: () => FULFILL },
-  { id: "cost", label: "Cost ledger", summary: "Per-request spend, metered", render: () => '<div class="pf-section" style="padding:0;overflow:hidden;border-radius:16px"><iframe src="/cost" title="Cost ledger" style="width:100%;height:72vh;border:0;display:block"></iframe></div>' },
+  {
+    id: "cost",
+    label: "Cost ledger",
+    summary: "Per-request spend, metered",
+    render: () =>
+      '<div class="pf-section" style="padding:0;overflow:hidden;border-radius:16px"><iframe src="/cost" title="Cost ledger" style="width:100%;height:72vh;border:0;display:block"></iframe></div>',
+  },
 ];

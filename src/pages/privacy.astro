@@ -2,15 +2,22 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
+
 <Layout title="Privacy — saasuluk">
   <h1>Privacy policy</h1>
   <p class="tag">A starter template — replace this with your real policy before launch.</p>
   <h2>What we collect</h2>
-  <p>Account data (email, name) via Better Auth, and the records you create (orders, reviews, wishlist). Every request's <em>cost</em> is metered to your principal id so you can see usage — this is visible at <code>/cost</code> and the admin panel, never sold.</p>
+  <p>
+    Account data (email, name) via Better Auth, and the records you create (orders, reviews, wishlist). Every request's <em>cost</em> is metered
+    to your principal id so you can see usage — this is visible at <code>/cost</code> and the admin panel, never sold.
+  </p>
   <h2>Payments</h2>
   <p>Card data is handled by Stripe; saasuluk never stores card numbers. Usage is reported to Stripe Billing Meters for metered pricing.</p>
   <h2>Your choices</h2>
-  <p>You can export or delete your data from your <a href="/dashboard">account</a>. Newsletter subscriptions can be cancelled at any time via the link in any email.</p>
+  <p>
+    You can export or delete your data from your <a href="/dashboard">account</a>. Newsletter subscriptions can be cancelled at any time via
+    the link in any email.
+  </p>
   <h2>Contact</h2>
   <p>Questions? <a href="/contact">Reach out</a>. This document is a placeholder shipped with the template and is not legal advice.</p>
 </Layout>

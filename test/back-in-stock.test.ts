@@ -14,11 +14,21 @@ beforeEach(() => {
 });
 
 function seed(inv: number, waiters: string[]) {
-  const p = db.insert(product).values({ name: "Widget", slug: "widget", priceCents: 100, inventory: inv, status: "published" }).returning().get();
+  const p = db
+    .insert(product)
+    .values({ name: "Widget", slug: "widget", priceCents: 100, inventory: inv, status: "published" })
+    .returning()
+    .get();
   for (const email of waiters) db.insert(stockNotification).values({ productId: p.id, email, createdAt: Date.now() }).run();
   return p;
 }
-const pending = (pid: number) => db.select().from(stockNotification).where(eq(stockNotification.productId, pid)).all().filter((r) => r.notifiedAt == null).length;
+const pending = (pid: number) =>
+  db
+    .select()
+    .from(stockNotification)
+    .where(eq(stockNotification.productId, pid))
+    .all()
+    .filter((r) => r.notifiedAt == null).length;
 
 test("a restock crossing 0 → positive notifies every waiting row once", async () => {
   const p = seed(0, ["a@x.com", "b@x.com"]);

@@ -2,9 +2,16 @@
 export const prerender = true;
 import Layout from "../layouts/Layout.astro";
 ---
-<Layout title="Contact — saasuluk" description="Get in touch with the saasuluk team — questions about licensing, self-hosting, the Suluk stack, or a custom build. We read every message.">
+
+<Layout
+  title="Contact — saasuluk"
+  description="Get in touch with the saasuluk team — questions about licensing, self-hosting, the Suluk stack, or a custom build. We read every message."
+>
   <h1>Contact us</h1>
-  <p class="tag">Submissions become a <b>ContactSubmission</b> entity (visible in <a href="/superadmin">/superadmin</a>). The newsletter is its own entity too.</p>
+  <p class="tag">
+    Submissions become a <b>ContactSubmission</b> entity (visible in <a href="/superadmin">/superadmin</a>). The newsletter is its own
+    entity too.
+  </p>
   <form id="contact" style="display:grid; gap:10px; max-width:520px; margin-top:18px">
     <input name="name" placeholder="Your name" aria-label="Your name" required />
     <input name="email" type="email" placeholder="you@example.com" aria-label="Email address" required />
@@ -22,10 +29,22 @@ import Layout from "../layouts/Layout.astro";
 
   <h2>Find us</h2>
   <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; align-items:start; margin-top:8px">
-    <div id="map" style="height:300px; border-radius:14px; border:1px solid var(--line); overflow:hidden; background:var(--bg-soft)" role="img" aria-label="Map of our location"></div>
+    <div
+      id="map"
+      style="height:300px; border-radius:14px; border:1px solid var(--line); overflow:hidden; background:var(--bg-soft)"
+      role="img"
+      aria-label="Map of our location"
+    >
+    </div>
     <div>
-      <p style="margin:0 0 12px"><b style="font-family:inherit">saasuluk HQ</b><br /><span style="color:var(--muted)">Remote-first — and on the edge, literally (Cloudflare Workers in 300+ cities).</span></p>
-      <p style="margin:0 0 12px"><b style="font-family:inherit">Hours</b><br /><span style="color:var(--muted)">Always on. The Worker never sleeps.</span></p>
+      <p style="margin:0 0 12px">
+        <b style="font-family:inherit">saasuluk HQ</b><br /><span style="color:var(--muted)"
+          >Remote-first — and on the edge, literally (Cloudflare Workers in 300+ cities).</span
+        >
+      </p>
+      <p style="margin:0 0 12px">
+        <b style="font-family:inherit">Hours</b><br /><span style="color:var(--muted)">Always on. The Worker never sleeps.</span>
+      </p>
       <p style="margin:0"><b style="font-family:inherit">Email</b><br /><a href="mailto:hello@saasuluk.dev">hello@saasuluk.dev</a></p>
     </div>
   </div>
@@ -39,52 +58,90 @@ import Layout from "../layouts/Layout.astro";
         if (!el || el.dataset.mapReady || !window.L) return; // no #map on this page, already built, or lib not ready
         el.dataset.mapReady = "1";
         var map = L.map(el, { scrollWheelZoom: false }).setView(COORD, 11);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 18 }).addTo(map);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap contributors",
+          maxZoom: 18,
+        }).addTo(map);
         L.marker(COORD).addTo(map).bindPopup("saasuluk — on the edge");
-        setTimeout(function () { map.invalidateSize(); }, 250);
+        setTimeout(function () {
+          map.invalidateSize();
+        }, 250);
       }
       function ensure() {
         if (!document.getElementById("map")) return;
-        if (window.L) { init(); return; }
+        if (window.L) {
+          init();
+          return;
+        }
         if (window.__leafletReq) return; // already loading — its onload will init the current #map
         window.__leafletReq = true;
-        var css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
-        var js = document.createElement("script"); js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.crossOrigin = ""; js.onload = init; document.head.appendChild(js);
+        var css = document.createElement("link");
+        css.rel = "stylesheet";
+        css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(css);
+        var js = document.createElement("script");
+        js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        js.crossOrigin = "";
+        js.onload = init;
+        document.head.appendChild(js);
       }
       document.addEventListener("astro:page-load", ensure);
     })();
   </script>
   <!-- data-astro-rerun + IIFE: rebind the contact + newsletter forms on each swap-in (own elements, no leak). -->
   <script is:inline data-astro-rerun>
-   (function () {
-    const contactForm = document.getElementById("contact");
-    if (contactForm) contactForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = e.target, btn = f.querySelector("button[type=submit]");
-      btn.disabled = true; // prevent a duplicate submission
-      try {
-        const r = await fetch("/contact/submit", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "contact-form" }, body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }) });
-        if (!r.ok) throw new Error("Something went wrong.");
-        document.getElementById("cmsg").innerHTML = `<span class="card" style="display:inline-block">✓ Thanks — we'll be in touch.</span>`;
-        f.reset();
-        if (window.toast) window.toast("Message sent ✓", { type: "success" });
-      } catch (err) {
-        document.getElementById("cmsg").textContent = "Could not send — please try again.";
-        if (window.toast) window.toast(err.message || "Could not send your message.", { type: "error" });
-      } finally { btn.disabled = false; }
-    });
-    const newsForm = document.getElementById("news");
-    if (newsForm) newsForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
-      try {
-        const r = await (await fetch("/newsletter/subscribe", { method: "POST", headers: { "content-type": "application/json", "x-suluk-action": "newsletter" }, body: JSON.stringify({ email: e.target.email.value }) })).json();
-        document.getElementById("nmsg").textContent = r.subscribed ? (r.already ? "You're already subscribed ✓" : "Subscribed ✓") : "Enter a valid email.";
-        if (r.subscribed) e.target.reset();
-      } catch (err) {
-        document.getElementById("nmsg").textContent = "Could not subscribe — please try again.";
-      } finally { btn.disabled = false; }
-    });
-   })();
+    (function () {
+      const contactForm = document.getElementById("contact");
+      if (contactForm)
+        contactForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const f = e.target,
+            btn = f.querySelector("button[type=submit]");
+          btn.disabled = true; // prevent a duplicate submission
+          try {
+            const r = await fetch("/contact/submit", {
+              method: "POST",
+              headers: { "content-type": "application/json", "x-suluk-action": "contact-form" },
+              body: JSON.stringify({ name: f.name.value, email: f.email.value, subject: f.subject.value, message: f.message.value }),
+            });
+            if (!r.ok) throw new Error("Something went wrong.");
+            document.getElementById("cmsg").innerHTML =
+              `<span class="card" style="display:inline-block">✓ Thanks — we'll be in touch.</span>`;
+            f.reset();
+            if (window.toast) window.toast("Message sent ✓", { type: "success" });
+          } catch (err) {
+            document.getElementById("cmsg").textContent = "Could not send — please try again.";
+            if (window.toast) window.toast(err.message || "Could not send your message.", { type: "error" });
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      const newsForm = document.getElementById("news");
+      if (newsForm)
+        newsForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector("button[type=submit]");
+          btn.disabled = true;
+          try {
+            const r = await (
+              await fetch("/newsletter/subscribe", {
+                method: "POST",
+                headers: { "content-type": "application/json", "x-suluk-action": "newsletter" },
+                body: JSON.stringify({ email: e.target.email.value }),
+              })
+            ).json();
+            document.getElementById("nmsg").textContent = r.subscribed
+              ? r.already
+                ? "You're already subscribed ✓"
+                : "Subscribed ✓"
+              : "Enter a valid email.";
+            if (r.subscribed) e.target.reset();
+          } catch (err) {
+            document.getElementById("nmsg").textContent = "Could not subscribe — please try again.";
+          } finally {
+            btn.disabled = false;
+          }
+        });
+    })();
   </script>
 </Layout>

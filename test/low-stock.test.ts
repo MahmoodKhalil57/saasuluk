@@ -13,12 +13,20 @@ import { markOrderPaid, restockOrderLines } from "../src/server/operations";
 const ctx = { env: { SUPERADMIN_EMAILS: '["owner@example.com"]', LOW_STOCK_THRESHOLD: "5" }, req: { url: "https://x.test/" } } as never;
 
 beforeEach(() => {
-  sqlite.exec("DELETE FROM product; DELETE FROM \"order\";");
+  sqlite.exec('DELETE FROM product; DELETE FROM "order";');
 });
 
 async function makePaidDip(startInv: number, qty: number) {
-  const p = db.insert(product).values({ name: "Widget", slug: "widget", priceCents: 100, inventory: startInv, status: "published" }).returning().get();
-  const o = db.insert(order).values({ items: JSON.stringify([{ productId: p.id, qty }]), totalCents: 100 * qty, status: "pending", createdAt: Date.now() }).returning().get();
+  const p = db
+    .insert(product)
+    .values({ name: "Widget", slug: "widget", priceCents: 100, inventory: startInv, status: "published" })
+    .returning()
+    .get();
+  const o = db
+    .insert(order)
+    .values({ items: JSON.stringify([{ productId: p.id, qty }]), totalCents: 100 * qty, status: "pending", createdAt: Date.now() })
+    .returning()
+    .get();
   const did = await markOrderPaid(ctx, db, o.id);
   return { pid: p.id, oid: o.id, did };
 }

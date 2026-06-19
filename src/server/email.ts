@@ -6,9 +6,16 @@
  */
 import { pickProvider } from "@suluk/email";
 
-export interface SendEmail { to: string; subject: string; html: string }
+export interface SendEmail {
+  to: string;
+  subject: string;
+  html: string;
+}
 /** On Cloudflare the secret comes from the Worker env, not process.env — callers pass it through explicitly. */
-export interface EmailOpts { apiKey?: string; from?: string }
+export interface EmailOpts {
+  apiKey?: string;
+  from?: string;
+}
 
 export async function sendEmail({ to, subject, html }: SendEmail, opts: EmailOpts = {}): Promise<{ sent: boolean; dev?: boolean }> {
   const apiKey = opts.apiKey || process.env.RESEND_API_KEY;
@@ -31,5 +38,7 @@ export function brandedEmail(title: string, bodyHtml: string): string {
 
 /** Fire-and-forget: send without blocking the response, swallowing errors (transactional mail is best-effort). */
 export function sendEmailAsync(msg: SendEmail, opts: EmailOpts = {}): void {
-  void sendEmail(msg, opts).catch(() => { /* best-effort */ });
+  void sendEmail(msg, opts).catch(() => {
+    /* best-effort */
+  });
 }

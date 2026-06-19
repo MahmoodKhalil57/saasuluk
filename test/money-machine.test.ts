@@ -11,12 +11,24 @@ import { markOrderPaid, cancelPendingOrder, refundOrder } from "../src/server/op
 
 const ctx = { env: {}, req: { url: "https://x.test/" } } as never; // no RESEND/SUPERADMIN → alerts no-op
 
-beforeEach(() => { sqlite.exec('DELETE FROM "order"; DELETE FROM product; DELETE FROM discount_code;'); });
+beforeEach(() => {
+  sqlite.exec('DELETE FROM "order"; DELETE FROM product; DELETE FROM discount_code;');
+});
 
 function seedPaidScenario() {
   const p = db.insert(product).values({ name: "W", slug: "w", priceCents: 100, inventory: 5, status: "published" }).returning().get();
   db.insert(discountCode).values({ code: "SAVE", discountType: "percent", discountValue: 10, currentUses: 0 }).run();
-  const o = db.insert(order).values({ items: JSON.stringify([{ productId: p.id, qty: 2 }]), totalCents: 180, status: "pending", discountCode: "SAVE", createdAt: Date.now() }).returning().get();
+  const o = db
+    .insert(order)
+    .values({
+      items: JSON.stringify([{ productId: p.id, qty: 2 }]),
+      totalCents: 180,
+      status: "pending",
+      discountCode: "SAVE",
+      createdAt: Date.now(),
+    })
+    .returning()
+    .get();
   return { pid: p.id, oid: o.id };
 }
 const inv = (pid: number) => db.select().from(product).where(eq(product.id, pid)).get()!.inventory;
@@ -27,9 +39,12 @@ describe("markOrderPaid — pending→paid exactly once", () => {
   test("first call pays + decrements inventory + bumps discount; re-delivery is a no-op", async () => {
     const { pid, oid } = seedPaidScenario();
     expect(await markOrderPaid(ctx, db, oid)).toBe(true);
-    expect(status(oid)).toBe("paid"); expect(inv(pid)).toBe(3); expect(uses()).toBe(1);
+    expect(status(oid)).toBe("paid");
+    expect(inv(pid)).toBe(3);
+    expect(uses()).toBe(1);
     expect(await markOrderPaid(ctx, db, oid)).toBe(false); // webhook re-delivery / double-confirm
-    expect(inv(pid)).toBe(3); expect(uses()).toBe(1);      // NOT decremented/bumped again
+    expect(inv(pid)).toBe(3);
+    expect(uses()).toBe(1); // NOT decremented/bumped again
   });
 });
 
@@ -38,7 +53,9 @@ describe("refundOrder — paid→cancelled exactly once", () => {
     const { pid, oid } = seedPaidScenario();
     await markOrderPaid(ctx, db, oid); // inv 3
     expect(await refundOrder(db, oid)).toBe(true);
-    expect(status(oid)).toBe("cancelled"); expect(inv(pid)).toBe(5); expect(uses()).toBe(0); // restocked + discount returned
+    expect(status(oid)).toBe("cancelled");
+    expect(inv(pid)).toBe(5);
+    expect(uses()).toBe(0); // restocked + discount returned
     expect(await refundOrder(db, oid)).toBe(false);
     expect(inv(pid)).toBe(5); // NOT over-restocked
   });

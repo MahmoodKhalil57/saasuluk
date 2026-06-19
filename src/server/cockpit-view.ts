@@ -11,7 +11,8 @@ import { convergeContract, contractGates, shipSummary, contractToD2, diagramView
 import { knownWidgets, renderPrimitiveHtml } from "@suluk/visual";
 import { themeHeadHtml } from "../themes/head";
 
-const esc = (s: string): string => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const esc = (s: string): string =>
+  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const DOT: Record<string, string> = { ok: "#16a34a", warn: "#d97706", error: "#dc2626", todo: "#d97706", info: "#64748b" };
 
 export function renderCockpitPage(document: OpenAPIv4Document): string {
@@ -23,14 +24,34 @@ export function renderCockpitPage(document: OpenAPIv4Document): string {
   const diagrams = diagramViews().map((v) => ({ ...v, d2: contractToD2(document, v.id) }));
   const widgets = knownWidgets();
 
-  const gateRows = gates.map((g) => `<li><span class="dot" style="background:${DOT[g.status] ?? "#64748b"}"></span><b>${esc(g.title)}</b><span class="muted"> — ${esc(g.detail)}</span></li>`).join("");
+  const gateRows = gates
+    .map(
+      (g) =>
+        `<li><span class="dot" style="background:${DOT[g.status] ?? "#64748b"}"></span><b>${esc(g.title)}</b><span class="muted"> — ${esc(g.detail)}</span></li>`,
+    )
+    .join("");
   const findings = conv.findings.length
-    ? conv.findings.map((f) => `<li><span class="tag tag-${f.severity}">${esc(f.severity)}</span> ${esc(f.message)}${f.where ? ` <code>${esc(f.where)}</code>` : ""}</li>`).join("")
+    ? conv.findings
+        .map(
+          (f) =>
+            `<li><span class="tag tag-${f.severity}">${esc(f.severity)}</span> ${esc(f.message)}${f.where ? ` <code>${esc(f.where)}</code>` : ""}</li>`,
+        )
+        .join("")
     : `<li class="ok">✓ The contract is self-consistent — no dangling refs, undeclared schemes, orphan scopes or empty paths.</li>`;
-  const diagramCards = diagrams.map((d) => `<figure><figcaption><b>${esc(d.title)}</b><span class="muted"> — ${esc(d.description)}</span></figcaption><pre class="d2" data-kroki>${esc(d.d2)}</pre></figure>`).join("");
+  const diagramCards = diagrams
+    .map(
+      (d) =>
+        `<figure><figcaption><b>${esc(d.title)}</b><span class="muted"> — ${esc(d.description)}</span></figcaption><pre class="d2" data-kroki>${esc(d.d2)}</pre></figure>`,
+    )
+    .join("");
   // renderPrimitiveHtml returns a FULL html doc (its own white-theme <style>) — isolate each in an iframe so its
   // body{color} reset can't leak into this dark page; the iframe provides the intended white preview surface.
-  const primitiveCards = widgets.map((w) => `<div class="prim"><span class="muted">${esc(w)}</span><iframe loading="lazy" sandbox="" title="${esc(w)} primitive" srcdoc="${esc(renderPrimitiveHtml({ widget: w }))}"></iframe></div>`).join("");
+  const primitiveCards = widgets
+    .map(
+      (w) =>
+        `<div class="prim"><span class="muted">${esc(w)}</span><iframe loading="lazy" sandbox="" title="${esc(w)} primitive" srcdoc="${esc(renderPrimitiveHtml({ widget: w }))}"></iframe></div>`,
+    )
+    .join("");
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 ${themeHeadHtml()}

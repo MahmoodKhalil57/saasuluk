@@ -12,7 +12,10 @@ import { deployWith, CloudflareClient, type AssetFile } from "@suluk/cloudflare"
 import { editorHtml } from "@suluk/editor";
 
 const token = process.env.CLOUDFLARE_API_TOKEN;
-if (!token) { console.error("✗ Set CLOUDFLARE_API_TOKEN in saasuluk/.env (Workers Scripts: Edit; Zone: Read for the custom domain)."); process.exit(1); }
+if (!token) {
+  console.error("✗ Set CLOUDFLARE_API_TOKEN in saasuluk/.env (Workers Scripts: Edit; Zone: Read for the custom domain).");
+  process.exit(1);
+}
 
 const SCRIPT = "suluk-editor";
 const HOSTNAME = "editor.suluk.saastemly.com";
@@ -21,8 +24,14 @@ const ZONE = "saastemly.com";
 const root = new URL("..", import.meta.url).pathname;
 const clientBundle = join(root, "node_modules/@suluk/editor/dist/editor.client.js");
 const forkBundle = join(root, "public/vendor/scalar/standalone-suluk.js");
-for (const [label, p] of [["@suluk/editor client bundle", clientBundle], ["Scalar fork bundle", forkBundle]] as const) {
-  if (!existsSync(p)) { console.error(`✗ Missing ${label}: ${p}\n  (run \`bun install\` and \`bun run scripts/vendor-scalar.ts\`).`); process.exit(1); }
+for (const [label, p] of [
+  ["@suluk/editor client bundle", clientBundle],
+  ["Scalar fork bundle", forkBundle],
+] as const) {
+  if (!existsSync(p)) {
+    console.error(`✗ Missing ${label}: ${p}\n  (run \`bun install\` and \`bun run scripts/vendor-scalar.ts\`).`);
+    process.exit(1);
+  }
 }
 
 // The page references the two bundles at the site root; serve all three from the ASSETS binding.
@@ -63,9 +72,13 @@ const cf = new CloudflareClient({ apiToken: token, accountId: res.accountId });
 let workersDev = "";
 try {
   const sub = await cf.request<{ subdomain?: string }>("GET", `/accounts/${res.accountId}/workers/subdomain`);
-  await cf.request("POST", `/accounts/${res.accountId}/workers/scripts/${SCRIPT}/subdomain`, { json: { enabled: true, previews_enabled: false } });
+  await cf.request("POST", `/accounts/${res.accountId}/workers/scripts/${SCRIPT}/subdomain`, {
+    json: { enabled: true, previews_enabled: false },
+  });
   if (sub?.subdomain) workersDev = `https://${SCRIPT}.${sub.subdomain}.workers.dev`;
-} catch (e) { console.warn("  workers.dev: skipped —", (e as Error).message); }
+} catch (e) {
+  console.warn("  workers.dev: skipped —", (e as Error).message);
+}
 
 // Attach the custom domain editor.suluk.saastemly.com (idempotent PUT). Needs Zone:Read + Workers Routes:Edit on the token.
 let customDomain = "";
@@ -73,7 +86,9 @@ try {
   const zones = await cf.request<Array<{ id: string; name: string }>>("GET", "/zones", { query: { name: ZONE } });
   const zone = zones?.find((z) => z.name === ZONE);
   if (!zone) throw new Error(`zone ${ZONE} not visible to this token`);
-  await cf.request("PUT", `/accounts/${res.accountId}/workers/domains`, { json: { environment: "production", hostname: HOSTNAME, service: SCRIPT, zone_id: zone.id } });
+  await cf.request("PUT", `/accounts/${res.accountId}/workers/domains`, {
+    json: { environment: "production", hostname: HOSTNAME, service: SCRIPT, zone_id: zone.id },
+  });
   customDomain = `https://${HOSTNAME}`;
   console.log(`  custom domain attached: ${HOSTNAME} → ${SCRIPT} (zone ${zone.id.slice(0, 6)}…)`);
 } catch (e) {

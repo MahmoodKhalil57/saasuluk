@@ -12,7 +12,14 @@ import { superadminEmails } from "../src/server/access";
 
 /** Brand context for the rich @suluk/email lifecycle templates — mirrors src/server/auth.ts (the dev twin) so the
  *  two Better Auth instances don't drift; the production Worker uses THIS path. */
-const EMAIL_CTX = () => ({ brand: { brandName: "saasuluk", baseUrl: process.env.BASE_URL ?? "https://saasuluk.saastemly.com", accentFrom: "#ef8e5f", accentTo: "#f5a97f" } });
+const EMAIL_CTX = () => ({
+  brand: {
+    brandName: "saasuluk",
+    baseUrl: process.env.BASE_URL ?? "https://saasuluk.saastemly.com",
+    accentFrom: "#ef8e5f",
+    accentTo: "#f5a97f",
+  },
+});
 import { buildErasureSteps } from "../src/server/erasure-steps";
 
 export interface AuthEnv {
@@ -50,15 +57,20 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
     secret: env.BETTER_AUTH_SECRET ?? "saasuluk-dev-secret-change-me-32chars!",
     baseURL: "https://saasuluk.saastemly.com",
     trustedOrigins: ["https://saasuluk.saastemly.com"],
-    socialProviders: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-      ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
-      : undefined,
+    socialProviders:
+      env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+        : undefined,
     // promote a SUPERADMIN_EMAILS address to role:"admin" at sign-up (the verified admin the access layer checks).
     databaseHooks: {
-      user: { create: { before: async (user: { email?: string }) => {
-        const admins = superadminEmails(env.SUPERADMIN_EMAILS);
-        return { data: user.email && admins.includes(user.email.toLowerCase()) ? { ...user, role: "admin" } : user };
-      } } },
+      user: {
+        create: {
+          before: async (user: { email?: string }) => {
+            const admins = superadminEmails(env.SUPERADMIN_EMAILS);
+            return { data: user.email && admins.includes(user.email.toLowerCase()) ? { ...user, role: "admin" } : user };
+          },
+        },
+      },
     },
     plugins: [
       bearer(),
@@ -67,7 +79,14 @@ export function getAuth(env: AuthEnv): ReturnType<typeof betterAuth> {
       magicLink({
         sendMagicLink: async ({ email, url }) => {
           sendEmailAsync(
-            { to: email, subject: "Your saasuluk sign-in link", html: brandedEmail("Sign in to saasuluk", `<p>Click to sign in — this link expires shortly.</p><p><a href="${url}" style="color:#6366f1">${url}</a></p>`) },
+            {
+              to: email,
+              subject: "Your saasuluk sign-in link",
+              html: brandedEmail(
+                "Sign in to saasuluk",
+                `<p>Click to sign in — this link expires shortly.</p><p><a href="${url}" style="color:#6366f1">${url}</a></p>`,
+              ),
+            },
             { apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM }, // the Worker secret (process.env may be empty on Workers)
           );
         },

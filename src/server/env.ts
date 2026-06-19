@@ -14,24 +14,48 @@ import { defineEnv, type ManifestEntry, type HealthStatus } from "@suluk/env";
 export const METER_EVENT_DEFAULT = "saasuluk_cost";
 
 export const env = defineEnv({
-  BETTER_AUTH_SECRET:      { secret: true, required: true, surfaces: ["local", "cloudflare"], description: "Better Auth signing secret (openssl rand -base64 32)" },
-  BASE_URL:                { default: "http://localhost:3000", surfaces: ["local", "preview"], description: "Public base URL (dev)" },
-  PORT:                    { default: "3000", surfaces: ["local"], description: "Dev API server port (src/server/main.ts)" },
-  STRIPE_SECRET_KEY:       { secret: true, surfaces: ["local", "cloudflare"], description: "Stripe API key — enables checkout + usage billing" },
-  STRIPE_PUBLISHABLE_KEY:  { surfaces: ["local", "cloudflare"], description: "Stripe publishable key (client)" },
-  STRIPE_WEBHOOK_SECRET:   { secret: true, surfaces: ["cloudflare", "local"], description: "Stripe webhook signing secret (whsec_…)" },
+  BETTER_AUTH_SECRET: {
+    secret: true,
+    required: true,
+    surfaces: ["local", "cloudflare"],
+    description: "Better Auth signing secret (openssl rand -base64 32)",
+  },
+  BASE_URL: { default: "http://localhost:3000", surfaces: ["local", "preview"], description: "Public base URL (dev)" },
+  PORT: { default: "3000", surfaces: ["local"], description: "Dev API server port (src/server/main.ts)" },
+  STRIPE_SECRET_KEY: { secret: true, surfaces: ["local", "cloudflare"], description: "Stripe API key — enables checkout + usage billing" },
+  STRIPE_PUBLISHABLE_KEY: { surfaces: ["local", "cloudflare"], description: "Stripe publishable key (client)" },
+  STRIPE_WEBHOOK_SECRET: { secret: true, surfaces: ["cloudflare", "local"], description: "Stripe webhook signing secret (whsec_…)" },
   STRIPE_METER_EVENT_NAME: { default: METER_EVENT_DEFAULT, surfaces: ["cloudflare"], description: "Stripe Billing Meter event name" },
   STRIPE_METERED_PRICE_ID: { surfaces: ["cloudflare"], description: "Stripe metered Price id for usage billing" },
-  RESEND_API_KEY:          { secret: true, surfaces: ["local", "cloudflare"], description: "Resend API key — outbound email (magic links, newsletter)" },
-  EMAIL_FROM:              { default: "saasuluk <onboarding@resend.dev>", surfaces: ["local", "cloudflare"], description: "From address for outbound email" },
-  GOOGLE_CLIENT_ID:        { surfaces: ["local", "cloudflare"], description: "Google OAuth client id" },
-  GOOGLE_CLIENT_SECRET:    { secret: true, surfaces: ["local", "cloudflare"], description: "Google OAuth client secret" },
-  SUPERADMIN_EMAILS:       { surfaces: ["local", "cloudflare"], description: 'JSON array of admin emails, e.g. ["you@example.com"] — also the contact-form + low-stock alert recipients' },
-  LOW_STOCK_THRESHOLD:     { default: "5", surfaces: ["local", "cloudflare"], description: "Inventory level at/below which a paid sale emails the owner a low-stock alert (default 5)" },
-  OPENROUTER_API_KEY:      { secret: true, surfaces: ["local", "cloudflare"], description: "OpenRouter API key — powers the @suluk/chat in-page assistant (omit ⇒ /chat returns a graceful 503)" },
+  RESEND_API_KEY: {
+    secret: true,
+    surfaces: ["local", "cloudflare"],
+    description: "Resend API key — outbound email (magic links, newsletter)",
+  },
+  EMAIL_FROM: {
+    default: "saasuluk <onboarding@resend.dev>",
+    surfaces: ["local", "cloudflare"],
+    description: "From address for outbound email",
+  },
+  GOOGLE_CLIENT_ID: { surfaces: ["local", "cloudflare"], description: "Google OAuth client id" },
+  GOOGLE_CLIENT_SECRET: { secret: true, surfaces: ["local", "cloudflare"], description: "Google OAuth client secret" },
+  SUPERADMIN_EMAILS: {
+    surfaces: ["local", "cloudflare"],
+    description: 'JSON array of admin emails, e.g. ["you@example.com"] — also the contact-form + low-stock alert recipients',
+  },
+  LOW_STOCK_THRESHOLD: {
+    default: "5",
+    surfaces: ["local", "cloudflare"],
+    description: "Inventory level at/below which a paid sale emails the owner a low-stock alert (default 5)",
+  },
+  OPENROUTER_API_KEY: {
+    secret: true,
+    surfaces: ["local", "cloudflare"],
+    description: "OpenRouter API key — powers the @suluk/chat in-page assistant (omit ⇒ /chat returns a graceful 503)",
+  },
   // build/script-only knobs (declared so /config doesn't under-report what the code reads)
-  CATALOG_BASE:            { surfaces: ["ci"], description: "Base URL the catalog-sync script fetches live prices from" },
-  FORCE:                   { surfaces: ["ci"], description: "Set to 1 to force re-creating Stripe prices in sync-catalog" },
+  CATALOG_BASE: { surfaces: ["ci"], description: "Base URL the catalog-sync script fetches live prices from" },
+  FORCE: { surfaces: ["ci"], description: "Set to 1 to force re-creating Stripe prices in sync-catalog" },
 });
 
 /**
@@ -39,12 +63,21 @@ export const env = defineEnv({
  * config plus any problem (a missing required var). Call at startup to fail LOUD (a warning) rather than silent: a
  * missing BETTER_AUTH_SECRET used to fall back to a known dev secret in prod; now it's surfaced.
  */
-export function loadConfig(runtime: Record<string, string | undefined>): { config: ReturnType<typeof env.parse> | null; problem: string | null } {
-  try { return { config: env.parse(runtime), problem: null }; }
-  catch (e) { return { config: null, problem: (e as Error).message }; }
+export function loadConfig(runtime: Record<string, string | undefined>): {
+  config: ReturnType<typeof env.parse> | null;
+  problem: string | null;
+} {
+  try {
+    return { config: env.parse(runtime), problem: null };
+  } catch (e) {
+    return { config: null, problem: (e as Error).message };
+  }
 }
 
-export interface ConfigHealth { surfaces: { cloudflare: string[]; local: string[] }; vars: ManifestEntry[] }
+export interface ConfigHealth {
+  surfaces: { cloudflare: string[]; local: string[] };
+  vars: ManifestEntry[];
+}
 
 /** A SAFE config-health snapshot (never returns any values) from a runtime env bag — process.env (dev) or the
  *  Worker's c.env bindings. Each var: which surfaces need it, is it a secret, and is it present on this surface. */
@@ -61,15 +94,17 @@ const BADGE: Record<HealthStatus, { label: string; bg: string; fg: string }> = {
 
 /** Render the config health as a self-contained premium HTML page (the "admin panel" surface). */
 export function renderConfigHealth(h: ConfigHealth): string {
-  const rows = h.vars.map((v) => {
-    const b = BADGE[v.status];
-    return `<tr>
+  const rows = h.vars
+    .map((v) => {
+      const b = BADGE[v.status];
+      return `<tr>
       <td><code>${v.name}</code>${v.secret ? ' <span class="lock" title="secret">🔒</span>' : ""}${v.required ? ' <span class="req" title="required">*</span>' : ""}</td>
       <td class="muted">${v.surfaces.join(", ")}</td>
       <td><span class="badge" style="background:${b.bg};color:${b.fg}">${b.label}</span></td>
       <td class="muted">${v.description ?? ""}</td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Config health · saasuluk</title>
   <style>

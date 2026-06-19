@@ -5,7 +5,7 @@
  * securitySchemes and its own OpenAPI surface (ingested → v4 → merged). The result is the single document every
  * other surface renders. Add an entity in `domain.ts` and it appears here — and everywhere downstream — for free.
  */
-import { buildApp, type BuiltApp } from "@suluk/builder";
+import { buildApp, type BuiltApp, type Entity } from "@suluk/builder";
 import { tableComponents } from "@suluk/drizzle";
 import { annotateCosts } from "@suluk/cost";
 import { authSecuritySchemes, ingestAuthOpenAPI, mergeAuth } from "@suluk/better-auth";
@@ -20,11 +20,16 @@ import { auth } from "./auth";
 // the cost meter (api.ts) and the docs share ONE model: CRUD costs (domain) + the custom-operation costs.
 export const costs = { ...domainCosts, ...OPERATION_COSTS };
 
-export interface Contract { built: BuiltApp; document: OpenAPIv4Document }
+export interface Contract {
+  built: BuiltApp;
+  document: OpenAPIv4Document;
+}
 
 /** Assemble the full v4 contract (domain CRUD + custom operations + cost + auth). Async because Better Auth's schema is generated. */
 export async function buildContract(): Promise<Contract> {
-  const built = buildApp({ entities: entitySchemas, info: { title: "Saasuluk API", version: "0.1.0" } });
+  // entitySchemas' `schema` infers as `unknown` (hardenSchema returns unknown); it's structurally a v4 SchemaOrRef
+  // at runtime, so cast to Entity[] to bridge the library-type gap.
+  const built = buildApp({ entities: entitySchemas as unknown as Entity[], info: { title: "Saasuluk API", version: "0.1.0" } });
   built.backend.document.paths = { ...built.backend.document.paths, ...(OPERATION_PATHS as typeof built.backend.document.paths) };
   // Stamp every entity's schema into components.schemas (as gen-openapi.ts does) so the WHOLE domain is in the
   // RUNTIME document — the data-admin, SDK, and conformance all project from this; without it the admin can't see
@@ -37,7 +42,10 @@ export async function buildContract(): Promise<Contract> {
 
   const { securitySchemes } = authSecuritySchemes({ session: true, bearer: true });
   try {
-    const authSchema = (await auth.api.generateOpenAPISchema()) as Record<string, unknown>;
+    // openAPI() plugin adds api.generateOpenAPISchema() at runtime, but the plugin endpoint isn't surfaced on the
+    // inferred auth.api type — cast api to reach it (library-type gap).
+    const generateOpenAPISchema = (auth.api as { generateOpenAPISchema: () => Promise<unknown> }).generateOpenAPISchema;
+    const authSchema = (await generateOpenAPISchema()) as Record<string, unknown>;
     const authV4 = ingestAuthOpenAPI(authSchema, { basePath: "/api/auth" });
     document = mergeAuth(document, authV4, { securitySchemes });
   } catch {

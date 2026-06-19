@@ -4,12 +4,8 @@
   "main": "worker/dist/worker.js",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
-  "d1_databases": [
-    { "binding": "DB", "database_name": "saasuluk-db", "database_id": "c190f7e4-85f7-4e77-be49-091b8927d9de" }
-  ],
-  "routes": [
-    { "pattern": "saasuluk.saastemly.com", "custom_domain": true }
-  ],
+  "d1_databases": [{ "binding": "DB", "database_name": "saasuluk-db", "database_id": "c190f7e4-85f7-4e77-be49-091b8927d9de" }],
+  "routes": [{ "pattern": "saasuluk.saastemly.com", "custom_domain": true }],
   "assets": { "directory": "dist/client", "binding": "ASSETS" },
   // Secrets (BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
   // RESEND_API_KEY, EMAIL_FROM) are stored ENCRYPTED via `wrangler secret put` — never in this file.
@@ -17,5 +13,5 @@
   "vars": { "STRIPE_METER_EVENT_NAME": "saasuluk_cost", "STRIPE_METERED_PRICE_ID": "price_1TgvOjR9OvhT1CxIicetCJ8R" },
   // Cron Trigger: hourly, sweep connected billing accounts → report NEW usage (delta) to the Stripe meter.
   "triggers": { "crons": ["0 * * * *"] },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 }

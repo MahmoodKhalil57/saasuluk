@@ -31,7 +31,7 @@ export function sourceFor(name: string): SulukSource {
 /** Stamp x-suluk-source on every operation, derived from the same registries that drive the projection. In place. */
 export function annotateSource(doc: OpenAPIv4Document): OpenAPIv4Document {
   for (const pi of Object.values(doc.paths ?? {})) {
-    const requests = (pi as { requests?: Record<string, Record<string, unknown>> }).requests ?? {};
+    const requests = (pi as unknown as { requests?: Record<string, Record<string, unknown>> }).requests ?? {};
     for (const [name, req] of Object.entries(requests)) req["x-suluk-source"] = sourceFor(name);
   }
   return doc;

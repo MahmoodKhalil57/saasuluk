@@ -20,9 +20,15 @@ if (existsSync(file) && statSync(file).size > MIN) {
 } else {
   console.log(`Vendoring Scalar ${SCALAR_VERSION} from ${url} …`);
   const res = await fetch(url);
-  if (!res.ok) { console.error(`✗ fetch failed: HTTP ${res.status}`); process.exit(1); }
+  if (!res.ok) {
+    console.error(`✗ fetch failed: HTTP ${res.status}`);
+    process.exit(1);
+  }
   const buf = new Uint8Array(await res.arrayBuffer());
-  if (buf.length < MIN) { console.error(`✗ suspiciously small (${buf.length} bytes) — not vendoring`); process.exit(1); }
+  if (buf.length < MIN) {
+    console.error(`✗ suspiciously small (${buf.length} bytes) — not vendoring`);
+    process.exit(1);
+  }
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, buf);
   console.log(`✓ Vendored Scalar → public/vendor/scalar/standalone-${SCALAR_VERSION}.js (${(buf.length / 1e6).toFixed(2)} MB)`);
@@ -40,6 +46,8 @@ if (existsSync(sulukFile) && statSync(sulukFile).size > MIN) {
   writeFileSync(sulukFile, readFileSync(forkDist));
   console.log(`✓ Vendored patched Scalar fork from scalar-fork/dist`);
 } else if (existsSync(file)) {
-  console.warn(`! patched fork bundle missing — falling back to upstream for /reference (no v4 panel). Run tooling/ts/scalar-fork/build.sh.`);
+  console.warn(
+    `! patched fork bundle missing — falling back to upstream for /reference (no v4 panel). Run tooling/ts/scalar-fork/build.sh.`,
+  );
   writeFileSync(sulukFile, readFileSync(file));
 }

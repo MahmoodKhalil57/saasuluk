@@ -53,6 +53,19 @@ export function gate(c: Context, rule: Rule, principal: string | null): { ok: bo
 /** Parse SUPERADMIN_EMAILS (a JSON array string, or a comma list) → lowercased emails. */
 export function superadminEmails(raw: string | undefined): string[] {
   if (!raw) return [];
-  try { const v = JSON.parse(raw); if (Array.isArray(v)) return v.map((s) => String(s).trim().toLowerCase()).filter(Boolean); } catch { /* fall through to CSV */ }
-  return raw.split(",").map((s) => s.trim().toLowerCase().replace(/^["[\]]+|["[\]]+$/g, "")).filter(Boolean);
+  try {
+    const v = JSON.parse(raw);
+    if (Array.isArray(v)) return v.map((s) => String(s).trim().toLowerCase()).filter(Boolean);
+  } catch {
+    /* fall through to CSV */
+  }
+  return raw
+    .split(",")
+    .map((s) =>
+      s
+        .trim()
+        .toLowerCase()
+        .replace(/^["[\]]+|["[\]]+$/g, ""),
+    )
+    .filter(Boolean);
 }

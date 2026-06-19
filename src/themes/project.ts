@@ -13,9 +13,16 @@ function aliasVars(c: ColorTokens): string {
   // brand (hue-preserving → always coherent). --link is the brand too (high-contrast links).
   const accent2 = withLightness(c.primary, Math.min(0.9, c.primary.l + 0.07));
   return [
-    `--bg:${k(c.background)}`, `--bg-soft:${k(c.muted)}`, `--panel:${k(c.card)}`, `--line:${k(c.border)}`,
-    `--fg:${k(c.foreground)}`, `--muted:${k(c.mutedForeground)}`, `--accent:${k(c.primary)}`, `--accent-2:${k(accent2)}`,
-    `--link:${k(c.primary)}`, `--on-accent:${k(c.primaryForeground)}`,
+    `--bg:${k(c.background)}`,
+    `--bg-soft:${k(c.muted)}`,
+    `--panel:${k(c.card)}`,
+    `--line:${k(c.border)}`,
+    `--fg:${k(c.foreground)}`,
+    `--muted:${k(c.mutedForeground)}`,
+    `--accent:${k(c.primary)}`,
+    `--accent-2:${k(accent2)}`,
+    `--link:${k(c.primary)}`,
+    `--on-accent:${k(c.primaryForeground)}`,
     `--shadow:0 1px 2px rgba(16,16,40,.06),0 12px 34px rgba(16,16,40,.10)`,
     `--glow:radial-gradient(60% 50% at 50% 0%,color-mix(in oklab,${k(c.primary)} 16%,transparent),transparent 70%)`,
   ].join(";");
@@ -23,7 +30,10 @@ function aliasVars(c: ColorTokens): string {
 
 /** Filename → display label: "elegant-luxury" → "Elegant Luxury". */
 export function prettyLabel(name: string): string {
-  return name.split(/[-_]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  return name
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 /** A 3-color preview (background · primary · accent) for light + dark — derived straight from the parsed tweakcn
@@ -32,7 +42,10 @@ export function parseSwatch(name: string, css: string): { light: [string, string
   const t = parseShadcnCss(css, name);
   if (!t) return null;
   const k = formatOklch;
-  return { light: [k(t.light.background), k(t.light.primary), k(t.light.accent)], dark: [k(t.dark.background), k(t.dark.primary), k(t.dark.accent)] };
+  return {
+    light: [k(t.light.background), k(t.light.primary), k(t.light.accent)],
+    dark: [k(t.dark.background), k(t.dark.primary), k(t.dark.accent)],
+  };
 }
 
 /** The `[data-scheme]` light + dark blocks for one tweakcn scheme CSS. Returns "" if the CSS isn't a theme. */

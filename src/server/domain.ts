@@ -14,7 +14,13 @@ import { applyValidations } from "./validations";
 import * as s from "./schema";
 
 const read = (m: number): CostModel => ({ components: [{ source: "db-read", basis: "per-call", microUsd: m }], estimateMicroUsd: m });
-const write = (m: number): CostModel => ({ components: [{ source: "compute", basis: "per-call", microUsd: 100 }, { source: "db-write", basis: "per-call", microUsd: m }], estimateMicroUsd: 100 + m });
+const write = (m: number): CostModel => ({
+  components: [
+    { source: "compute", basis: "per-call", microUsd: 100 },
+    { source: "db-write", basis: "per-call", microUsd: m },
+  ],
+  estimateMicroUsd: 100 + m,
+});
 
 export interface EntityDef {
   /** PascalCase singular — drives the operation names (list/get/create/update/delete + the path). */
@@ -62,7 +68,10 @@ export const ENTITIES: EntityDef[] = [
  *  projection gives bare types; we layer REASONABLE per-field validations (validations.ts) — slugs, emails, rating
  *  1–5, sane caps, no `<>` in display fields — then hardenSchema only fills any remaining gap with a floor. These
  *  are enforced at runtime (the API rejects invalid input), so they're real security, not just a grade. */
-export const entitySchemas = ENTITIES.map((e) => ({ name: e.name, schema: hardenSchema(applyValidations(e.name, tableToV4(e.table).insert)) }));
+export const entitySchemas = ENTITIES.map((e) => ({
+  name: e.name,
+  schema: hardenSchema(applyValidations(e.name, tableToV4(e.table).insert)),
+}));
 
 /** The cost map — 5 operations per entity, keyed by operation name (list/get/create/update/delete<Name>). */
 export const costs: Record<string, CostModel> = Object.fromEntries(
@@ -91,5 +100,12 @@ export const allTables = ENTITIES.map((e) => e.table);
  */
 const tableSymbol = new Map<unknown, string>(Object.entries(s).map(([sym, tbl]) => [tbl, sym]));
 export const entitySource: Record<string, { file: string; symbol: string; kind: string }> = Object.fromEntries(
-  ENTITIES.map((e) => [e.name, { file: "src/server/schema.ts", symbol: tableSymbol.get(e.table) ?? `${e.name[0].toLowerCase()}${e.name.slice(1)}`, kind: "drizzle-table" }]),
+  ENTITIES.map((e) => [
+    e.name,
+    {
+      file: "src/server/schema.ts",
+      symbol: tableSymbol.get(e.table) ?? `${e.name[0].toLowerCase()}${e.name.slice(1)}`,
+      kind: "drizzle-table",
+    },
+  ]),
 );

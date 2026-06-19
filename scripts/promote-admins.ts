@@ -12,7 +12,10 @@ import { $ } from "bun";
 import { superadminEmails } from "../src/server/access";
 
 const emails = superadminEmails(process.env.SUPERADMIN_EMAILS);
-if (!emails.length) { console.error('set SUPERADMIN_EMAILS in .env, e.g. SUPERADMIN_EMAILS=["you@example.com"]'); process.exit(1); }
+if (!emails.length) {
+  console.error('set SUPERADMIN_EMAILS in .env, e.g. SUPERADMIN_EMAILS=["you@example.com"]');
+  process.exit(1);
+}
 
 const inList = emails.map((e) => `'${e.replace(/'/g, "''")}'`).join(", ");
 const sql = `UPDATE "user" SET role='admin' WHERE lower(email) IN (${inList});`;

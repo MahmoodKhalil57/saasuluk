@@ -6,7 +6,10 @@
  */
 import { flatRateShipping, flatRateTax, type ShippingProvider, type TaxProvider } from "@suluk/stripe";
 
-const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+const num = (v: string | undefined, d: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+};
 
 /** Swap this binding to change shipping providers (e.g. `combineShipping(flatRateShipping(...), shippoProvider(...))`). */
 export const shippingProvider: ShippingProvider = flatRateShipping({

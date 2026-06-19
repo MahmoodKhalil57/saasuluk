@@ -14,10 +14,16 @@ const PAGES: { path: string; priority?: number; changefreq?: SitemapUrl["changef
   { path: "products", priority: 0.9, changefreq: "daily" },
   { path: "pricing", priority: 0.8, changefreq: "weekly" },
   { path: "blogs", priority: 0.7, changefreq: "weekly" },
-  { path: "about", priority: 0.5 }, { path: "contact", priority: 0.5 }, { path: "faqs", priority: 0.6 },
-  { path: "metrics", priority: 0.3 }, { path: "reference", priority: 0.4 },
-  { path: "terms", priority: 0.2 }, { path: "privacy", priority: 0.2 }, { path: "license", priority: 0.2 },
-  { path: "returns", priority: 0.4 }, { path: "shipping", priority: 0.4 },
+  { path: "about", priority: 0.5 },
+  { path: "contact", priority: 0.5 },
+  { path: "faqs", priority: 0.6 },
+  { path: "metrics", priority: 0.3 },
+  { path: "reference", priority: 0.4 },
+  { path: "terms", priority: 0.2 },
+  { path: "privacy", priority: 0.2 },
+  { path: "license", priority: 0.2 },
+  { path: "returns", priority: 0.4 },
+  { path: "shipping", priority: 0.4 },
 ];
 
 export const GET: APIRoute = ({ site }) => {
@@ -27,11 +33,17 @@ export const GET: APIRoute = ({ site }) => {
     ...SEED_PRODUCTS.filter((p) => p.status === "published").map((p) => {
       // the product's REAL first image — the old `${slug}.jpg` guess 404'd for gallery products (e.g. founder-tee).
       const img = p.images?.[0]?.url ?? `/img/products/${p.slug}.jpg`;
-      return { loc: `${base}/products/${p.slug}`, changefreq: "weekly" as const, priority: 0.8,
-        images: [{ loc: img.startsWith("http") ? img : `${base}${img}`, title: p.name }] };
+      return {
+        loc: `${base}/products/${p.slug}`,
+        changefreq: "weekly" as const,
+        priority: 0.8,
+        images: [{ loc: img.startsWith("http") ? img : `${base}${img}`, title: p.name }],
+      };
     }),
     ...SEED_POSTS.map((p) => ({
-      loc: `${base}/blogs/${p.slug}`, changefreq: "monthly" as const, priority: 0.6,
+      loc: `${base}/blogs/${p.slug}`,
+      changefreq: "monthly" as const,
+      priority: 0.6,
       images: [{ loc: `${base}/img/blog/${p.slug}.jpg`, title: p.title }],
     })),
   ];

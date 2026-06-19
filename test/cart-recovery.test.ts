@@ -9,13 +9,23 @@ import { sweepAbandonedCartEmails } from "../src/server/operations";
 const HOUR = 3_600_000;
 const opts = { origin: "https://x.test" }; // no apiKey ⇒ sends no-op, but the claim/stamp + returned count still work
 
-beforeEach(() => { sqlite.exec('DELETE FROM "order";'); });
+beforeEach(() => {
+  sqlite.exec('DELETE FROM "order";');
+});
 
 function mkOrder(ageMs: number, over: Partial<{ status: string; customerEmail: string | null; recoveryEmailedAt: number }> = {}) {
-  return db.insert(order).values({
-    customerEmail: "buyer@example.com", items: JSON.stringify([{ name: "Widget", qty: 2 }]), totalCents: 200,
-    status: "pending", createdAt: Date.now() - ageMs, ...over,
-  } as never).returning().get();
+  return db
+    .insert(order)
+    .values({
+      customerEmail: "buyer@example.com",
+      items: JSON.stringify([{ name: "Widget", qty: 2 }]),
+      totalCents: 200,
+      status: "pending",
+      createdAt: Date.now() - ageMs,
+      ...over,
+    } as never)
+    .returning()
+    .get();
 }
 const stamped = (id: number) => db.select().from(order).where(eq(order.id, id)).get()!.recoveryEmailedAt != null;
 

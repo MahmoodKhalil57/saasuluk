@@ -9,19 +9,30 @@ import { restStripe } from "../src/server/stripe-rest";
 import { SEED_PRODUCTS } from "../src/server/seed";
 
 const key = process.env.STRIPE_SECRET_KEY;
-if (!key) { console.error("set STRIPE_SECRET_KEY in .env"); process.exit(1); }
+if (!key) {
+  console.error("set STRIPE_SECRET_KEY in .env");
+  process.exit(1);
+}
 const stripe = restStripe(key);
 
 // IDEMPOTENT: skip products that already carry a Stripe price in the live catalog (set FORCE=1 to recreate).
 const base = process.env.CATALOG_BASE ?? "https://saasuluk.saastemly.com";
-const live = (await fetch(`${base}/product`).then((r) => r.json()).catch(() => [])) as { slug: string; stripePriceId?: string }[];
+const live = (await fetch(`${base}/product`)
+  .then((r) => r.json())
+  .catch(() => [])) as { slug: string; stripePriceId?: string }[];
 const alreadyPriced = new Set(live.filter((p) => p.stripePriceId).map((p) => p.slug));
 
 const updates: string[] = [];
 for (const p of SEED_PRODUCTS) {
   if (p.status !== "published" || p.priceCents <= 0) continue; // free / draft products aren't sold via Stripe
-  if (alreadyPriced.has(p.slug) && process.env.FORCE !== "1") { console.log(`  ${p.slug.padEnd(20)} → already priced (skip; FORCE=1 to recreate)`); continue; }
-  const product = await stripe.products.create({ name: p.name, description: p.description, metadata: { slug: p.slug } } as Record<string, unknown>);
+  if (alreadyPriced.has(p.slug) && process.env.FORCE !== "1") {
+    console.log(`  ${p.slug.padEnd(20)} → already priced (skip; FORCE=1 to recreate)`);
+    continue;
+  }
+  const product = await stripe.products.create({ name: p.name, description: p.description, metadata: { slug: p.slug } } as Record<
+    string,
+    unknown
+  >);
   // a one-time Price (no `recurring`) in cents — the adapter form-encodes the params
   const price = await stripe.prices.create({ product: (product as { id: string }).id, currency: "usd", unit_amount: p.priceCents });
   const priceId = (price as { id: string }).id;

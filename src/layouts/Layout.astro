@@ -10,7 +10,15 @@ const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate scheme
 // the a11y + motion contract (focus-visible rings, reduced-motion, aria-invalid, sr-only/skip-link, shake/reveal/
 // nav-progress) — inherited from @suluk/theme, pointed at saasuluk's own color vars.
 const baseCss = renderBaseCss({ ring: "var(--accent)", destructive: "#ef4444" });
-const { title = "saasuluk — the SaaS that ships itself", description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk.", image, keywords, ogType, noindex, jsonLd: pageNodes } = Astro.props;
+const {
+  title = "saasuluk — the SaaS that ships itself",
+  description = "Auth, payments, eCommerce, admin, a typed API + docs — every layer projected from one contract. The premium SaaS starter on Suluk.",
+  image,
+  keywords,
+  ogType,
+  noindex,
+  jsonLd: pageNodes,
+} = Astro.props;
 // SEO is PROJECTED from @suluk/seo (one toolkit → robots, sitemap, schema, meta, og, llms, skew). seoTags emits the
 // full title/description/canonical/og/twitter/robots set; the schema.org @graph carries Organization + WebSite
 // (with a SearchAction) plus any page-specific nodes (Product/BlogPosting/FAQPage/BreadcrumbList).
@@ -20,10 +28,23 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : As
 // OG image: the page's OWN image (a product/cover photo — best for ecommerce) when present, else a generated
 // branded card from @suluk/seo's ogImageSvg (served by the /og.svg worker route).
 const ogImage = image ?? `${siteBase}/og.svg?title=${encodeURIComponent(title)}`;
-const headTags = renderTags(seoTags({
-  title, description, canonical, url: canonical, image: ogImage, imageAlt: title, siteName: SITE_NAME, locale: "en",
-  type: ogType, keywords: Array.isArray(keywords) ? keywords : undefined, noindex, twitterCard: "summary_large_image", themeColor: "#6366f1",
-}));
+const headTags = renderTags(
+  seoTags({
+    title,
+    description,
+    canonical,
+    url: canonical,
+    image: ogImage,
+    imageAlt: title,
+    siteName: SITE_NAME,
+    locale: "en",
+    type: ogType,
+    keywords: Array.isArray(keywords) ? keywords : undefined,
+    noindex,
+    twitterCard: "summary_large_image",
+    themeColor: "#6366f1",
+  }),
+);
 const structured = graph(
   organization({ name: SITE_NAME, url: siteBase || canonical, logo: `${siteBase}/favicon.svg`, description }),
   website({ name: SITE_NAME, url: siteBase || canonical, searchUrl: `${siteBase}/products?q={search_term_string}` }),
@@ -33,29 +54,107 @@ const structured = graph(
 // chrome with a data-i18n key on each label; the inline script swaps it to the stored locale and sets <html
 // lang/dir> (RTL for Arabic). One dictionary (src/i18n.ts) feeds both the render and the client.
 type Key = Parameters<typeof t>[1];
-const nav: [string, Key][] = [["/products", "products"], ["/pricing", "pricing"], ["/blogs", "blog"], ["/about", "about"], ["/reference", "docs"]];
+const nav: [string, Key][] = [
+  ["/products", "products"],
+  ["/pricing", "pricing"],
+  ["/blogs", "blog"],
+  ["/about", "about"],
+  ["/contact", "contact"],
+  ["/reference", "docs"],
+];
 const footerCols: { head: string; links: [string, Key | string][] }[] = [
-  { head: "Product", links: [["/products", "products"], ["/pricing", "pricing"], ["/metrics", "metrics"], ["/dashboard", "dashboard"]] },
-  { head: "Resources", links: [["/blogs", "blog"], ["/faqs", "faq"], ["/about", "about"], ["/contact", "contact"]] },
-  { head: "Developers", links: [["/reference", "API reference (v4)"], ["/scalar", "Scalar · 3.1 view"], ["/swagger", "Swagger UI"], ["/openapi.json", "OpenAPI v4 doc"], ["/panel", "Admin panel"], ["/superadmin", "Superadmin"], ["/cockpit", "Cockpit"], ["/cost", "Cost ledger"]] },
-  { head: "Robots & AI", links: [["/sitemap.xml", "Sitemap"], ["/robots.txt", "robots.txt"], ["/llms.txt", "llms.txt"], ["/mcp", "MCP server"], ["/og.svg?title=saasuluk", "OG image"], ["/manifest.webmanifest", "Web manifest"]] },
-  { head: "Legal", links: [["/terms", "terms"], ["/privacy", "privacy"], ["/license", "license"], ["/returns", "Returns & refunds"], ["/shipping", "Shipping"]] },
+  {
+    head: "Product",
+    links: [
+      ["/products", "products"],
+      ["/pricing", "pricing"],
+      ["/metrics", "metrics"],
+      ["/dashboard", "dashboard"],
+    ],
+  },
+  {
+    head: "Resources",
+    links: [
+      ["/blogs", "blog"],
+      ["/faqs", "faq"],
+      ["/about", "about"],
+      ["/contact", "contact"],
+    ],
+  },
+  {
+    head: "Developers",
+    links: [
+      ["/reference", "API reference (v4)"],
+      ["/scalar", "Scalar · 3.1 view"],
+      ["/swagger", "Swagger UI"],
+      ["/openapi.json", "OpenAPI v4 doc"],
+      ["/panel", "Admin panel"],
+      ["/superadmin", "Superadmin"],
+      ["/cockpit", "Cockpit"],
+      ["/cost", "Cost ledger"],
+    ],
+  },
+  {
+    head: "Robots & AI",
+    links: [
+      ["/sitemap.xml", "Sitemap"],
+      ["/robots.txt", "robots.txt"],
+      ["/llms.txt", "llms.txt"],
+      ["/mcp", "MCP server"],
+      ["/og.svg?title=saasuluk", "OG image"],
+      ["/manifest.webmanifest", "Web manifest"],
+    ],
+  },
+  {
+    head: "Legal",
+    links: [
+      ["/terms", "terms"],
+      ["/privacy", "privacy"],
+      ["/license", "license"],
+      ["/returns", "Returns & refunds"],
+      ["/shipping", "Shipping"],
+    ],
+  },
 ];
 const path = Astro.url.pathname;
 const label = (k: Key | string) => (typeof k === "string" && !(k in DICT.en) ? k : t("en", k as Key));
 // Worker-served (non-Astro) routes: Scalar/docs/admin/api manage their own document and can't be DOM-swapped. Mark
 // them at RENDER time (server-side) so ClientRouter full-loads them AND prefetch/clientPrerender skips them — runtime
 // marking would lose the race against Astro's viewport observer, which is set up before the first astro:page-load.
-const WORKER_PREFIXES = ["/api/", "/scalar", "/swagger", "/reference", "/superadmin", "/cockpit", "/panel", "/cost", "/dashboard", "/openapi.json", "/mcp", "/og.svg", "/manifest.webmanifest", "/sitemap.xml", "/robots.txt", "/llms.txt"];
-const isWorker = (href: string) => typeof href === "string" && WORKER_PREFIXES.some((w) => href === w || href.startsWith(w + "/") || href.startsWith(w + "?") || (w.endsWith("/") && href.startsWith(w)));
+const WORKER_PREFIXES = [
+  "/api/",
+  "/scalar",
+  "/swagger",
+  "/reference",
+  "/superadmin",
+  "/cockpit",
+  "/panel",
+  "/cost",
+  "/dashboard",
+  "/openapi.json",
+  "/mcp",
+  "/og.svg",
+  "/manifest.webmanifest",
+  "/sitemap.xml",
+  "/robots.txt",
+  "/llms.txt",
+];
+const isWorker = (href: string) =>
+  typeof href === "string" &&
+  WORKER_PREFIXES.some(
+    (w) => href === w || href.startsWith(w + "/") || href.startsWith(w + "?") || (w.endsWith("/") && href.startsWith(w)),
+  );
 const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true, "data-astro-prefetch": "false" } : {});
 ---
+
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-    {/* SPA router — DOM-swap navigation (no full reload, no white flash). Theme/scheme/lang are re-applied
+    {
+      /* SPA router — DOM-swap navigation (no full reload, no white flash). Theme/scheme/lang are re-applied
         pre-paint on astro:before-swap below, and the global chrome is transition:persist'd so its once-bound
-        listeners + the signed-in avatar survive swaps. */}
+        listeners + the signed-in avatar survive swaps. */
+    }
     <ClientRouter />
     <Fragment set:html={headTags} />
     <script type="application/ld+json" set:html={JSON.stringify(structured)} />
@@ -72,16 +171,30 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           var sysDark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
           document.documentElement.dataset.theme = tp === "system" ? (sysDark ? "dark" : "light") : tp;
           document.documentElement.dataset.themePref = tp;
-          var sc = localStorage.getItem("scheme"); if (sc) document.documentElement.dataset.scheme = sc; // color scheme
+          var sc = localStorage.getItem("scheme");
+          if (sc) document.documentElement.dataset.scheme = sc; // color scheme
         } catch (e) {}
-        function curLang() { try { return localStorage.getItem("lang") || (document.cookie.match(/(?:^|; )lang=(\w+)/) || [])[1] || "en"; } catch (e) { return "en"; } }
+        function curLang() {
+          try {
+            return localStorage.getItem("lang") || (document.cookie.match(/(?:^|; )lang=(\w+)/) || [])[1] || "en";
+          } catch (e) {
+            return "en";
+          }
+        }
         window.__applyLang = function (l) {
-          var d = document.documentElement; d.lang = l; d.dir = (RTL.indexOf(l) >= 0 ? "rtl" : "ltr");
-          document.querySelectorAll("[data-i18n]").forEach(function (el) { var k = el.getAttribute("data-i18n"); if (DICT[l] && DICT[l][k]) el.textContent = DICT[l][k]; });
-          var sel = document.getElementById("lang"); if (sel) sel.value = l;
+          var d = document.documentElement;
+          d.lang = l;
+          d.dir = RTL.indexOf(l) >= 0 ? "rtl" : "ltr";
+          document.querySelectorAll("[data-i18n]").forEach(function (el) {
+            var k = el.getAttribute("data-i18n");
+            if (DICT[l] && DICT[l][k]) el.textContent = DICT[l][k];
+          });
+          var sel = document.getElementById("lang");
+          if (sel) sel.value = l;
         };
         window.__lang0 = curLang();
-        document.documentElement.lang = window.__lang0; document.documentElement.dir = (RTL.indexOf(window.__lang0) >= 0 ? "rtl" : "ltr");
+        document.documentElement.lang = window.__lang0;
+        document.documentElement.dir = RTL.indexOf(window.__lang0) >= 0 ? "rtl" : "ltr";
       })();
     </script>
     <script is:inline>
@@ -92,10 +205,12 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       (function () {
         var root = document.documentElement;
         document.addEventListener("astro:before-swap", function (e) {
-          var d = e.newDocument && e.newDocument.documentElement; if (!d) return;
+          var d = e.newDocument && e.newDocument.documentElement;
+          if (!d) return;
           if (root.dataset.theme) d.dataset.theme = root.dataset.theme;
           if (root.dataset.themePref) d.dataset.themePref = root.dataset.themePref;
-          if (root.dataset.scheme) d.dataset.scheme = root.dataset.scheme; else delete d.dataset.scheme;
+          if (root.dataset.scheme) d.dataset.scheme = root.dataset.scheme;
+          else delete d.dataset.scheme;
           d.lang = root.lang || "en";
           d.dir = root.dir || "ltr";
         });
@@ -105,15 +220,45 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
           document.querySelectorAll("#site-header nav.main a, #mobilenav nav a").forEach(function (a) {
             var on = a.getAttribute("href") === path;
             a.classList.toggle("on", on);
-            if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+            if (on) a.setAttribute("aria-current", "page");
+            else a.removeAttribute("aria-current");
           });
           // Worker-served (non-Astro) routes can't be DOM-swapped — Scalar/docs/admin manage their own document. Mark
           // their links data-astro-reload so ClientRouter does a clean full navigation instead of a broken half-swap.
-          var WORKER = ["/api/", "/scalar", "/swagger", "/reference", "/superadmin", "/cockpit", "/panel", "/cost", "/dashboard", "/openapi.json", "/mcp", "/og.svg", "/manifest.webmanifest", "/sitemap.xml", "/robots.txt", "/llms.txt"];
+          var WORKER = [
+            "/api/",
+            "/scalar",
+            "/swagger",
+            "/reference",
+            "/superadmin",
+            "/cockpit",
+            "/panel",
+            "/cost",
+            "/dashboard",
+            "/openapi.json",
+            "/mcp",
+            "/og.svg",
+            "/manifest.webmanifest",
+            "/sitemap.xml",
+            "/robots.txt",
+            "/llms.txt",
+          ];
           document.querySelectorAll('a[href^="/"]').forEach(function (a) {
             if (a.hasAttribute("data-astro-reload")) return;
             var p = a.getAttribute("href") || "";
-            for (var i = 0; i < WORKER.length; i++) { var w = WORKER[i]; if (p === w || p.indexOf(w + "/") === 0 || p.indexOf(w + "?") === 0 || (w.charAt(w.length - 1) === "/" && p.indexOf(w) === 0)) { a.setAttribute("data-astro-reload", ""); a.setAttribute("data-astro-prefetch", "false"); break; } }
+            for (var i = 0; i < WORKER.length; i++) {
+              var w = WORKER[i];
+              if (
+                p === w ||
+                p.indexOf(w + "/") === 0 ||
+                p.indexOf(w + "?") === 0 ||
+                (w.charAt(w.length - 1) === "/" && p.indexOf(w) === 0)
+              ) {
+                a.setAttribute("data-astro-reload", "");
+                a.setAttribute("data-astro-prefetch", "false");
+                break;
+              }
+            }
           });
           // the persisted header's scroll-state/progress are bound once on window; nudge them to recompute against
           // the freshly-swapped (scroll-reset) page so the glassy "scrolled" class + hairline aren't stuck.
@@ -122,243 +267,1379 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       })();
     </script>
     <style is:global>
-      :root, html[data-theme="light"] {
+      :root,
+      html[data-theme="light"] {
         color-scheme: light;
-        --bg:#ffffff; --bg-soft:#f7f7fb; --panel:#ffffff; --line:#ececf1; --fg:#0b0b12; --muted:#646474;
-        --accent:#6366f1; --accent-2:#8b5cf6; --link:#4f46e5; --on-accent:#ffffff;
-        --shadow:0 1px 2px rgba(16,16,40,.04), 0 10px 30px rgba(16,16,40,.06);
-        --glow:radial-gradient(60% 50% at 50% 0%, rgba(139,92,246,.14), transparent 70%);
+        --bg: #ffffff;
+        --bg-soft: #f7f7fb;
+        --panel: #ffffff;
+        --line: #ececf1;
+        --fg: #0b0b12;
+        --muted: #646474;
+        --accent: #6366f1;
+        --accent-2: #8b5cf6;
+        --link: #4f46e5;
+        --on-accent: #ffffff;
+        --shadow: 0 1px 2px rgba(16, 16, 40, 0.04), 0 10px 30px rgba(16, 16, 40, 0.06);
+        --glow: radial-gradient(60% 50% at 50% 0%, rgba(139, 92, 246, 0.14), transparent 70%);
       }
       html[data-theme="dark"] {
         color-scheme: dark;
-        --bg:#09090c; --bg-soft:#0d0d12; --panel:#131319; --line:#23232c; --fg:#ededf2; --muted:#8c8c99;
-        --accent:#818cf8; --accent-2:#a78bfa; --link:#a5b4fc; --on-accent:#0b0b12;
-        --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px rgba(0,0,0,.45);
-        --glow:radial-gradient(60% 50% at 50% 0%, rgba(129,140,248,.16), transparent 70%);
+        --bg: #09090c;
+        --bg-soft: #0d0d12;
+        --panel: #131319;
+        --line: #23232c;
+        --fg: #ededf2;
+        --muted: #8c8c99;
+        --accent: #818cf8;
+        --accent-2: #a78bfa;
+        --link: #a5b4fc;
+        --on-accent: #0b0b12;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 34px rgba(0, 0, 0, 0.45);
+        --glow: radial-gradient(60% 50% at 50% 0%, rgba(129, 140, 248, 0.16), transparent 70%);
       }
-      * { box-sizing:border-box; } html { scroll-behavior:smooth; }
-      body { margin:0; font:400 16px/1.6 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); -webkit-font-smoothing:antialiased; font-feature-settings:"cv02","cv03","cv04","ss01"; }
-      a { color:var(--link); text-decoration:none; } a:hover { text-decoration:underline; }
-      ::selection { background:color-mix(in srgb, var(--accent) 28%, transparent); }
-      .wrap { max-width:1080px; margin:0 auto; padding-inline:24px; }
-      main { min-height:60vh; }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        font:
+          400 16px/1.6 "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+      }
+      a {
+        color: var(--link);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      ::selection {
+        background: color-mix(in srgb, var(--accent) 28%, transparent);
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding-inline: 24px;
+      }
+      main {
+        min-height: 60vh;
+      }
       /* header */
-      header.site { position:sticky; top:0; z-index:30; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(12px) saturate(1.4); }
-      header.site .wrap { display:flex; align-items:center; gap:22px; height:60px; }
-      .brand { display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-.02em; color:var(--fg); font-size:17px; }
-      .brand .dot { width:22px; height:22px; border-radius:7px; background:linear-gradient(135deg,var(--accent-2),var(--accent)); display:grid; place-items:center; color:#fff; font-size:13px; box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent); }
-      nav.main { display:flex; gap:4px; } nav.main a { color:var(--muted); font-size:14.5px; font-weight:500; padding:7px 11px; border-radius:8px; } nav.main a:hover { color:var(--fg); background:var(--bg-soft); text-decoration:none; } nav.main a.on { color:var(--fg); }
-      .chrome { margin-inline-start:auto; display:flex; gap:8px; align-items:center; }
-      .chrome select, .iconbtn { font:inherit; font-size:13px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:6px 9px; cursor:pointer; }
-      .iconbtn:hover { background:var(--bg-soft); }
-      @media (max-width:760px){ nav.main{display:none} }
+      header.site {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--bg) 82%, transparent);
+        backdrop-filter: blur(12px) saturate(1.4);
+      }
+      header.site .wrap {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        height: 60px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: var(--fg);
+        font-size: 17px;
+      }
+      .brand .dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, var(--accent-2), var(--accent));
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 13px;
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent);
+      }
+      nav.main {
+        display: flex;
+        gap: 4px;
+      }
+      nav.main a {
+        color: var(--muted);
+        font-size: 14.5px;
+        font-weight: 500;
+        padding: 7px 11px;
+        border-radius: 8px;
+      }
+      nav.main a:hover {
+        color: var(--fg);
+        background: var(--bg-soft);
+        text-decoration: none;
+      }
+      nav.main a.on {
+        color: var(--fg);
+      }
+      .chrome {
+        margin-inline-start: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .chrome select,
+      .iconbtn {
+        font: inherit;
+        font-size: 13px;
+        background: var(--panel);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 6px 9px;
+        cursor: pointer;
+      }
+      .iconbtn:hover {
+        background: var(--bg-soft);
+      }
+      @media (max-width: 760px) {
+        nav.main {
+          display: none;
+        }
+      }
       /* type */
-      h1 { font-size:clamp(34px,5vw,52px); font-weight:800; letter-spacing:-.025em; line-height:1.05; margin:0 0 12px; }
-      h2 { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin:40px 0 14px; }
-      h3 { font-size:19px; font-weight:700; letter-spacing:-.01em; margin:0 0 6px; }
-      .tag { font-size:18px; color:var(--muted); max-width:64ch; line-height:1.6; }
-      main > .wrap { padding-top:34px; padding-bottom:72px; }
-      .gradient { background:linear-gradient(115deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+      h1 {
+        font-size: clamp(34px, 5vw, 52px);
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        line-height: 1.05;
+        margin: 0 0 12px;
+      }
+      h2 {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--muted);
+        margin: 40px 0 14px;
+      }
+      h3 {
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin: 0 0 6px;
+      }
+      .tag {
+        font-size: 18px;
+        color: var(--muted);
+        max-width: 64ch;
+        line-height: 1.6;
+      }
+      main > .wrap {
+        padding-top: 34px;
+        padding-bottom: 72px;
+      }
+      .gradient {
+        background: linear-gradient(115deg, var(--accent-2), var(--accent));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
       /* buttons */
-      .btn { display:inline-flex; align-items:center; gap:7px; background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff; padding:11px 19px; border-radius:11px; font-weight:600; font-size:15px; border:0; cursor:pointer; box-shadow:0 1px 2px rgba(16,16,40,.12); transition:transform .15s ease, box-shadow .15s ease, opacity .15s; }
-      .btn:hover { transform:translateY(-1px); box-shadow:0 8px 26px color-mix(in srgb,var(--accent) 38%,transparent); text-decoration:none; color:#fff; }
-      .btn:active { transform:translateY(0); }
-      .btn.ghost { background:var(--panel); color:var(--fg); border:1px solid var(--line); box-shadow:var(--shadow); }
-      .btn.ghost:hover { color:var(--fg); border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); box-shadow:0 6px 18px rgba(16,16,40,.08); }
-      .btn.sm { padding:7px 13px; font-size:13.5px; border-radius:9px; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: linear-gradient(135deg, var(--accent-2), var(--accent));
+        color: #fff;
+        padding: 11px 19px;
+        border-radius: 11px;
+        font-weight: 600;
+        font-size: 15px;
+        border: 0;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(16, 16, 40, 0.12);
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          opacity 0.15s;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 26px color-mix(in srgb, var(--accent) 38%, transparent);
+        text-decoration: none;
+        color: #fff;
+      }
+      .btn:active {
+        transform: translateY(0);
+      }
+      .btn.ghost {
+        background: var(--panel);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+      }
+      .btn.ghost:hover {
+        color: var(--fg);
+        border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+        box-shadow: 0 6px 18px rgba(16, 16, 40, 0.08);
+      }
+      .btn.sm {
+        padding: 7px 13px;
+        font-size: 13.5px;
+        border-radius: 9px;
+      }
       /* cards + grid */
-      .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:16px; margin-top:18px; }
-      .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px; box-shadow:var(--shadow); transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
-      .card:hover { transform:translateY(-2px); border-color:color-mix(in srgb,var(--accent) 26%,var(--line)); box-shadow:0 14px 40px rgba(16,16,40,.10); }
-      .card b { color:var(--accent); font-family:ui-monospace,"SFMono-Regular",monospace; font-size:13px; }
-      .card p { color:var(--muted); font-size:14px; margin:6px 0 0; }
-      .pill { display:inline-block; background:var(--bg-soft); color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 11px; font-size:12px; font-weight:500; }
-      .pill.accent { background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); border-color:color-mix(in srgb,var(--accent) 24%,transparent); }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+        gap: 16px;
+        margin-top: 18px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: var(--shadow);
+        transition:
+          transform 0.16s ease,
+          box-shadow 0.16s ease,
+          border-color 0.16s ease;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+        box-shadow: 0 14px 40px rgba(16, 16, 40, 0.1);
+      }
+      .card b {
+        color: var(--accent);
+        font-family: ui-monospace, "SFMono-Regular", monospace;
+        font-size: 13px;
+      }
+      .card p {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 6px 0 0;
+      }
+      .pill {
+        display: inline-block;
+        background: var(--bg-soft);
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 11px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .pill.accent {
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        color: var(--accent);
+        border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+      }
       /* forms + tables */
-      input,select,textarea { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; font-size:15px; transition:border-color .15s, box-shadow .15s; }
-      input:focus-visible,select:focus-visible,textarea:focus-visible { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
-      table { width:100%; border-collapse:collapse; } th,td { text-align:start; padding:11px 12px; border-bottom:1px solid var(--line); font-size:14.5px; } th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+      input,
+      select,
+      textarea {
+        background: var(--panel);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+        font-size: 15px;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: start;
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14.5px;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
       /* hero */
-      .hero { text-align:center; padding:72px 0 32px; position:relative; }
-      .hero::before { content:""; position:absolute; inset:-40px 0 auto; height:520px; background:var(--glow); z-index:-1; }
-      .hero h1 { font-size:clamp(40px,7vw,72px); }
-      .hero .tag { margin:0 auto; font-size:clamp(17px,2.4vw,21px); }
-      .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:26px; }
-      .badges { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:30px; }
-      .section { padding:30px 0; }
-      .center { text-align:center; }
+      .hero {
+        text-align: center;
+        padding: 72px 0 32px;
+        position: relative;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: -40px 0 auto;
+        height: 520px;
+        background: var(--glow);
+        z-index: -1;
+      }
+      .hero h1 {
+        font-size: clamp(40px, 7vw, 72px);
+      }
+      .hero .tag {
+        margin: 0 auto;
+        font-size: clamp(17px, 2.4vw, 21px);
+      }
+      .cta {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 26px;
+      }
+      .badges {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 30px;
+      }
+      .section {
+        padding: 30px 0;
+      }
+      .center {
+        text-align: center;
+      }
       /* pricing */
-      .tiers { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; margin-top:22px; align-items:stretch; }
-      .tier { display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:24px; box-shadow:var(--shadow); transition:transform .16s, box-shadow .16s; position:relative; }
-      .tier:hover { transform:translateY(-3px); box-shadow:0 18px 50px rgba(16,16,40,.12); }
-      .tier.popular { border-color:color-mix(in srgb,var(--accent) 55%,var(--line)); box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent), 0 20px 60px color-mix(in srgb,var(--accent) 18%,transparent); }
-      .tier .price { font-size:38px; font-weight:800; letter-spacing:-.03em; margin:8px 0 2px; }
-      .tier ul { list-style:none; padding:0; margin:16px 0 0; display:grid; gap:9px; }
-      .tier li { color:var(--muted); font-size:14.5px; padding-inline-start:24px; position:relative; }
-      .tier li::before { content:"✓"; position:absolute; inset-inline-start:0; color:var(--accent); font-weight:700; }
-      .tier .badge { position:absolute; top:-11px; inset-inline-end:20px; background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; letter-spacing:.03em; text-transform:uppercase; }
-      .spacer { flex:1; }
+      .tiers {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 18px;
+        margin-top: 22px;
+        align-items: stretch;
+      }
+      .tier {
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: var(--shadow);
+        transition:
+          transform 0.16s,
+          box-shadow 0.16s;
+        position: relative;
+      }
+      .tier:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 18px 50px rgba(16, 16, 40, 0.12);
+      }
+      .tier.popular {
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+          0 20px 60px color-mix(in srgb, var(--accent) 18%, transparent);
+      }
+      .tier .price {
+        font-size: 38px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin: 8px 0 2px;
+      }
+      .tier ul {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0;
+        display: grid;
+        gap: 9px;
+      }
+      .tier li {
+        color: var(--muted);
+        font-size: 14.5px;
+        padding-inline-start: 24px;
+        position: relative;
+      }
+      .tier li::before {
+        content: "✓";
+        position: absolute;
+        inset-inline-start: 0;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .tier .badge {
+        position: absolute;
+        top: -11px;
+        inset-inline-end: 20px;
+        background: linear-gradient(135deg, var(--accent-2), var(--accent));
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .spacer {
+        flex: 1;
+      }
       /* footer */
-      footer.site { border-top:1px solid var(--line); background:var(--bg-soft); margin-top:60px; }
-      footer.site .newsletter { display:flex; gap:24px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:28px 0; border-bottom:1px solid var(--line); }
-      footer.site .newsletter-form { display:flex; gap:8px; flex-wrap:wrap; }
-      footer.site .newsletter-form input { min-width:220px; }
-      footer.site .cols { display:grid; grid-template-columns:1.5fr repeat(5,1fr); gap:24px; padding:46px 0 30px; }
-      @media (max-width:980px){ footer.site .cols{grid-template-columns:1fr 1fr 1fr} }
-      @media (max-width:600px){ footer.site .cols{grid-template-columns:1fr 1fr} }
-      footer.site h4 { font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:0 0 12px; }
-      footer.site a { display:block; color:var(--muted); font-size:14px; padding:4px 0; } footer.site a:hover { color:var(--fg); }
-      footer.site .bottom { border-top:1px solid var(--line); padding:18px 0; display:flex; gap:14px; flex-wrap:wrap; align-items:center; color:var(--muted); font-size:13px; }
+      footer.site {
+        border-top: 1px solid var(--line);
+        background: var(--bg-soft);
+        margin-top: 60px;
+      }
+      footer.site .newsletter {
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        padding: 28px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      footer.site .newsletter-form {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      footer.site .newsletter-form input {
+        min-width: 220px;
+      }
+      footer.site .cols {
+        display: grid;
+        grid-template-columns: 1.5fr repeat(5, 1fr);
+        gap: 24px;
+        padding: 46px 0 30px;
+      }
+      @media (max-width: 980px) {
+        footer.site .cols {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+      }
+      @media (max-width: 600px) {
+        footer.site .cols {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      footer.site h4 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      footer.site a {
+        display: block;
+        color: var(--muted);
+        font-size: 14px;
+        padding: 4px 0;
+      }
+      footer.site a:hover {
+        color: var(--fg);
+      }
+      footer.site .bottom {
+        border-top: 1px solid var(--line);
+        padding: 18px 0;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
       /* cart button + slide-out drawer (logical props + a dir-aware transform → correct slide side in RTL) */
-      .cartbtn { position:relative; font-size:15px; line-height:1; }
-      .cartcount { position:absolute; top:-6px; inset-inline-end:-6px; min-width:17px; height:17px; padding:0 4px; border-radius:999px; background:var(--accent); color:var(--on-accent); font-size:11px; font-weight:700; line-height:17px; text-align:center; box-shadow:0 1px 3px rgba(16,16,40,.25); }
-      .cartback { position:fixed; inset:0; z-index:40; background:rgba(8,8,20,.42); backdrop-filter:blur(2px); opacity:0; transition:opacity .22s ease; }
-      .cartback.open { opacity:1; }
-      .cartdrawer { position:fixed; top:0; inset-inline-end:0; z-index:41; width:min(390px,92vw); height:100dvh; display:flex; flex-direction:column; background:var(--panel); border-inline-start:1px solid var(--line); box-shadow:-18px 0 50px rgba(16,16,40,.18); transform:translateX(100%); transition:transform .24s cubic-bezier(.4,0,.2,1); }
-      [dir="rtl"] .cartdrawer { box-shadow:18px 0 50px rgba(16,16,40,.18); transform:translateX(-100%); }
-      .cartdrawer.open { transform:translateX(0); }
-      .cartdrawer-head { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--line); }
-      .cartdrawer-head strong { font-size:16px; font-weight:700; letter-spacing:-.01em; }
-      .cartlines { flex:1; overflow-y:auto; padding:6px 14px; }
-      .cartempty { color:var(--muted); text-align:center; padding:44px 12px; font-size:14.5px; }
-      .cartline { display:flex; gap:12px; padding:12px 8px; border-bottom:1px solid var(--line); }
-      .cartline-img { width:54px; height:54px; flex:none; border-radius:9px; object-fit:cover; background:var(--bg-soft); border:1px solid var(--line); }
-      .cartline-img-ph { display:block; }
-      .cartline-body { flex:1; min-width:0; }
-      .cartline-top { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
-      .cartline-name { font-weight:600; font-size:14.5px; }
-      .cartline-variant { font-size:12px; color:var(--muted); margin-top:2px; }
-      .cartline-price { font-family:ui-monospace,monospace; font-size:13.5px; white-space:nowrap; }
-      .cartline-ctrl { display:flex; align-items:center; gap:6px; margin-top:9px; }
-      .qbtn { width:26px; height:26px; display:grid; place-items:center; border:1px solid var(--line); background:var(--bg-soft); color:var(--fg); border-radius:7px; cursor:pointer; font-size:14px; padding:0; line-height:1; }
-      .qbtn:hover { border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); }
-      .qbtn.rm { margin-inline-start:auto; color:var(--muted); }
-      .cartline-ctrl .qty { min-width:22px; text-align:center; font-size:14px; font-variant-numeric:tabular-nums; }
-      .cartdrawer-foot { border-top:1px solid var(--line); padding:16px 20px; background:var(--bg-soft); }
-      .cartsub { display:flex; justify-content:space-between; font-size:15px; margin-bottom:12px; }
-      .cartsub span:last-child { font-weight:700; font-family:ui-monospace,monospace; }
-      .cartdrawer-foot .btn { width:100%; justify-content:center; }
+      .cartbtn {
+        position: relative;
+        font-size: 15px;
+        line-height: 1;
+      }
+      .cartcount {
+        position: absolute;
+        top: -6px;
+        inset-inline-end: -6px;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 17px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(16, 16, 40, 0.25);
+      }
+      .cartback {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: rgba(8, 8, 20, 0.42);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        transition: opacity 0.22s ease;
+      }
+      .cartback.open {
+        opacity: 1;
+      }
+      .cartdrawer {
+        position: fixed;
+        top: 0;
+        inset-inline-end: 0;
+        z-index: 41;
+        width: min(390px, 92vw);
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border-inline-start: 1px solid var(--line);
+        box-shadow: -18px 0 50px rgba(16, 16, 40, 0.18);
+        transform: translateX(100%);
+        transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      [dir="rtl"] .cartdrawer {
+        box-shadow: 18px 0 50px rgba(16, 16, 40, 0.18);
+        transform: translateX(-100%);
+      }
+      .cartdrawer.open {
+        transform: translateX(0);
+      }
+      .cartdrawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .cartdrawer-head strong {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .cartlines {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px 14px;
+      }
+      .cartempty {
+        color: var(--muted);
+        text-align: center;
+        padding: 44px 12px;
+        font-size: 14.5px;
+      }
+      .cartline {
+        display: flex;
+        gap: 12px;
+        padding: 12px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .cartline-img {
+        width: 54px;
+        height: 54px;
+        flex: none;
+        border-radius: 9px;
+        object-fit: cover;
+        background: var(--bg-soft);
+        border: 1px solid var(--line);
+      }
+      .cartline-img-ph {
+        display: block;
+      }
+      .cartline-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .cartline-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+      }
+      .cartline-name {
+        font-weight: 600;
+        font-size: 14.5px;
+      }
+      .cartline-variant {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .cartline-price {
+        font-family: ui-monospace, monospace;
+        font-size: 13.5px;
+        white-space: nowrap;
+      }
+      .cartline-ctrl {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 9px;
+      }
+      .qbtn {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        background: var(--bg-soft);
+        color: var(--fg);
+        border-radius: 7px;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0;
+        line-height: 1;
+      }
+      .qbtn:hover {
+        border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+      }
+      .qbtn.rm {
+        margin-inline-start: auto;
+        color: var(--muted);
+      }
+      .cartline-ctrl .qty {
+        min-width: 22px;
+        text-align: center;
+        font-size: 14px;
+        font-variant-numeric: tabular-nums;
+      }
+      .cartdrawer-foot {
+        border-top: 1px solid var(--line);
+        padding: 16px 20px;
+        background: var(--bg-soft);
+      }
+      .cartsub {
+        display: flex;
+        justify-content: space-between;
+        font-size: 15px;
+        margin-bottom: 12px;
+      }
+      .cartsub span:last-child {
+        font-weight: 700;
+        font-family: ui-monospace, monospace;
+      }
+      .cartdrawer-foot .btn {
+        width: 100%;
+        justify-content: center;
+      }
       /* mobile nav drawer — slides from the START edge (opposite the cart), RTL-aware; hamburger shows < 760px */
-      .navtoggle { display:none; font-size:16px; }
-      @media (max-width:760px){ .navtoggle { display:inline-grid; place-items:center; } }
-      .mobilenav { position:fixed; top:0; inset-inline-start:0; z-index:41; width:min(300px,86vw); height:100dvh; display:flex; flex-direction:column; background:var(--panel); border-inline-end:1px solid var(--line); box-shadow:18px 0 50px rgba(16,16,40,.18); transform:translateX(-100%); transition:transform .24s cubic-bezier(.4,0,.2,1); }
-      [dir="rtl"] .mobilenav { box-shadow:-18px 0 50px rgba(16,16,40,.18); transform:translateX(100%); }
-      .mobilenav.open { transform:translateX(0); }
-      .mobilenav-head { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line); }
-      .mobilenav nav { display:flex; flex-direction:column; padding:10px 12px; gap:2px; }
-      .mobilenav nav a { color:var(--fg); padding:11px 14px; border-radius:9px; font-weight:500; font-size:15px; }
-      .mobilenav nav a:hover, .mobilenav nav a.on { background:var(--bg-soft); text-decoration:none; }
-      .mobilenav nav a.on { color:var(--accent); }
+      .navtoggle {
+        display: none;
+        font-size: 16px;
+      }
+      @media (max-width: 760px) {
+        .navtoggle {
+          display: inline-grid;
+          place-items: center;
+        }
+      }
+      .mobilenav {
+        position: fixed;
+        top: 0;
+        inset-inline-start: 0;
+        z-index: 41;
+        width: min(300px, 86vw);
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border-inline-end: 1px solid var(--line);
+        box-shadow: 18px 0 50px rgba(16, 16, 40, 0.18);
+        transform: translateX(-100%);
+        transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      [dir="rtl"] .mobilenav {
+        box-shadow: -18px 0 50px rgba(16, 16, 40, 0.18);
+        transform: translateX(100%);
+      }
+      .mobilenav.open {
+        transform: translateX(0);
+      }
+      .mobilenav-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .mobilenav nav {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px;
+        gap: 2px;
+      }
+      .mobilenav nav a {
+        color: var(--fg);
+        padding: 11px 14px;
+        border-radius: 9px;
+        font-weight: 500;
+        font-size: 15px;
+      }
+      .mobilenav nav a:hover,
+      .mobilenav nav a.on {
+        background: var(--bg-soft);
+        text-decoration: none;
+      }
+      .mobilenav nav a.on {
+        color: var(--accent);
+      }
       /* ⌘K command palette (centered modal) */
-      .palette-btn { font-size:14px; }
-      .paletteback { position:fixed; inset:0; z-index:50; background:rgba(8,8,20,.42); backdrop-filter:blur(2px); opacity:0; transition:opacity .18s ease; }
-      .paletteback.open { opacity:1; }
-      .palette { position:fixed; top:13vh; left:50%; transform:translateX(-50%) translateY(-8px); z-index:51; width:min(560px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 24px 70px rgba(16,16,40,.3); overflow:hidden; opacity:0; transition:opacity .18s ease, transform .18s ease; }
-      .palette.open { opacity:1; transform:translateX(-50%) translateY(0); }
-      .palette input { width:100%; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:15px 18px; font-size:16px; background:transparent; }
-      .palette input:focus-visible { outline:none; box-shadow:none; }
-      .palette-results { list-style:none; margin:0; padding:6px; max-height:52vh; overflow-y:auto; }
-      .palette-item { display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:9px; cursor:pointer; font-size:14.5px; }
-      .palette-item.on, .palette-item:hover { background:var(--bg-soft); }
-      .palette-type { font-size:11px; font-weight:600; color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); padding:2px 7px; border-radius:999px; white-space:nowrap; }
-      .palette-empty { padding:16px 14px; color:var(--muted); font-size:14px; }
-      .palette-foot { border-top:1px solid var(--line); padding:8px 14px; color:var(--muted); font-size:12px; background:var(--bg-soft); }
+      .palette-btn {
+        font-size: 14px;
+      }
+      .paletteback {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(8, 8, 20, 0.42);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        transition: opacity 0.18s ease;
+      }
+      .paletteback.open {
+        opacity: 1;
+      }
+      .palette {
+        position: fixed;
+        top: 13vh;
+        left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        z-index: 51;
+        width: min(560px, 92vw);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 24px 70px rgba(16, 16, 40, 0.3);
+        overflow: hidden;
+        opacity: 0;
+        transition:
+          opacity 0.18s ease,
+          transform 0.18s ease;
+      }
+      .palette.open {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      .palette input {
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        padding: 15px 18px;
+        font-size: 16px;
+        background: transparent;
+      }
+      .palette input:focus-visible {
+        outline: none;
+        box-shadow: none;
+      }
+      .palette-results {
+        list-style: none;
+        margin: 0;
+        padding: 6px;
+        max-height: 52vh;
+        overflow-y: auto;
+      }
+      .palette-item {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 9px;
+        cursor: pointer;
+        font-size: 14.5px;
+      }
+      .palette-item.on,
+      .palette-item:hover {
+        background: var(--bg-soft);
+      }
+      .palette-type {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        padding: 2px 7px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .palette-empty {
+        padding: 16px 14px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .palette-foot {
+        border-top: 1px solid var(--line);
+        padding: 8px 14px;
+        color: var(--muted);
+        font-size: 12px;
+        background: var(--bg-soft);
+      }
       /* stat bento (landing) */
-      .statbento { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; }
-      .stat { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 18px; text-align:center; box-shadow:var(--shadow); }
-      .stat b { display:block; font-size:34px; font-weight:800; letter-spacing:-.03em; background:linear-gradient(115deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-      .stat span { color:var(--muted); font-size:13px; }
-      @media (max-width:560px){ #scheme{display:none} } /* keep the chrome uncrowded on small phones */
+      .statbento {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 14px;
+      }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px 18px;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+      .stat b {
+        display: block;
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        background: linear-gradient(115deg, var(--accent-2), var(--accent));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .stat span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 560px) {
+        #scheme {
+          display: none;
+        }
+      } /* keep the chrome uncrowded on small phones */
       /* toasts (bottom-inline-end stack; logical props → flips for RTL) */
-      .toasts { position:fixed; bottom:20px; inset-inline-end:20px; z-index:60; display:flex; flex-direction:column; gap:10px; max-width:min(360px,calc(100vw - 40px)); pointer-events:none; }
-      .toast { pointer-events:auto; display:flex; align-items:center; gap:10px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-inline-start:3px solid var(--accent); border-radius:11px; padding:11px 13px; box-shadow:0 10px 34px rgba(16,16,40,.16); font-size:14px; transform:translateY(8px); opacity:0; transition:opacity .2s ease, transform .2s ease; }
-      .toast.in { opacity:1; transform:translateY(0); }
-      .toast.out { opacity:0; transform:translateY(8px); }
-      .toast-success { border-inline-start-color:#22c55e; } .toast-success .toast-ic { color:#22c55e; }
-      .toast-error { border-inline-start-color:#ef4444; } .toast-error .toast-ic { color:#ef4444; }
-      .toast-ic { font-weight:700; } .toast-msg { flex:1; } .toast-x { background:none; border:0; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:0 2px; }
-      .toast-x:hover { color:var(--fg); }
+      .toasts {
+        position: fixed;
+        bottom: 20px;
+        inset-inline-end: 20px;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: min(360px, calc(100vw - 40px));
+        pointer-events: none;
+      }
+      .toast {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--panel);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-inline-start: 3px solid var(--accent);
+        border-radius: 11px;
+        padding: 11px 13px;
+        box-shadow: 0 10px 34px rgba(16, 16, 40, 0.16);
+        font-size: 14px;
+        transform: translateY(8px);
+        opacity: 0;
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease;
+      }
+      .toast.in {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .toast.out {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      .toast-success {
+        border-inline-start-color: #22c55e;
+      }
+      .toast-success .toast-ic {
+        color: #22c55e;
+      }
+      .toast-error {
+        border-inline-start-color: #ef4444;
+      }
+      .toast-error .toast-ic {
+        color: #ef4444;
+      }
+      .toast-ic {
+        font-weight: 700;
+      }
+      .toast-msg {
+        flex: 1;
+      }
+      .toast-x {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        padding: 0 2px;
+      }
+      .toast-x:hover {
+        color: var(--fg);
+      }
       /* loading skeletons (shimmer placeholder; respects reduced-motion) */
-      .skel { position:relative; overflow:hidden; background:var(--bg-soft); border-radius:8px; }
-      .skel::after { content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--fg) 7%,transparent),transparent); animation:shimmer 1.3s infinite; }
-      @keyframes shimmer { 100% { transform:translateX(100%); } }
-      @media (prefers-reduced-motion:reduce){ .skel::after{ animation:none } }
+      .skel {
+        position: relative;
+        overflow: hidden;
+        background: var(--bg-soft);
+        border-radius: 8px;
+      }
+      .skel::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 7%, transparent), transparent);
+        animation: shimmer 1.3s infinite;
+      }
+      @keyframes shimmer {
+        100% {
+          transform: translateX(100%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .skel::after {
+          animation: none;
+        }
+      }
     </style>
     <style is:global set:html={schemeCss}></style>
     <style is:global set:html={baseCss}></style>
     <style is:global>
       /* ── upgraded header: glass + scroll-aware, animated nav, crisp SVG controls ───────────── */
-      header.site { transition: background .25s ease, border-color .25s ease, box-shadow .25s ease; }
-      header.site.scrolled { background: color-mix(in srgb, var(--bg) 70%, transparent); box-shadow: 0 8px 30px -16px rgba(16,16,40,.55); border-bottom-color: color-mix(in srgb, var(--line) 70%, var(--accent) 30%); }
-      header.site .wrap { position: relative; }
-      .scrollprog { position:absolute; left:0; bottom:-1px; height:2px; width:0; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:0 2px 2px 0; pointer-events:none; }
-      nav.main a { position:relative; } nav.main a:hover { background:transparent; color:var(--fg); }
-      nav.main a::after { content:""; position:absolute; left:11px; right:11px; bottom:2px; height:2px; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); transform:scaleX(0); transform-origin:left; transition:transform .25s cubic-bezier(.4,0,.2,1); }
-      nav.main a:hover::after, nav.main a.on::after { transform:scaleX(1); }
-      .iconbtn { display:inline-grid; place-items:center; width:36px; height:36px; padding:0; transition:background .15s ease, color .15s ease, transform .15s ease; }
-      .iconbtn:hover { color:var(--fg); transform:translateY(-1px); }
-      .iconbtn svg { width:17px; height:17px; display:block; }
-      .theme-btn svg { transition:transform .45s cubic-bezier(.4,0,.2,1); } .theme-btn:hover svg { transform:rotate(35deg); }
-      .cartbtn.bump { animation:cartbump .45s cubic-bezier(.3,1.5,.5,1); }
-      @keyframes cartbump { 0%{transform:scale(1)} 35%{transform:scale(1.25)} 100%{transform:scale(1)} }
-      .navtoggle { display:none; }
+      header.site {
+        transition:
+          background 0.25s ease,
+          border-color 0.25s ease,
+          box-shadow 0.25s ease;
+      }
+      header.site.scrolled {
+        background: color-mix(in srgb, var(--bg) 70%, transparent);
+        box-shadow: 0 8px 30px -16px rgba(16, 16, 40, 0.55);
+        border-bottom-color: color-mix(in srgb, var(--line) 70%, var(--accent) 30%);
+      }
+      header.site .wrap {
+        position: relative;
+      }
+      .scrollprog {
+        position: absolute;
+        left: 0;
+        bottom: -1px;
+        height: 2px;
+        width: 0;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        border-radius: 0 2px 2px 0;
+        pointer-events: none;
+      }
+      nav.main a {
+        position: relative;
+      }
+      nav.main a:hover {
+        background: transparent;
+        color: var(--fg);
+      }
+      nav.main a::after {
+        content: "";
+        position: absolute;
+        left: 11px;
+        right: 11px;
+        bottom: 2px;
+        height: 2px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      nav.main a:hover::after,
+      nav.main a.on::after {
+        transform: scaleX(1);
+      }
+      .iconbtn {
+        display: inline-grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease,
+          transform 0.15s ease;
+      }
+      .iconbtn:hover {
+        color: var(--fg);
+        transform: translateY(-1px);
+      }
+      .iconbtn svg {
+        width: 17px;
+        height: 17px;
+        display: block;
+      }
+      .theme-btn svg {
+        transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .theme-btn:hover svg {
+        transform: rotate(35deg);
+      }
+      .cartbtn.bump {
+        animation: cartbump 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
+      }
+      @keyframes cartbump {
+        0% {
+          transform: scale(1);
+        }
+        35% {
+          transform: scale(1.25);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .navtoggle {
+        display: none;
+      }
       /* only the clip-path circle plays on a theme switch (suppress the default root cross-fade) */
-      ::view-transition-old(root), ::view-transition-new(root) { animation:none; mix-blend-mode:normal; }
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation: none;
+        mix-blend-mode: normal;
+      }
 
       /* ── color-scheme popover (swatches derived from @suluk/theme) ─────────────────────────── */
-      .popback { position:fixed; inset:0; z-index:50; background:rgba(8,8,20,.5); backdrop-filter:blur(3px); opacity:0; transition:opacity .18s ease; }
-      .popback.open { opacity:1; } .popback:not(.open) { pointer-events:none; } .popback[hidden] { display:none; }
+      .popback {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(8, 8, 20, 0.5);
+        backdrop-filter: blur(3px);
+        opacity: 0;
+        transition: opacity 0.18s ease;
+      }
+      .popback.open {
+        opacity: 1;
+      }
+      .popback:not(.open) {
+        pointer-events: none;
+      }
+      .popback[hidden] {
+        display: none;
+      }
       /* centered modal. NB: [hidden] must beat the class's display, and it's pointer-events:none unless fully open —
          otherwise the invisible (opacity:0) panel stays clickable after close. */
-      .schemepop { position:fixed; top:50%; left:50%; z-index:51; width:min(440px,calc(100vw - 32px)); max-height:min(74vh,600px); display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:0 30px 80px rgba(16,16,40,.42); overflow:hidden; opacity:0; transform:translate(-50%,-50%) scale(.96); transition:opacity .18s ease, transform .18s ease; pointer-events:none; }
-      .schemepop.open { opacity:1; transform:translate(-50%,-50%) scale(1); pointer-events:auto; }
-      .schemepop[hidden] { display:none; }
-      .schemepop-head { padding:14px 14px 11px; display:flex; flex-direction:column; gap:9px; border-bottom:1px solid var(--line); }
-      .schemepop-head strong { font-size:13px; font-family:inherit; }
-      #scheme-search { font:inherit; font-size:13.5px; background:var(--bg-soft); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:8px 11px; }
-      .scheme-grid { padding:10px; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-      .scheme-card { display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:10px; border:1px solid transparent; background:transparent; cursor:pointer; text-align:left; font:inherit; color:var(--fg); width:100%; }
-      .scheme-card:hover { background:var(--bg-soft); }
-      .scheme-card.on { border-color:color-mix(in srgb,var(--accent) 55%,var(--line)); background:color-mix(in srgb,var(--accent) 9%,transparent); }
-      .scheme-sw { display:inline-flex; flex-shrink:0; border-radius:6px; overflow:hidden; border:1px solid var(--line); box-shadow:0 1px 2px rgba(16,16,40,.14); }
-      .scheme-sw i { width:12px; height:24px; display:block; }
-      .scheme-name { font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
-      .scheme-card.on .scheme-name { font-weight:700; }
-      .scheme-empty { grid-column:1/-1; color:var(--muted); font-size:13px; text-align:center; padding:18px; }
+      .schemepop {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        z-index: 51;
+        width: min(440px, calc(100vw - 32px));
+        max-height: min(74vh, 600px);
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 30px 80px rgba(16, 16, 40, 0.42);
+        overflow: hidden;
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.96);
+        transition:
+          opacity 0.18s ease,
+          transform 0.18s ease;
+        pointer-events: none;
+      }
+      .schemepop.open {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+        pointer-events: auto;
+      }
+      .schemepop[hidden] {
+        display: none;
+      }
+      .schemepop-head {
+        padding: 14px 14px 11px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        border-bottom: 1px solid var(--line);
+      }
+      .schemepop-head strong {
+        font-size: 13px;
+        font-family: inherit;
+      }
+      #scheme-search {
+        font: inherit;
+        font-size: 13.5px;
+        background: var(--bg-soft);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 8px 11px;
+      }
+      .scheme-grid {
+        padding: 10px;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .scheme-card {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 9px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        color: var(--fg);
+        width: 100%;
+      }
+      .scheme-card:hover {
+        background: var(--bg-soft);
+      }
+      .scheme-card.on {
+        border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+        background: color-mix(in srgb, var(--accent) 9%, transparent);
+      }
+      .scheme-sw {
+        display: inline-flex;
+        flex-shrink: 0;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        box-shadow: 0 1px 2px rgba(16, 16, 40, 0.14);
+      }
+      .scheme-sw i {
+        width: 12px;
+        height: 24px;
+        display: block;
+      }
+      .scheme-name {
+        font-size: 12.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+      }
+      .scheme-card.on .scheme-name {
+        font-weight: 700;
+      }
+      .scheme-empty {
+        grid-column: 1/-1;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+        padding: 18px;
+      }
 
       /* ── responsivity: fold secondary controls into the mobile drawer ─────────────────────── */
-      @media (max-width:760px){
-        .navtoggle { display:inline-grid; }
-        .chrome #palette-open, .chrome #lang, .chrome #scheme-btn { display:none; }
-        .authname, .authcaret { display:none; }
+      @media (max-width: 760px) {
+        .navtoggle {
+          display: inline-grid;
+        }
+        .chrome #palette-open,
+        .chrome #lang,
+        .chrome #scheme-btn {
+          display: none;
+        }
+        .authname,
+        .authcaret {
+          display: none;
+        }
       }
       /* account menu — a real session-aware avatar + name dropdown (no "Sign in" flash; cached hint reveals it) */
       /* [hidden] must beat the .btn/.authbtn/.authpop display rules (class specificity > the UA [hidden] rule). */
-      .authmenu [hidden] { display:none !important; }
-      .authmenu { position:relative; }
-      .authbtn { display:inline-flex; align-items:center; gap:7px; max-width:180px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:3px 11px 3px 4px; cursor:pointer; font:inherit; color:var(--fg); }
-      .authbtn:hover { border-color:color-mix(in srgb,var(--accent) 34%,var(--line)); }
-      .authavatar { width:26px; height:26px; border-radius:50%; object-fit:cover; flex:none; background:var(--bg-soft); }
-      .authname { font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .authcaret { color:var(--muted); flex:none; }
-      .authpop { position:absolute; inset-inline-end:0; top:calc(100% + 8px); min-width:230px; z-index:60; padding:8px; display:flex; flex-direction:column; gap:2px; }
-      .authpop-head { display:flex; gap:10px; align-items:center; padding:6px 8px 10px; border-bottom:1px solid var(--line); margin-bottom:4px; }
-      .authpop-head img { width:38px; height:38px; border-radius:50%; object-fit:cover; flex:none; background:var(--bg-soft); }
-      .authpop-head strong { display:block; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
-      .authpop-head span { display:block; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
-      .authpop [role=menuitem] { text-align:start; padding:8px 10px; border-radius:8px; font-size:14px; color:var(--fg); text-decoration:none; background:none; border:0; cursor:pointer; font:inherit; width:100%; }
-      .authpop [role=menuitem]:hover { background:var(--bg-soft); }
-      #authsignout { color:var(--accent); font-weight:600; }
-      .mobilenav .mnav-actions { margin-top:auto; padding-top:18px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
-      .mobilenav .mnav-row { display:flex; gap:8px; flex-wrap:wrap; }
-      .mobilenav .mnav-row .btn.ghost { flex:1; justify-content:center; }
-    .promo-bar { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 16px; background:linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 62%, #ffffff)); color:#fff; font-size:13.5px; line-height:1.3; text-align:center; }
-    .promo-bar b { font-weight:700; }
-    .promo-bar button { background:rgba(255,255,255,.22); border:0; color:#fff; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:15px; line-height:1; flex:none; }
-    .promo-bar[hidden] { display:none; }
-    .cookie-banner { position:fixed; inset-inline:16px; bottom:16px; z-index:80; max-width:520px; margin-inline:auto; display:flex; gap:14px; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.14); font-size:13px; }
-    .cookie-banner[hidden] { display:none; }
-    .cookie-banner button { flex:none; }
+      .authmenu [hidden] {
+        display: none !important;
+      }
+      .authmenu {
+        position: relative;
+      }
+      .authbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        max-width: 180px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 999px;
+        padding: 3px 11px 3px 4px;
+        cursor: pointer;
+        font: inherit;
+        color: var(--fg);
+      }
+      .authbtn:hover {
+        border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+      }
+      .authavatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex: none;
+        background: var(--bg-soft);
+      }
+      .authname {
+        font-size: 13.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .authcaret {
+        color: var(--muted);
+        flex: none;
+      }
+      .authpop {
+        position: absolute;
+        inset-inline-end: 0;
+        top: calc(100% + 8px);
+        min-width: 230px;
+        z-index: 60;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .authpop-head {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 8px 10px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 4px;
+      }
+      .authpop-head img {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex: none;
+        background: var(--bg-soft);
+      }
+      .authpop-head strong {
+        display: block;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 160px;
+      }
+      .authpop-head span {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 160px;
+      }
+      .authpop [role="menuitem"] {
+        text-align: start;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--fg);
+        text-decoration: none;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        font: inherit;
+        width: 100%;
+      }
+      .authpop [role="menuitem"]:hover {
+        background: var(--bg-soft);
+      }
+      #authsignout {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .mobilenav .mnav-actions {
+        margin-top: auto;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .mobilenav .mnav-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .mobilenav .mnav-row .btn.ghost {
+        flex: 1;
+        justify-content: center;
+      }
+      .promo-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 8px 16px;
+        background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 62%, #ffffff));
+        color: #fff;
+        font-size: 13.5px;
+        line-height: 1.3;
+        text-align: center;
+      }
+      .promo-bar b {
+        font-weight: 700;
+      }
+      .promo-bar button {
+        background: rgba(255, 255, 255, 0.22);
+        border: 0;
+        color: #fff;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 15px;
+        line-height: 1;
+        flex: none;
+      }
+      .promo-bar[hidden] {
+        display: none;
+      }
+      .cookie-banner {
+        position: fixed;
+        inset-inline: 16px;
+        bottom: 16px;
+        z-index: 80;
+        max-width: 520px;
+        margin-inline: auto;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.14);
+        font-size: 13px;
+      }
+      .cookie-banner[hidden] {
+        display: none;
+      }
+      .cookie-banner button {
+        flex: none;
+      }
     </style>
   </head>
   <body>
@@ -367,25 +1648,90 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       <span>🎉 Launch week — use code <b>LAUNCH30</b> at checkout for 30% off your order.</span>
       <button id="promo-dismiss" type="button" aria-label="Dismiss announcement">×</button>
     </div>
-    <script is:inline>try { if (localStorage.getItem("promo_dismissed")) document.getElementById("promo-bar").hidden = true; } catch (e) {}</script>
+    <script is:inline>
+      try {
+        if (localStorage.getItem("promo_dismissed")) document.getElementById("promo-bar").hidden = true;
+      } catch (e) {}
+    </script>
     <header class="site" id="site-header" transition:persist="site-header">
       <div class="wrap">
         <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
-        <nav class="main">{nav.map(([href, key]) => <a href={href} {...navAttrs(href)} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}><span>{t("en", key)}</span></a>)}</nav>
+        <nav class="main">
+          {
+            nav.map(([href, key]) => (
+              <a
+                href={href}
+                {...navAttrs(href)}
+                data-i18n={key}
+                class={path === href ? "on" : ""}
+                aria-current={path === href ? "page" : undefined}
+              >
+                <span>{t("en", key)}</span>
+              </a>
+            ))
+          }
+        </nav>
         <div class="chrome">
-          <button id="palette-open" class="iconbtn palette-btn" aria-label="Search" title="Search (⌘K)" aria-haspopup="dialog" aria-controls="palette"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></button>
+          <button
+            id="palette-open"
+            class="iconbtn palette-btn"
+            aria-label="Search"
+            title="Search (⌘K)"
+            aria-haspopup="dialog"
+            aria-controls="palette"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              ><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.35-4.35"></path></svg
+            ></button
+          >
           <select id="lang" aria-label="Language">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
-          <button id="scheme-btn" class="iconbtn" aria-label="Color scheme" title="Color scheme" aria-haspopup="dialog" aria-controls="schemepop" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 5.624 17.461 2 12 2Z"/></svg></button>
-          <button id="theme" class="iconbtn theme-btn" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
-          <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span id="cartcount" class="cartcount" hidden>0</span></button>
+          <button
+            id="scheme-btn"
+            class="iconbtn"
+            aria-label="Color scheme"
+            title="Color scheme"
+            aria-haspopup="dialog"
+            aria-controls="schemepop"
+            aria-expanded="false"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              ><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"
+              ></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"
+              ></circle><path
+                d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 5.624 17.461 2 12 2Z"
+              ></path></svg
+            ></button
+          >
+          <button id="theme" class="iconbtn theme-btn" aria-label="Toggle theme"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              ><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg
+            ></button
+          >
+          <button id="cartbtn" class="iconbtn cartbtn" aria-label="Open cart" aria-haspopup="dialog" aria-controls="cartdrawer"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              ><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"
+              ></path></svg
+            ><span id="cartcount" class="cartcount" hidden>0</span></button
+          >
           <div class="authmenu" id="authmenu">
             <a id="authsignin" class="btn sm" href="/login" data-i18n="signIn" hidden>Sign in</a>
             <button id="authbtn" class="authbtn" aria-haspopup="menu" aria-expanded="false" aria-controls="authpop" hidden>
               <img id="authavatar" class="authavatar" alt="" /><span id="authname" class="authname"></span>
-              <svg class="authcaret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg
+                class="authcaret"
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg
+              >
             </button>
             <div class="authpop card" id="authpop" role="menu" hidden>
-              <div class="authpop-head"><img id="authpopavatar" alt="" /><div style="min-width:0"><strong id="authpopname"></strong><span id="authpopemail"></span></div></div>
+              <div class="authpop-head">
+                <img id="authpopavatar" alt="" /><div style="min-width:0">
+                  <strong id="authpopname"></strong><span id="authpopemail"></span>
+                </div>
+              </div>
               <a role="menuitem" href="/dashboard" {...navAttrs("/dashboard")} data-i18n="dashboard">Dashboard</a>
               <a role="menuitem" href="/dashboard/s/orders" {...navAttrs("/dashboard/s/orders")}>Orders</a>
               <a role="menuitem" href="/dashboard/s/wishlist" {...navAttrs("/dashboard/s/wishlist")}>Wishlist</a>
@@ -397,16 +1743,33 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             /* No-flash reveal: render the correct auth control during header PARSE (before paint) from the cached
                session hint (localStorage su_user), so a returning signed-in user never sees a "Sign in" flash. */
             (function () {
-              var su; try { su = JSON.parse(localStorage.getItem("su_user") || "null"); } catch (e) {}
-              var signin = document.getElementById("authsignin"), btn = document.getElementById("authbtn");
+              var su;
+              try {
+                su = JSON.parse(localStorage.getItem("su_user") || "null");
+              } catch (e) {}
+              var signin = document.getElementById("authsignin"),
+                btn = document.getElementById("authbtn");
               if (su && su.name && btn && signin) {
-                document.getElementById("authavatar").src = su.image || ("/avatar?seed=" + encodeURIComponent(su.email || su.name));
+                document.getElementById("authavatar").src = su.image || "/avatar?seed=" + encodeURIComponent(su.email || su.name);
                 document.getElementById("authname").textContent = su.name;
-                btn.hidden = false; signin.hidden = true;
-              } else if (signin) { signin.hidden = false; }
+                btn.hidden = false;
+                signin.hidden = true;
+              } else if (signin) {
+                signin.hidden = false;
+              }
             })();
           </script>
-          <button id="navtoggle" class="iconbtn navtoggle" aria-label="Menu" aria-expanded="false" aria-controls="mobilenav" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          <button
+            id="navtoggle"
+            class="iconbtn navtoggle"
+            aria-label="Menu"
+            aria-expanded="false"
+            aria-controls="mobilenav"
+            aria-haspopup="dialog"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              ><path d="M3 6h18M3 12h18M3 18h18"></path></svg
+            ></button
+          >
         </div>
       </div>
       <span class="scrollprog" id="scrollprog" aria-hidden="true"></span>
@@ -414,7 +1777,16 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
 
     <!-- color-scheme picker — a previews popover; swatches are DERIVED from @suluk/theme (never hand-maintained) -->
     <div id="schemeback" class="popback" hidden transition:persist="schemeback"></div>
-    <div id="schemepop" class="schemepop" role="dialog" aria-modal="true" aria-label="Color scheme" aria-hidden="true" hidden transition:persist="schemepop">
+    <div
+      id="schemepop"
+      class="schemepop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Color scheme"
+      aria-hidden="true"
+      hidden
+      transition:persist="schemepop"
+    >
       <div class="schemepop-head">
         <strong data-i18n="colorScheme">Color scheme</strong>
         <input id="scheme-search" type="search" placeholder="Search 43 schemes…" aria-label="Search schemes" autocomplete="off" />
@@ -427,21 +1799,41 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         <div class="newsletter">
           <div>
             <h4 style="font-size:16px;text-transform:none;letter-spacing:-.01em;color:var(--fg);margin:0 0 4px">Stay in the loop</h4>
-            <p style="color:var(--muted);font-size:14px;margin:0">New modules, the live cost ledger, and OpenAPI&nbsp;v4 progress — no spam.</p>
+            <p style="color:var(--muted);font-size:14px;margin:0">
+              New modules, the live cost ledger, and OpenAPI&nbsp;v4 progress — no spam.
+            </p>
           </div>
           <form id="newsletter-form" class="newsletter-form">
-            <input id="newsletter-email" type="email" required placeholder="you@example.com" aria-label="Email address" autocomplete="email" />
+            <input
+              id="newsletter-email"
+              type="email"
+              required
+              placeholder="you@example.com"
+              aria-label="Email address"
+              autocomplete="email"
+            />
             <button class="btn" type="submit" id="newsletter-btn">Subscribe</button>
           </form>
         </div>
         <div class="cols">
           <div>
             <a class="brand" href="/"><span class="dot">s</span> saasuluk</a>
-            <p style="color:var(--muted); font-size:14px; margin-top:12px; max-width:34ch">A premium SaaS starter where every layer — data, API, docs, UI, admin, cost — is projected from one typed contract.</p>
+            <p style="color:var(--muted); font-size:14px; margin-top:12px; max-width:34ch">
+              A premium SaaS starter where every layer — data, API, docs, UI, admin, cost — is projected from one typed contract.
+            </p>
           </div>
-          {footerCols.map((col) => (
-            <div><h4>{col.head}</h4>{col.links.map(([href, key]) => <a href={href} {...navAttrs(href)} data-i18n={(key in DICT.en) ? key : undefined}>{label(key)}</a>)}</div>
-          ))}
+          {
+            footerCols.map((col) => (
+              <div>
+                <h4>{col.head}</h4>
+                {col.links.map(([href, key]) => (
+                  <a href={href} {...navAttrs(href)} data-i18n={key in DICT.en ? key : undefined}>
+                    {label(key)}
+                  </a>
+                ))}
+              </div>
+            ))
+          }
         </div>
         <div class="bottom">
           <span>© 2026 saasuluk · built on <a href="https://github.com/MahmoodKhalil57/suluk">Suluk</a> (OpenAPI v4 candidate)</span>
@@ -451,31 +1843,84 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
     </footer>
     <script is:inline>
       (function () {
-        var f = document.getElementById("newsletter-form"); if (!f) return;
+        var f = document.getElementById("newsletter-form");
+        if (!f) return;
         f.addEventListener("submit", function (e) {
           e.preventDefault();
-          var inp = document.getElementById("newsletter-email"), btn = document.getElementById("newsletter-btn");
-          var email = (inp.value || "").trim(); if (!email) return;
-          btn.disabled = true; var lbl = btn.textContent; btn.textContent = "…";
-          fetch("/newsletter/subscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email }) })
-            .then(function (r) { if (!r.ok) throw new Error(); f.innerHTML = '<p style="color:var(--accent);font-weight:600;margin:0">✓ Subscribed — thanks!</p>'; if (window.toast) window.toast("Subscribed ✓", { type: "success" }); })
-            .catch(function () { btn.disabled = false; btn.textContent = lbl; if (window.toast) window.toast("Could not subscribe — try again.", { type: "error" }); });
+          var inp = document.getElementById("newsletter-email"),
+            btn = document.getElementById("newsletter-btn");
+          var email = (inp.value || "").trim();
+          if (!email) return;
+          btn.disabled = true;
+          var lbl = btn.textContent;
+          btn.textContent = "…";
+          fetch("/newsletter/subscribe", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: email }),
+          })
+            .then(function (r) {
+              if (!r.ok) throw new Error();
+              f.innerHTML = '<p style="color:var(--accent);font-weight:600;margin:0">✓ Subscribed — thanks!</p>';
+              if (window.toast) window.toast("Subscribed ✓", { type: "success" });
+            })
+            .catch(function () {
+              btn.disabled = false;
+              btn.textContent = lbl;
+              if (window.toast) window.toast("Could not subscribe — try again.", { type: "error" });
+            });
         });
       })();
     </script>
     <!-- cart drawer (populated by the bundled @suluk/nano-stores module below) -->
     <!-- ⌘K command palette (global search-and-jump over /search) -->
     <div id="paletteback" class="paletteback" hidden transition:persist="paletteback"></div>
-    <div id="palette" class="palette" role="dialog" aria-modal="true" aria-label="Search" aria-hidden="true" hidden transition:persist="palette">
+    <div
+      id="palette"
+      class="palette"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search"
+      aria-hidden="true"
+      hidden
+      transition:persist="palette"
+    >
       <input id="palette-input" type="search" placeholder="Search products & posts…" aria-label="Search" autocomplete="off" />
       <ul id="palette-results" class="palette-results" role="listbox"></ul>
       <div class="palette-foot">↑↓ navigate · ↵ open · esc close</div>
     </div>
     <!-- mobile navigation drawer (the desktop nav is hidden < 760px; @suluk/nano-stores createDrawer drives it) -->
     <div id="navback" class="cartback" hidden transition:persist="navback"></div>
-    <aside id="mobilenav" class="mobilenav" role="dialog" aria-modal="true" aria-label="Navigation" aria-hidden="true" hidden transition:persist="mobilenav">
-      <div class="mobilenav-head"><a class="brand" href="/"><span class="dot">s</span> saasuluk</a><button id="navclose" class="iconbtn" aria-label="Close menu">✕</button></div>
-      <nav>{nav.map(([href, key]) => <a href={href} {...navAttrs(href)} data-i18n={key} class={path === href ? "on" : ""} aria-current={path === href ? "page" : undefined}>{t("en", key)}</a>)}</nav>
+    <aside
+      id="mobilenav"
+      class="mobilenav"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Navigation"
+      aria-hidden="true"
+      hidden
+      transition:persist="mobilenav"
+    >
+      <div class="mobilenav-head">
+        <a class="brand" href="/"><span class="dot">s</span> saasuluk</a><button id="navclose" class="iconbtn" aria-label="Close menu"
+          >✕</button
+        >
+      </div>
+      <nav>
+        {
+          nav.map(([href, key]) => (
+            <a
+              href={href}
+              {...navAttrs(href)}
+              data-i18n={key}
+              class={path === href ? "on" : ""}
+              aria-current={path === href ? "page" : undefined}
+            >
+              {t("en", key)}
+            </a>
+          ))
+        }
+      </nav>
       <div class="mnav-actions">
         <div class="mnav-row">
           <button class="btn ghost sm" type="button" data-act="search">Search</button>
@@ -483,12 +1928,26 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
         </div>
         <div class="mnav-row">
           <button class="btn ghost sm" type="button" data-act="theme">Theme · <span id="m-theme-label">system</span></button>
-          <select id="m-lang" aria-label="Language" style="font:inherit;font-size:13px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:7px 9px;flex:1">{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select>
+          <select
+            id="m-lang"
+            aria-label="Language"
+            style="font:inherit;font-size:13px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:7px 9px;flex:1"
+            >{LOCALES.map((l) => <option value={l}>{LOCALE_LABEL[l]}</option>)}</select
+          >
         </div>
       </div>
     </aside>
     <div id="cartback" class="cartback" hidden transition:persist="cartback"></div>
-    <aside id="cartdrawer" class="cartdrawer" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-hidden="true" hidden transition:persist="cartdrawer">
+    <aside
+      id="cartdrawer"
+      class="cartdrawer"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Shopping cart"
+      aria-hidden="true"
+      hidden
+      transition:persist="cartdrawer"
+    >
       <div class="cartdrawer-head">
         <strong data-i18n="cart">Cart</strong>
         <button id="cartclose" class="iconbtn" aria-label="Close cart">✕</button>
@@ -503,105 +1962,253 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
     <!-- navigation progress hairline (@suluk/theme .navprogress). Rendered + persisted here (not runtime-appended to
          body) so the bar survives DOM-swap navs; src/client/ux.ts drives it off astro:before-preparation/page-load. -->
     <div class="navprogress" aria-hidden="true" transition:persist="navprogress"></div>
-    <script>import "../client/stores";</script>
-    <script>import "../client/auth";</script>
-    <script>import "../client/prefetch";</script>
-    <script>import "../client/format";</script>
-    <script>import "../client/cart";</script>
-    <script>import "../client/toast";</script>
-    <script>import "../client/ux";</script>
-    <script>import "../client/palette";</script>
-    <script is:inline set:html={`window.__schemes=${JSON.stringify(SCHEME_SWATCHES)}`}></script>
+    <script>
+      import "../client/stores";
+    </script>
+    <script>
+      import "../client/auth";
+    </script>
+    <script>
+      import "../client/prefetch";
+    </script>
+    <script>
+      import "../client/format";
+    </script>
+    <script>
+      import "../client/cart";
+    </script>
+    <script>
+      import "../client/toast";
+    </script>
+    <script>
+      import "../client/ux";
+    </script>
+    <script>
+      import "../client/palette";
+    </script>
+    <script is:inline set:html={`window.__schemes=${JSON.stringify(SCHEME_SWATCHES)}`} />
     <script is:inline>
       if (window.__applyLang) window.__applyLang(window.__lang0);
       (function () {
-        var root = document.documentElement, mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+        var root = document.documentElement,
+          mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
         var ICONS = {
-          light: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+          light:
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
           dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.36 6.36 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
-          system: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'
+          system:
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
         };
-        var THEMES = ["light", "dark", "system"], tbtn = document.getElementById("theme"), mLabel = document.getElementById("m-theme-label");
+        var THEMES = ["light", "dark", "system"],
+          tbtn = document.getElementById("theme"),
+          mLabel = document.getElementById("m-theme-label");
         function applyTheme(pref) {
           root.dataset.theme = pref === "system" ? (mq && mq.matches ? "dark" : "light") : pref;
           root.dataset.themePref = pref;
-          try { localStorage.setItem("theme", pref); } catch (e) {}
-          if (tbtn) { tbtn.innerHTML = ICONS[pref]; tbtn.setAttribute("aria-label", "Theme: " + pref + " — click to change"); }
+          try {
+            localStorage.setItem("theme", pref);
+          } catch (e) {}
+          if (tbtn) {
+            tbtn.innerHTML = ICONS[pref];
+            tbtn.setAttribute("aria-label", "Theme: " + pref + " — click to change");
+          }
           if (mLabel) mLabel.textContent = pref;
           if (popOpen) renderGrid(search ? search.value : ""); // swatches preview the active light/dark mode
         }
         function cycleTheme(e) {
-          var cur = root.dataset.themePref || "system", next = THEMES[(THEMES.indexOf(cur) + 1) % 3];
-          var btn = (e && e.currentTarget && e.currentTarget.getBoundingClientRect) ? e.currentTarget : tbtn;
-          if (!document.startViewTransition || !btn) { applyTheme(next); return; }
-          document.startViewTransition(function () { applyTheme(next); }).ready.then(function () {
-            var r = btn.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-            var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-            root.animate({ clipPath: ["circle(0px at " + x + "px " + y + "px)", "circle(" + rad + "px at " + x + "px " + y + "px)"] },
-              { duration: 480, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" });
-          }).catch(function () {});
+          var cur = root.dataset.themePref || "system",
+            next = THEMES[(THEMES.indexOf(cur) + 1) % 3];
+          var btn = e && e.currentTarget && e.currentTarget.getBoundingClientRect ? e.currentTarget : tbtn;
+          if (!document.startViewTransition || !btn) {
+            applyTheme(next);
+            return;
+          }
+          document
+            .startViewTransition(function () {
+              applyTheme(next);
+            })
+            .ready.then(function () {
+              var r = btn.getBoundingClientRect(),
+                x = r.left + r.width / 2,
+                y = r.top + r.height / 2;
+              var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+              root.animate(
+                { clipPath: ["circle(0px at " + x + "px " + y + "px)", "circle(" + rad + "px at " + x + "px " + y + "px)"] },
+                { duration: 480, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" },
+              );
+            })
+            .catch(function () {});
         }
-        if (tbtn) { applyTheme(root.dataset.themePref || "system"); tbtn.addEventListener("click", cycleTheme); }
-        if (mq) mq.addEventListener("change", function () { if ((root.dataset.themePref || "system") === "system") applyTheme("system"); });
+        if (tbtn) {
+          applyTheme(root.dataset.themePref || "system");
+          tbtn.addEventListener("click", cycleTheme);
+        }
+        if (mq)
+          mq.addEventListener("change", function () {
+            if ((root.dataset.themePref || "system") === "system") applyTheme("system");
+          });
 
         // ── color-scheme popover (swatches DERIVED from @suluk/theme — never hand-maintained) ──
-        var pop = document.getElementById("schemepop"), back = document.getElementById("schemeback"), grid = document.getElementById("scheme-grid"),
-            sbtn = document.getElementById("scheme-btn"), search = document.getElementById("scheme-search"), swatches = window.__schemes || [], popOpen = false;
-        function cur() { return root.dataset.scheme || ""; }
-        function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+        var pop = document.getElementById("schemepop"),
+          back = document.getElementById("schemeback"),
+          grid = document.getElementById("scheme-grid"),
+          sbtn = document.getElementById("scheme-btn"),
+          search = document.getElementById("scheme-search"),
+          swatches = window.__schemes || [],
+          popOpen = false;
+        function cur() {
+          return root.dataset.scheme || "";
+        }
+        function esc(s) {
+          return String(s).replace(/[&<>"]/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+          });
+        }
         function card(s) {
           var cols = (root.dataset.theme === "dark" ? s.dark : s.light) || [];
-          var sw = cols.map(function (c) { return '<i style="background:' + esc(c) + '"></i>'; }).join("");
+          var sw = cols
+            .map(function (c) {
+              return '<i style="background:' + esc(c) + '"></i>';
+            })
+            .join("");
           var on = s.name === cur() ? " on" : "";
-          return '<button class="scheme-card' + on + '" role="option" aria-selected="' + (on ? "true" : "false") + '" data-scheme="' + esc(s.name) + '"><span class="scheme-sw">' + sw + '</span><span class="scheme-name">' + esc(s.label) + '</span></button>';
+          return (
+            '<button class="scheme-card' +
+            on +
+            '" role="option" aria-selected="' +
+            (on ? "true" : "false") +
+            '" data-scheme="' +
+            esc(s.name) +
+            '"><span class="scheme-sw">' +
+            sw +
+            '</span><span class="scheme-name">' +
+            esc(s.label) +
+            "</span></button>"
+          );
         }
         function renderGrid(q) {
-          if (!grid) return; q = (q || "").toLowerCase();
-          var list = swatches.filter(function (s) { return !q || s.label.toLowerCase().indexOf(q) >= 0; });
+          if (!grid) return;
+          q = (q || "").toLowerCase();
+          var list = swatches.filter(function (s) {
+            return !q || s.label.toLowerCase().indexOf(q) >= 0;
+          });
           grid.innerHTML = list.length ? list.map(card).join("") : '<p class="scheme-empty">No schemes match.</p>';
         }
         function setScheme(name) {
-          if (name) { root.dataset.scheme = name; try { localStorage.setItem("scheme", name); } catch (e) {} }
-          else { delete root.dataset.scheme; try { localStorage.removeItem("scheme"); } catch (e) {} }
+          if (name) {
+            root.dataset.scheme = name;
+            try {
+              localStorage.setItem("scheme", name);
+            } catch (e) {}
+          } else {
+            delete root.dataset.scheme;
+            try {
+              localStorage.removeItem("scheme");
+            } catch (e) {}
+          }
           renderGrid(search ? search.value : "");
         }
-        function openPop() { if (!pop) return; renderGrid(""); pop.hidden = false; if (back) back.hidden = false; requestAnimationFrame(function () { pop.classList.add("open"); if (back) back.classList.add("open"); }); pop.setAttribute("aria-hidden", "false"); if (sbtn) sbtn.setAttribute("aria-expanded", "true"); popOpen = true; setTimeout(function () { if (search) search.focus(); }, 40); }
-        function closePop() { if (!pop) return; pop.classList.remove("open"); if (back) back.classList.remove("open"); pop.setAttribute("aria-hidden", "true"); if (sbtn) sbtn.setAttribute("aria-expanded", "false"); popOpen = false; setTimeout(function () { pop.hidden = true; if (back) back.hidden = true; }, 180); }
-        if (sbtn) sbtn.addEventListener("click", function () { popOpen ? closePop() : openPop(); });
+        function openPop() {
+          if (!pop) return;
+          renderGrid("");
+          pop.hidden = false;
+          if (back) back.hidden = false;
+          requestAnimationFrame(function () {
+            pop.classList.add("open");
+            if (back) back.classList.add("open");
+          });
+          pop.setAttribute("aria-hidden", "false");
+          if (sbtn) sbtn.setAttribute("aria-expanded", "true");
+          popOpen = true;
+          setTimeout(function () {
+            if (search) search.focus();
+          }, 40);
+        }
+        function closePop() {
+          if (!pop) return;
+          pop.classList.remove("open");
+          if (back) back.classList.remove("open");
+          pop.setAttribute("aria-hidden", "true");
+          if (sbtn) sbtn.setAttribute("aria-expanded", "false");
+          popOpen = false;
+          setTimeout(function () {
+            pop.hidden = true;
+            if (back) back.hidden = true;
+          }, 180);
+        }
+        if (sbtn)
+          sbtn.addEventListener("click", function () {
+            popOpen ? closePop() : openPop();
+          });
         if (back) back.addEventListener("click", closePop);
-        if (search) search.addEventListener("input", function () { renderGrid(search.value); });
-        if (grid) grid.addEventListener("click", function (e) { var c = e.target.closest && e.target.closest("[data-scheme]"); if (c) setScheme(c.getAttribute("data-scheme")); });
-        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && popOpen) closePop(); });
+        if (search)
+          search.addEventListener("input", function () {
+            renderGrid(search.value);
+          });
+        if (grid)
+          grid.addEventListener("click", function (e) {
+            var c = e.target.closest && e.target.closest("[data-scheme]");
+            if (c) setScheme(c.getAttribute("data-scheme"));
+          });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && popOpen) closePop();
+        });
 
         // ── glassy scroll state + scroll-progress hairline ──
-        var hdr = document.getElementById("site-header"), prog = document.getElementById("scrollprog");
+        var hdr = document.getElementById("site-header"),
+          prog = document.getElementById("scrollprog");
         function onScroll() {
           var y = window.scrollY || 0;
           if (hdr) hdr.classList.toggle("scrolled", y > 6);
-          if (prog) { var h = document.documentElement.scrollHeight - innerHeight; prog.style.width = (h > 0 ? (y / h) * 100 : 0) + "%"; }
+          if (prog) {
+            var h = document.documentElement.scrollHeight - innerHeight;
+            prog.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
+          }
         }
-        addEventListener("scroll", onScroll, { passive: true }); onScroll();
+        addEventListener("scroll", onScroll, { passive: true });
+        onScroll();
 
         // ── cart bump on change ──
         var cbtn = document.getElementById("cartbtn");
-        addEventListener("cart-changed", function () { if (cbtn) { cbtn.classList.remove("bump"); void cbtn.offsetWidth; cbtn.classList.add("bump"); } });
+        addEventListener("cart-changed", function () {
+          if (cbtn) {
+            cbtn.classList.remove("bump");
+            void cbtn.offsetWidth;
+            cbtn.classList.add("bump");
+          }
+        });
 
         // ── mobile drawer actions delegate to the header controls ──
         document.querySelectorAll("[data-act]").forEach(function (b) {
           b.addEventListener("click", function () {
-            var act = b.getAttribute("data-act"), nc = document.getElementById("navclose"); if (nc) nc.click();
+            var act = b.getAttribute("data-act"),
+              nc = document.getElementById("navclose");
+            if (nc) nc.click();
             setTimeout(function () {
-              if (act === "search") { var p = document.getElementById("palette-open"); if (p) p.click(); }
-              else if (act === "scheme") openPop();
+              if (act === "search") {
+                var p = document.getElementById("palette-open");
+                if (p) p.click();
+              } else if (act === "scheme") openPop();
               else if (act === "theme") cycleTheme();
             }, 60);
           });
         });
         var mlang = document.getElementById("m-lang");
-        if (mlang) { mlang.value = (window.__lang0 || "en"); mlang.addEventListener("change", function (e) { var L = document.getElementById("lang"); if (L) { L.value = e.target.value; L.dispatchEvent(new Event("change")); } }); }
+        if (mlang) {
+          mlang.value = window.__lang0 || "en";
+          mlang.addEventListener("change", function (e) {
+            var L = document.getElementById("lang");
+            if (L) {
+              L.value = e.target.value;
+              L.dispatchEvent(new Event("change"));
+            }
+          });
+        }
       })();
       document.getElementById("lang").addEventListener("change", function (e) {
-        try { localStorage.setItem("lang", e.target.value); } catch (x) {}
+        try {
+          localStorage.setItem("lang", e.target.value);
+        } catch (x) {}
         document.cookie = "lang=" + e.target.value + ";path=/;max-age=31536000;samesite=lax";
         if (window.__applyLang) window.__applyLang(e.target.value);
         window.dispatchEvent(new Event("locale-changed")); // re-render localized money/dates (cart drawer + pages)
@@ -611,56 +2218,173 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       // the su_user hint + the cached $session store on EVERY navigation, so it's correct on every route regardless of
       // whether the persisted header was kept, rebuilt, or replaced by a prerender activation.
     </script>
-    <script is:inline set:html={skewGuardScript()}></script>
+    <script is:inline set:html={skewGuardScript()} />
     <script is:inline>
       /* Global client backstop — a silent fetch rejection or runtime error should never just vanish. Warn always; show
          ONE debounced toast (every 8s max) so the user knows to retry. Guarded so it never throws or spams. */
       (function () {
         var last = 0;
-        function notify() { var now = Date.now(); if (now - last < 8000) return; last = now; if (window.toast) window.toast("Something went wrong. Please try again.", { type: "error" }); }
-        window.addEventListener("unhandledrejection", function (e) { try { console.warn("[saasuluk] unhandled rejection:", e && e.reason); } catch (_) {} notify(); });
-        window.addEventListener("error", function (e) { try { console.warn("[saasuluk] error:", e && (e.message || e.error)); } catch (_) {} });
+        function notify() {
+          var now = Date.now();
+          if (now - last < 8000) return;
+          last = now;
+          if (window.toast) window.toast("Something went wrong. Please try again.", { type: "error" });
+        }
+        window.addEventListener("unhandledrejection", function (e) {
+          try {
+            console.warn("[saasuluk] unhandled rejection:", e && e.reason);
+          } catch (_) {}
+          notify();
+        });
+        window.addEventListener("error", function (e) {
+          try {
+            console.warn("[saasuluk] error:", e && (e.message || e.error));
+          } catch (_) {}
+        });
       })();
     </script>
     <!-- Browser-executed CLIENT TOOLS the @suluk/chat agent can call: cart (works logged-out — the cart is local),
          theme/scheme, and same-site navigation. Only DEFINITIONS go to the model; run() executes here in the page. -->
     <script is:inline>
       (function () {
-        function num(v) { var n = Number(v); return Number.isFinite(n) ? n : 0; }
-        function readCart() { try { return JSON.parse(localStorage.getItem("cart") || "[]"); } catch (e) { return []; } }
-        var schemes = (window.__schemes || []).map(function (s) { return s.name; });
+        function num(v) {
+          var n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        }
+        function readCart() {
+          try {
+            return JSON.parse(localStorage.getItem("cart") || "[]");
+          } catch (e) {
+            return [];
+          }
+        }
+        var schemes = (window.__schemes || []).map(function (s) {
+          return s.name;
+        });
         window.__sulukChatContext = function () {
           var c = readCart();
-          return { path: location.pathname, theme: localStorage.getItem("theme") || "system", scheme: document.documentElement.dataset.scheme || "default",
-            availableSchemes: schemes, cart: c, cartCount: c.reduce(function (n, l) { return n + (l.qty || 0); }, 0),
-            subtotalCents: c.reduce(function (n, l) { return n + (l.qty || 0) * (l.priceCents || 0); }, 0) };
+          return {
+            path: location.pathname,
+            theme: localStorage.getItem("theme") || "system",
+            scheme: document.documentElement.dataset.scheme || "default",
+            availableSchemes: schemes,
+            cart: c,
+            cartCount: c.reduce(function (n, l) {
+              return n + (l.qty || 0);
+            }, 0),
+            subtotalCents: c.reduce(function (n, l) {
+              return n + (l.qty || 0) * (l.priceCents || 0);
+            }, 0),
+          };
         };
         window.__sulukChatTools = [
-          { name: "addToCart", description: "Add a product to the shopping cart by its numeric product id (find the id via search/listProduct first). Quantity defaults to 1. Works without signing in.",
-            parameters: { type: "object", properties: { productId: { type: "integer", description: "the product's numeric id" }, quantity: { type: "integer", description: "how many (default 1)" } }, required: ["productId"] },
-            run: function (a) { var id = num(a.productId), qty = Math.max(1, num(a.quantity) || 1);
-              return fetch("/product/" + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; }).then(function (p) { if (p && window.cart && window.cart.add) window.cart.add({ productId: id, qty: qty, priceCents: num(p.priceCents), name: String(p.name || ("#" + id)) }); }); } },
-          { name: "removeFromCart", description: "Remove a product from the cart by its numeric product id.",
+          {
+            name: "addToCart",
+            description:
+              "Add a product to the shopping cart by its numeric product id (find the id via search/listProduct first). Quantity defaults to 1. Works without signing in.",
+            parameters: {
+              type: "object",
+              properties: {
+                productId: { type: "integer", description: "the product's numeric id" },
+                quantity: { type: "integer", description: "how many (default 1)" },
+              },
+              required: ["productId"],
+            },
+            run: function (a) {
+              var id = num(a.productId),
+                qty = Math.max(1, num(a.quantity) || 1);
+              return fetch("/product/" + encodeURIComponent(id))
+                .then(function (r) {
+                  return r.ok ? r.json() : null;
+                })
+                .then(function (p) {
+                  if (p && window.cart && window.cart.add)
+                    window.cart.add({ productId: id, qty: qty, priceCents: num(p.priceCents), name: String(p.name || "#" + id) });
+                });
+            },
+          },
+          {
+            name: "removeFromCart",
+            description: "Remove a product from the cart by its numeric product id.",
             parameters: { type: "object", properties: { productId: { type: "integer" } }, required: ["productId"] },
-            run: function (a) { if (window.cart && window.cart.remove) window.cart.remove(num(a.productId)); } },
-          { name: "setCartQuantity", description: "Set the quantity of a product already in the cart (0 removes it).",
-            parameters: { type: "object", properties: { productId: { type: "integer" }, quantity: { type: "integer" } }, required: ["productId", "quantity"] },
-            run: function (a) { if (window.cart && window.cart.setQty) window.cart.setQty(num(a.productId), Math.max(0, num(a.quantity))); } },
-          { name: "clearCart", description: "Empty the shopping cart.", parameters: { type: "object", properties: {} },
-            run: function () { if (window.cart && window.cart.clear) window.cart.clear(); } },
-          { name: "openCart", description: "Open the cart drawer so the user can review their items.", parameters: { type: "object", properties: {} },
-            run: function () { var b = document.getElementById("cartbtn"); if (b) b.click(); } },
-          { name: "goToCheckout", description: "Go to the checkout page.", parameters: { type: "object", properties: {} },
-            run: function () { location.href = "/checkout"; } },
-          { name: "setTheme", description: "Switch the site between light and dark mode, or follow the operating system.",
+            run: function (a) {
+              if (window.cart && window.cart.remove) window.cart.remove(num(a.productId));
+            },
+          },
+          {
+            name: "setCartQuantity",
+            description: "Set the quantity of a product already in the cart (0 removes it).",
+            parameters: {
+              type: "object",
+              properties: { productId: { type: "integer" }, quantity: { type: "integer" } },
+              required: ["productId", "quantity"],
+            },
+            run: function (a) {
+              if (window.cart && window.cart.setQty) window.cart.setQty(num(a.productId), Math.max(0, num(a.quantity)));
+            },
+          },
+          {
+            name: "clearCart",
+            description: "Empty the shopping cart.",
+            parameters: { type: "object", properties: {} },
+            run: function () {
+              if (window.cart && window.cart.clear) window.cart.clear();
+            },
+          },
+          {
+            name: "openCart",
+            description: "Open the cart drawer so the user can review their items.",
+            parameters: { type: "object", properties: {} },
+            run: function () {
+              var b = document.getElementById("cartbtn");
+              if (b) b.click();
+            },
+          },
+          {
+            name: "goToCheckout",
+            description: "Go to the checkout page.",
+            parameters: { type: "object", properties: {} },
+            run: function () {
+              location.href = "/checkout";
+            },
+          },
+          {
+            name: "setTheme",
+            description: "Switch the site between light and dark mode, or follow the operating system.",
             parameters: { type: "object", properties: { mode: { type: "string", enum: ["light", "dark", "system"] } }, required: ["mode"] },
-            run: function (a) { var m = a.mode === "dark" ? "dark" : a.mode === "light" ? "light" : "system"; try { localStorage.setItem("theme", m); } catch (e) {} document.documentElement.dataset.theme = m === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : m; } },
-          { name: "setColorScheme", description: "Apply a named color scheme to the whole site. Use one of the names listed in availableSchemes (browser state).",
+            run: function (a) {
+              var m = a.mode === "dark" ? "dark" : a.mode === "light" ? "light" : "system";
+              try {
+                localStorage.setItem("theme", m);
+              } catch (e) {}
+              document.documentElement.dataset.theme =
+                m === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : m;
+            },
+          },
+          {
+            name: "setColorScheme",
+            description: "Apply a named color scheme to the whole site. Use one of the names listed in availableSchemes (browser state).",
             parameters: { type: "object", properties: { scheme: { type: "string" } }, required: ["scheme"] },
-            run: function (a) { var n = String(a.scheme || ""); if (!schemes.length || schemes.indexOf(n) >= 0) { document.documentElement.dataset.scheme = n; try { localStorage.setItem("scheme", n); } catch (e) {} } } },
-          { name: "navigate", description: "Navigate to a page on this site. Use a same-site path such as /products, /pricing, /products/<slug>, /blogs, /faqs, or /dashboard.",
+            run: function (a) {
+              var n = String(a.scheme || "");
+              if (!schemes.length || schemes.indexOf(n) >= 0) {
+                document.documentElement.dataset.scheme = n;
+                try {
+                  localStorage.setItem("scheme", n);
+                } catch (e) {}
+              }
+            },
+          },
+          {
+            name: "navigate",
+            description:
+              "Navigate to a page on this site. Use a same-site path such as /products, /pricing, /products/<slug>, /blogs, /faqs, or /dashboard.",
             parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
-            run: function (a) { var p = String(a.path || ""); if (p === "/" || /^\/[^\/\\]/.test(p)) location.href = p; } }
+            run: function (a) {
+              var p = String(a.path || "");
+              if (p === "/" || /^\/[^\/\\]/.test(p)) location.href = p;
+            },
+          },
         ];
       })();
     </script>
@@ -672,11 +2396,24 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       (function () {
         try {
           var pd = document.getElementById("promo-dismiss");
-          if (pd) pd.addEventListener("click", function () { var b = document.getElementById("promo-bar"); if (b) b.hidden = true; try { localStorage.setItem("promo_dismissed", "1"); } catch (e) {} });
+          if (pd)
+            pd.addEventListener("click", function () {
+              var b = document.getElementById("promo-bar");
+              if (b) b.hidden = true;
+              try {
+                localStorage.setItem("promo_dismissed", "1");
+              } catch (e) {}
+            });
           var cb = document.getElementById("cookie-banner");
           if (cb && !localStorage.getItem("cookie_ok")) cb.hidden = false; // privacy-preserving: only essential cookies, so this is informational
           var ok = document.getElementById("cookie-ok");
-          if (ok) ok.addEventListener("click", function () { if (cb) cb.hidden = true; try { localStorage.setItem("cookie_ok", "1"); } catch (e) {} });
+          if (ok)
+            ok.addEventListener("click", function () {
+              if (cb) cb.hidden = true;
+              try {
+                localStorage.setItem("cookie_ok", "1");
+              } catch (e) {}
+            });
         } catch (e) {}
       })();
     </script>
