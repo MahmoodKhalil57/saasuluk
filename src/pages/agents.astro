@@ -1,0 +1,167 @@
+---
+export const prerender = true;
+import Layout from "../layouts/Layout.astro";
+import type { OpenAPIv4Document } from "@suluk/core";
+import { layerReport, affordedPatterns, agenticPatterns, gradeAgent, resourceCatalog, paidToolPrice } from "@suluk/agents";
+
+// ── ONE agent contract (`x-suluk-agents`) — everything below is DERIVED from it, statically, at build time ──────────
+const pinned = (h: string) => ({ source: "https://saastemly.com/skills/" + h, contentHash: "sha256-" + h, version: "2026-06-23" });
+const route = (op: string, tier: "resident" | "cold-tail" = "resident") => ({ operationRef: op, tier });
+
+const doc: OpenAPIv4Document = {
+  openapi: "4.0.0-candidate",
+  info: { title: "Support Copilot", version: "1.0.0" },
+  paths: {
+    "v1/orders": { requests: { searchOrders: { method: "get", summary: "Search orders", responses: { ok: { status: 200 } } } } },
+    "v1/orders/{id}": { requests: { getOrder: { method: "get", summary: "Get one order", responses: { ok: { status: 200 } } } } },
+    "v1/replies": { requests: { draftReply: { method: "post", summary: "Draft a customer reply", responses: { ok: { status: 200 } } } } },
+    "v1/refunds": {
+      requests: {
+        issueRefund: {
+          method: "post", summary: "Issue a refund", responses: { ok: { status: 200 } },
+          // a SENSITIVE op: charged per call (x402) + human approval before it runs (HITL)
+          "x-suluk-cost": { components: [{ source: "stripe", basis: "per-call", microUsd: 30_000 }] },
+          "x-suluk-approval": { required: true, reason: "money leaves the account" },
+        } as any,
+      },
+    },
+  },
+  "x-suluk-resources": {
+    refundPolicy: { description: "Refund policy & eligibility runbook — load before issuing a refund.", kind: "instructions", provenance: pinned("rp"), trust: "author-declared" },
+    replyStyle: { description: "Brand voice & reply style guide (reference).", kind: "reference", provenance: pinned("rs") },
+  },
+  "x-suluk-agents": {
+    supportCopilot: {
+      description: "A customer-support copilot that resolves order issues, drafting replies and issuing refunds with oversight.",
+      maxDepth: 1,
+      contextBudget: { tokens: 12_000, basis: "estimate" },
+      thinking: { maxRounds: 3, budget: { tokens: 8_000, basis: "estimate" } }, // an iterative refine loop → evaluator-optimizer
+      skills: { chat: { model: ["anthropic/claude-sonnet-4"], tier: "resident", provenance: pinned("chat") } },
+      routes: {
+        searchOrders: route("#/paths/v1~1orders/requests/searchOrders"),
+        getOrder: route("#/paths/v1~1orders~1{id}/requests/getOrder"),
+        draftReply: route("#/paths/v1~1replies/requests/draftReply"),
+        issueRefund: route("#/paths/v1~1refunds/requests/issueRefund", "cold-tail"), // sensitive → off the default surface
+      },
+      agents: { research: { ref: "#/x-suluk-agents/researcher" }, escalate: { ref: "#/x-suluk-agents/escalation" } },
+      resources: { policy: { ref: "#/x-suluk-resources/refundPolicy" }, style: { ref: "#/x-suluk-resources/replyStyle" } },
+    },
+    researcher: {
+      description: "Looks up order history and context for the copilot.",
+      maxDepth: 0,
+      skills: { search: { model: ["google/gemini-2.5-flash"], tier: "resident", provenance: pinned("srch") } },
+      routes: { searchOrders: route("#/paths/v1~1orders/requests/searchOrders") },
+      agents: {},
+    },
+    escalation: {
+      description: "Triages whether an issue needs a human agent.",
+      maxDepth: 0,
+      skills: { triage: { model: ["google/gemini-2.5-flash"], tier: "resident", provenance: pinned("tri") } },
+      routes: { getOrder: route("#/paths/v1~1orders~1{id}/requests/getOrder") },
+      agents: {},
+    },
+  },
+};
+
+// ── DERIVATIONS (all pure + static; never touch the request→operation matcher) ──────────────────────────────────────
+const report = layerReport(doc);
+const byAgent = Object.fromEntries(report.layers.map((l) => [l.agent, l]));
+const order = ["supportCopilot", "researcher", "escalation"];
+const grades = Object.fromEntries(order.map((a) => [a, gradeAgent(doc, a)]));
+const patterns = Object.fromEntries(order.map((a) => [a, agenticPatterns(doc, a)]));
+const catalog = resourceCatalog(doc, "supportCopilot");
+const refundCost = (doc.paths["v1/refunds"].requests!.issueRefund as any)["x-suluk-cost"];
+const refundPrice = paidToolPrice(refundCost);
+
+const levels = [...new Set(report.layers.map((l) => l.level))].sort((a, b) => b - a); // top of the pyramid first
+const gradeColor: Record<string, string> = { A: "#16a34a", B: "#65a30d", C: "#ca8a04", D: "#ea580c", F: "#dc2626" };
+const Badge = (g: string) => `<span style="display:inline-block;min-width:1.4em;text-align:center;font-weight:800;color:#fff;background:${gradeColor[g] ?? "#666"};border-radius:6px;padding:1px 7px">${g}</span>`;
+---
+
+<Layout
+  title="Agent observability — saasuluk"
+  description="A live, build-time view of one x-suluk-agents contract: the determinism pyramid, agentic-pattern affordances, an A–F hardening grade, a loadable-resource catalog, and x402 paid-tool + human-approval facets — all derived statically by @suluk/agents."
+>
+  <h1>Agent observability — from one contract</h1>
+  <p class="tag">
+    Everything on this page is <b>derived statically at build time</b> by <code>@suluk/agents</code> from a single
+    <code>x-suluk-agents</code> declaration — no runtime, no LLM call. It is the same "contracts in, everything derived"
+    idea that powers the rest of saasuluk, applied to <b>agents</b>: the pyramid, a hardening grade, token-budget and
+    context-waste warnings, the pattern an agent's shape affords, its loadable resources, and its paid / human-gated tools.
+  </p>
+
+  <h2>The pyramid — a determinism gradient</h2>
+  <p>Routes (no model) are the deterministic floor; each layer above composes lower layers + a model. Higher = less deterministic, more general.</p>
+  {
+    levels.map((lvl) => (
+      <div style="margin:10px 0">
+        <div style="font:600 12px/1 ui-monospace,monospace;color:var(--muted,#888);margin-bottom:6px">LAYER {lvl}{lvl === report.maxLevel ? " · top (most general)" : ""}</div>
+        <div class="grid">
+          {report.layers.filter((l) => l.level === lvl).map((l) => (
+            <div class="card" style="border-left:4px solid var(--line)">
+              <b>{l.agent}</b> <Fragment set:html={Badge(l.grade ?? "?")} />
+              <p style="margin:6px 0 4px;font-size:13px">
+                {l.skillCount} skill(s) · {l.routeCount} route(s) · {l.subAgentCount} sub-agent(s)
+              </p>
+              <p style="margin:0;font-size:12px;color:var(--muted,#888)">
+                context ≈ {l.contextTokens?.toLocaleString()} tok
+                {l.budget != null && <> / budget {l.budget.toLocaleString()}</>}
+                {l.overBudget && <b style="color:#dc2626"> · over budget ⚠</b>}
+              </p>
+              {l.contextWaste && (
+                <p style="margin:4px 0 0;font-size:12px;color:#ea580c">
+                  context-waste: move {l.contextWaste.moveToColdTail.join(", ")} to cold-tail (saves ≈{l.contextWaste.wouldSaveTokens} tok)
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    ))
+  }
+  <div style="margin:10px 0">
+    <div style="font:600 12px/1 ui-monospace,monospace;color:var(--muted,#888);margin-bottom:6px">LAYER 0 · deterministic floor (routes → MCP tools)</div>
+    <div class="card"><code>{report.floor.map((r) => r.split("/").pop()).join("  ·  ")}</code></div>
+  </div>
+
+  <h2>What each agent's shape affords</h2>
+  <p>Structural capability only — the runtime trajectory stays opaque by design (the contract never claims which pattern actually runs).</p>
+  <div class="grid">
+    {order.map((a) => (
+      <div class="card">
+        <b>{a}</b>
+        <p style="margin:6px 0 0;font-size:13px">
+          {patterns[a].length ? patterns[a].map((p) => <span style="display:inline-block;background:var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 2px 0;font-size:12px">{p.pattern}</span>) : <em>single-step (no multi-step pattern)</em>}
+        </p>
+      </div>
+    ))}
+  </div>
+
+  <h2>Hardening grade · resources · paid + gated tools</h2>
+  <div class="grid">
+    <div class="card">
+      <b>Hardening</b>
+      <p style="margin:6px 0 0;font-size:13px">
+        {order.map((a) => (<span style="display:block;margin:3px 0"><Fragment set:html={Badge(grades[a].grade)} /> {a} <span style="color:var(--muted,#888)">· {grades[a].findings.length} finding(s)</span></span>))}
+      </p>
+    </div>
+    <div class="card">
+      <b>Loadable resources</b> <span style="color:var(--muted,#888);font-size:12px">(CF "Agent Skills")</span>
+      <p style="margin:6px 0 0;font-size:13px">
+        {catalog.map((c) => (<span style="display:block;margin:3px 0"><code>{c.key}</code> <span style="color:var(--muted,#888)">· {c.kind}</span></span>))}
+      </p>
+    </div>
+    <div class="card">
+      <b>Paid + human-gated</b>
+      <p style="margin:6px 0 0;font-size:13px">
+        <code>issueRefund</code> → x402 paidTool <b>${refundPrice?.priceUsd.toFixed(2)}</b>/call
+        <span style="display:block;margin-top:4px;color:#ca8a04">needs human approval ⚖ — "money leaves the account"</span>
+      </p>
+    </div>
+  </div>
+
+  <p style="margin-top:18px">
+    <a class="btn" href="/scalar">Read the API</a>
+    <a class="btn ghost" href="https://www.npmjs.com/package/@suluk/agents">@suluk/agents on npm</a>
+  </p>
+</Layout>
