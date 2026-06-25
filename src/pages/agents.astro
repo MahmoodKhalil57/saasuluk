@@ -18,7 +18,9 @@ const doc: OpenAPIv4Document = {
     "v1/refunds": {
       requests: {
         issueRefund: {
-          method: "post", summary: "Issue a refund", responses: { ok: { status: 200 } },
+          method: "post",
+          summary: "Issue a refund",
+          responses: { ok: { status: 200 } },
           // a SENSITIVE op: charged per call (x402) + human approval before it runs (HITL)
           "x-suluk-cost": { components: [{ source: "stripe", basis: "per-call", microUsd: 30_000 }] },
           "x-suluk-approval": { required: true, reason: "money leaves the account" },
@@ -27,7 +29,12 @@ const doc: OpenAPIv4Document = {
     },
   },
   "x-suluk-resources": {
-    refundPolicy: { description: "Refund policy & eligibility runbook — load before issuing a refund.", kind: "instructions", provenance: pinned("rp"), trust: "author-declared" },
+    refundPolicy: {
+      description: "Refund policy & eligibility runbook — load before issuing a refund.",
+      kind: "instructions",
+      provenance: pinned("rp"),
+      trust: "author-declared",
+    },
     replyStyle: { description: "Brand voice & reply style guide (reference).", kind: "reference", provenance: pinned("rs") },
   },
   "x-suluk-agents": {
@@ -75,7 +82,8 @@ const refundPrice = paidToolPrice(refundCost);
 
 const levels = [...new Set(report.layers.map((l) => l.level))].sort((a, b) => b - a); // top of the pyramid first
 const gradeColor: Record<string, string> = { A: "#16a34a", B: "#65a30d", C: "#ca8a04", D: "#ea580c", F: "#dc2626" };
-const Badge = (g: string) => `<span style="display:inline-block;min-width:1.4em;text-align:center;font-weight:800;color:#fff;background:${gradeColor[g] ?? "#666"};border-radius:6px;padding:1px 7px">${g}</span>`;
+const Badge = (g: string) =>
+  `<span style="display:inline-block;min-width:1.4em;text-align:center;font-weight:800;color:#fff;background:${gradeColor[g] ?? "#666"};border-radius:6px;padding:1px 7px">${g}</span>`;
 ---
 
 <Layout
@@ -85,56 +93,77 @@ const Badge = (g: string) => `<span style="display:inline-block;min-width:1.4em;
   <h1>Agent observability — from one contract</h1>
   <p class="tag">
     Everything on this page is <b>derived statically at build time</b> by <code>@suluk/agents</code> from a single
-    <code>x-suluk-agents</code> declaration — no runtime, no LLM call. It is the same "contracts in, everything derived"
-    idea that powers the rest of saasuluk, applied to <b>agents</b>: the pyramid, a hardening grade, token-budget and
-    context-waste warnings, the pattern an agent's shape affords, its loadable resources, and its paid / human-gated tools.
+    <code>x-suluk-agents</code> declaration — no runtime, no LLM call. It is the same "contracts in, everything derived" idea that powers the
+    rest of saasuluk, applied to <b>agents</b>: the pyramid, a hardening grade, token-budget and context-waste warnings, the pattern an
+    agent's shape affords, its loadable resources, and its paid / human-gated tools.
   </p>
 
   <h2>The pyramid — a determinism gradient</h2>
-  <p>Routes (no model) are the deterministic floor; each layer above composes lower layers + a model. Higher = less deterministic, more general.</p>
+  <p>
+    Routes (no model) are the deterministic floor; each layer above composes lower layers + a model. Higher = less deterministic, more
+    general.
+  </p>
   {
     levels.map((lvl) => (
       <div style="margin:10px 0">
-        <div style="font:600 12px/1 ui-monospace,monospace;color:var(--muted,#888);margin-bottom:6px">LAYER {lvl}{lvl === report.maxLevel ? " · top (most general)" : ""}</div>
+        <div style="font:600 12px/1 ui-monospace,monospace;color:var(--muted,#888);margin-bottom:6px">
+          LAYER {lvl}
+          {lvl === report.maxLevel ? " · top (most general)" : ""}
+        </div>
         <div class="grid">
-          {report.layers.filter((l) => l.level === lvl).map((l) => (
-            <div class="card" style="border-left:4px solid var(--line)">
-              <b>{l.agent}</b> <Fragment set:html={Badge(l.grade ?? "?")} />
-              <p style="margin:6px 0 4px;font-size:13px">
-                {l.skillCount} skill(s) · {l.routeCount} route(s) · {l.subAgentCount} sub-agent(s)
-              </p>
-              <p style="margin:0;font-size:12px;color:var(--muted,#888)">
-                context ≈ {l.contextTokens?.toLocaleString()} tok
-                {l.budget != null && <> / budget {l.budget.toLocaleString()}</>}
-                {l.overBudget && <b style="color:#dc2626"> · over budget ⚠</b>}
-              </p>
-              {l.contextWaste && (
-                <p style="margin:4px 0 0;font-size:12px;color:#ea580c">
-                  context-waste: move {l.contextWaste.moveToColdTail.join(", ")} to cold-tail (saves ≈{l.contextWaste.wouldSaveTokens} tok)
+          {report.layers
+            .filter((l) => l.level === lvl)
+            .map((l) => (
+              <div class="card" style="border-left:4px solid var(--line)">
+                <b>{l.agent}</b> <Fragment set:html={Badge(l.grade ?? "?")} />
+                <p style="margin:6px 0 4px;font-size:13px">
+                  {l.skillCount} skill(s) · {l.routeCount} route(s) · {l.subAgentCount} sub-agent(s)
                 </p>
-              )}
-            </div>
-          ))}
+                <p style="margin:0;font-size:12px;color:var(--muted,#888)">
+                  context ≈ {l.contextTokens?.toLocaleString()} tok
+                  {l.budget != null && <> / budget {l.budget.toLocaleString()}</>}
+                  {l.overBudget && <b style="color:#dc2626"> · over budget ⚠</b>}
+                </p>
+                {l.contextWaste && (
+                  <p style="margin:4px 0 0;font-size:12px;color:#ea580c">
+                    context-waste: move {l.contextWaste.moveToColdTail.join(", ")} to cold-tail (saves ≈{l.contextWaste.wouldSaveTokens}{" "}
+                    tok)
+                  </p>
+                )}
+              </div>
+            ))}
         </div>
       </div>
     ))
   }
   <div style="margin:10px 0">
-    <div style="font:600 12px/1 ui-monospace,monospace;color:var(--muted,#888);margin-bottom:6px">LAYER 0 · deterministic floor (routes → MCP tools)</div>
+    <div style="font:600 12px/1 ui-monospace,monospace;color:var(--muted,#888);margin-bottom:6px">
+      LAYER 0 · deterministic floor (routes → MCP tools)
+    </div>
     <div class="card"><code>{report.floor.map((r) => r.split("/").pop()).join("  ·  ")}</code></div>
   </div>
 
   <h2>What each agent's shape affords</h2>
   <p>Structural capability only — the runtime trajectory stays opaque by design (the contract never claims which pattern actually runs).</p>
   <div class="grid">
-    {order.map((a) => (
-      <div class="card">
-        <b>{a}</b>
-        <p style="margin:6px 0 0;font-size:13px">
-          {patterns[a].length ? patterns[a].map((p) => <span style="display:inline-block;background:var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 2px 0;font-size:12px">{p.pattern}</span>) : <em>single-step (no multi-step pattern)</em>}
-        </p>
-      </div>
-    ))}
+    {
+      order.map((a) => (
+        <div class="card">
+          <b>{a}</b>
+          <p style="margin:6px 0 0;font-size:13px">
+            {patterns[a].length ? (
+              patterns[a].map((p) => (
+                <span style="display:inline-block;background:var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 2px 0;font-size:12px">
+                  {p.pattern}
+                </span>
+              ))
+            ) : (
+              <em>single-step (no multi-step pattern)</em>
+            )}
+          </p>
+        </div>
+      ))
+    }
   </div>
 
   <h2>Hardening grade · resources · paid + gated tools</h2>
@@ -142,13 +171,27 @@ const Badge = (g: string) => `<span style="display:inline-block;min-width:1.4em;
     <div class="card">
       <b>Hardening</b>
       <p style="margin:6px 0 0;font-size:13px">
-        {order.map((a) => (<span style="display:block;margin:3px 0"><Fragment set:html={Badge(grades[a].grade)} /> {a} <span style="color:var(--muted,#888)">· {grades[a].findings.length} finding(s)</span></span>))}
+        {
+          order.map((a) => (
+            <span style="display:block;margin:3px 0">
+              <Fragment set:html={Badge(grades[a].grade)} /> {a}{" "}
+              <span style="color:var(--muted,#888)">· {grades[a].findings.length} finding(s)</span>
+            </span>
+          ))
+        }
       </p>
     </div>
     <div class="card">
-      <b>Loadable resources</b> <span style="color:var(--muted,#888);font-size:12px">(CF "Agent Skills")</span>
+      <b>Loadable resources</b>
+      <span style="color:var(--muted,#888);font-size:12px">(CF "Agent Skills")</span>
       <p style="margin:6px 0 0;font-size:13px">
-        {catalog.map((c) => (<span style="display:block;margin:3px 0"><code>{c.key}</code> <span style="color:var(--muted,#888)">· {c.kind}</span></span>))}
+        {
+          catalog.map((c) => (
+            <span style="display:block;margin:3px 0">
+              <code>{c.key}</code> <span style="color:var(--muted,#888)">· {c.kind}</span>
+            </span>
+          ))
+        }
       </p>
     </div>
     <div class="card">
