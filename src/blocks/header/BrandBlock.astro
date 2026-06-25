@@ -1,0 +1,18 @@
+---
+/**
+ * BrandBlock (tier: SUB-BLOCK) — the logo mark + wordmark, linking home. Reused by the header and the footer.
+ */
+interface Props {
+  href?: string;
+  label?: string;
+}
+const { href = "/", label = "saasuluk" } = Astro.props;
+---
+
+<a href={href} class="flex shrink-0 items-center gap-2 text-[17px] font-extrabold tracking-tight text-foreground">
+  <span
+    class="grid size-6 place-items-center rounded-md bg-gradient-to-br from-[var(--accent-2)] to-primary text-xs leading-none text-white"
+    >s</span
+  >
+  {label}
+</a>

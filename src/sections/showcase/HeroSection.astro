@@ -1,0 +1,24 @@
+---
+/**
+ * HeroSection (tier: SECTION) — saasuluk's hero. Owns the business copy; composes the SectionBand shell + HeroBlock.
+ * Spreads {...DEFAULTS, ...Astro.props} so a page can still override any line.
+ */
+import SectionBand from "@/blocks/shared/SectionBand.astro";
+import HeroBlock from "@/blocks/showcase/HeroBlock.astro";
+
+const DEFAULTS = {
+  eyebrow: "Built on Suluk",
+  title: "The SaaS starter that",
+  titleAccent: "ships itself.",
+  subtitle: "Auth, payments, eCommerce, an admin cockpit, and a typed API + docs — every layer projected from one contract.",
+  primaryLabel: "Browse the store",
+  primaryHref: "/products",
+  secondaryLabel: "See pricing",
+  secondaryHref: "/pricing",
+};
+const props = { ...DEFAULTS, ...Astro.props };
+---
+
+<SectionBand padding="hero" width="wide">
+  <HeroBlock {...props} />
+</SectionBand>

@@ -1,0 +1,24 @@
+---
+/**
+ * TechSection (tier: SECTION) — owns the "Built on" copy + the actual stack. Composes SectionBand + TechStripBlock.
+ * The only place the showcase uses the devicon set: full-color brand marks for the runtime saasuluk is built on.
+ */
+import SectionBand from "@/blocks/shared/SectionBand.astro";
+import TechStripBlock from "@/blocks/showcase/TechStripBlock.astro";
+import { ICON } from "@/icons";
+
+const STACK = [
+  { icon: ICON.astro, label: "Astro" },
+  { icon: ICON.cloudflare, label: "Cloudflare" },
+  { icon: ICON.react, label: "React" },
+  { icon: ICON.typescript, label: "TypeScript" },
+  { icon: ICON.tailwind, label: "Tailwind" },
+];
+---
+
+<SectionBand tone="soft" padding="compact" width="wide">
+  <div class="flex flex-col items-center gap-7 text-center">
+    <p class="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">Built on</p>
+    <TechStripBlock items={STACK} />
+  </div>
+</SectionBand>

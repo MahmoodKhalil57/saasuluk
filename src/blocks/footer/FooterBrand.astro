@@ -1,0 +1,16 @@
+---
+/**
+ * FooterBrand (tier: SUB-BLOCK) — the footer's brand block: logo + a one-line pitch. Reuses BrandBlock.
+ */
+import BrandBlock from "@/blocks/header/BrandBlock.astro";
+
+interface Props {
+  tagline?: string;
+}
+const { tagline = "Auth, payments, eCommerce, admin, and a typed API + docs — every layer projected from one contract." } = Astro.props;
+---
+
+<div class="flex max-w-xs flex-col gap-3">
+  <BrandBlock />
+  <p class="text-sm text-muted-foreground">{tagline}</p>
+</div>

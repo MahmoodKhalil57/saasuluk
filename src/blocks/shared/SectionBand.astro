@@ -1,0 +1,28 @@
+---
+/**
+ * SectionBand — the layout shell every section wraps its content in (tier: BLOCK). Owns the full-bleed band (vertical
+ * rhythm + optional surface tone) and the inner max-width container, and is the `.sk-tw` boundary that scopes the
+ * shadcn reset (see src/styles/app.css) so it never leaks onto the legacy pages. Generic — carries no business copy.
+ */
+interface Props {
+  tone?: "default" | "soft" | "accent";
+  padding?: "compact" | "default" | "hero";
+  width?: "narrow" | "default" | "wide";
+  id?: string;
+}
+const { tone = "default", padding = "default", width = "default", id } = Astro.props;
+
+const TONE = {
+  default: "bg-background text-foreground",
+  soft: "bg-[color-mix(in_oklab,var(--color-secondary)_55%,var(--color-background))] text-foreground",
+  accent: "bg-primary text-primary-foreground",
+} as const;
+const PAD = { compact: "py-12 sm:py-16", default: "py-16 sm:py-20", hero: "py-20 sm:py-28" } as const;
+const WIDTH = { narrow: "max-w-2xl", default: "max-w-5xl", wide: "max-w-6xl" } as const;
+---
+
+<section class:list={["sk-tw w-full", TONE[tone], PAD[padding]]} id={id}>
+  <div class:list={["mx-auto w-full px-5 sm:px-8", WIDTH[width]]}>
+    <slot />
+  </div>
+</section>

@@ -1,0 +1,29 @@
+---
+/**
+ * SiteHeader (tier: BLOCK) — the full site header: brand · primary nav · the chrome actions cluster · mobile menu.
+ * Composes the header sub-blocks (Brand, Nav) + the chrome ChromeBar + MobileNav island. Responsive: the desktop nav
+ * shows ≥lg, the full ChromeBar shows ≥sm, the hamburger (nav + compact chrome inside) shows < lg.
+ */
+import BrandBlock from "./BrandBlock.astro";
+import NavBlock from "./NavBlock.astro";
+import { ChromeBar } from "@/blocks/chrome/ChromeBar";
+import { MobileNav } from "./MobileNav";
+
+interface Props {
+  current?: string;
+}
+const { current } = Astro.props;
+---
+
+<div class="sk-tw mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-5 sm:px-8">
+  <BrandBlock />
+  <div class="ml-2 hidden lg:flex">
+    <NavBlock current={current} />
+  </div>
+  <div class="ml-auto flex items-center gap-2">
+    <ChromeBar client:visible className="hidden sm:flex" />
+    <div class="lg:hidden">
+      <MobileNav client:visible />
+    </div>
+  </div>
+</div>

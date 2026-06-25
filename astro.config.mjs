@@ -2,6 +2,7 @@ import { defineConfig } from "astro/config";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import icon from "astro-icon";
+import tailwindcss from "@tailwindcss/vite";
 
 // Astro renders the marketing/app pages; a middleware delegates /api, /scalar, /superadmin, /cost and
 // /openapi.json to the Suluk-powered Hono app (one server). On Cloudflare both run in the same Worker.
@@ -23,4 +24,7 @@ export default defineConfig({
   // excluded via data-astro-prefetch="false" + data-astro-reload (stamped server-side in Layout.astro's nav/footer).
   prefetch: { prefetchAll: true, defaultStrategy: "load" },
   experimental: { clientPrerender: true },
+  // Tailwind v4 (issue: shadcn setup) — the Vite plugin compiles src/styles/app.css. We deliberately skip Tailwind's
+  // global Preflight there (it would reset the 43 hand-styled legacy pages); shadcn's reset is scoped to `.sk-tw`.
+  vite: { plugins: [tailwindcss()] },
 });

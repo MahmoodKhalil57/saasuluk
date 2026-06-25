@@ -1,0 +1,26 @@
+---
+/**
+ * FooterLink (tier: SUB-BLOCK) — one footer link (in a list). `i18nKey` adds the live-translation hook. Worker-served
+ * routes (Developers / Robots & AI columns: /scalar, /openapi.json, /superadmin, /cost, /mcp, …) get
+ * `data-astro-reload` + `data-astro-prefetch="false"` so the SPA router full-navigates and skips the prefetch warm.
+ */
+import { workerLinkAttrs } from "@/lib/worker-routes";
+
+interface Props {
+  href: string;
+  label: string;
+  i18nKey?: string;
+}
+const { href, label, i18nKey } = Astro.props;
+---
+
+<li>
+  <a
+    href={href}
+    data-i18n={i18nKey}
+    class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+    {...workerLinkAttrs(href)}
+  >
+    {label}
+  </a>
+</li>

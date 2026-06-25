@@ -6,6 +6,9 @@ dist/
 .env.*
 !.env.example
 
+# local dev-scratch (screenshots, throwaway test drivers) — never part of the app or a commit
+temp/
+
 worker/dist/
 public/schemes.css
 src/build-id.ts

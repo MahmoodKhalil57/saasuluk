@@ -1,0 +1,32 @@
+---
+/**
+ * FeatureCardBlock (tier: BLOCK) — an icon + title + body in a shadcn Card. Renders the real React <Card> primitive
+ * (statically, at build) to demonstrate the shadcn components themselves; note React components take `className`, while
+ * native Astro elements take `class`. Generic defaults; the section passes the real feature copy.
+ */
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Icon } from "astro-icon/components";
+
+interface Props {
+  icon?: string;
+  title?: string;
+  body?: string;
+}
+const {
+  icon = "material-symbols:bolt-rounded",
+  title = "Feature title",
+  body = "A concise description of what this feature does and why it matters.",
+} = Astro.props;
+---
+
+<Card className="h-full gap-0 transition-shadow duration-200 hover:shadow-md">
+  <CardHeader>
+    <div
+      class="mb-3 flex size-11 items-center justify-center rounded-xl bg-[color-mix(in_oklab,var(--color-primary)_12%,transparent)] text-primary [&_svg]:size-5"
+    >
+      <Icon name={icon} />
+    </div>
+    <CardTitle>{title}</CardTitle>
+    <CardDescription className="pt-1.5 leading-relaxed">{body}</CardDescription>
+  </CardHeader>
+</Card>

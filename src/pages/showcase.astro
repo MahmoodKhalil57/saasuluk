@@ -1,0 +1,28 @@
+---
+/**
+ * /showcase (tier: PAGE) — composes sections only, inside the app frame. The reference example of the
+ * page → section → block → component split: this file imports SECTIONS (never blocks, never base ui). `bare` lets the
+ * sections lay out full-bleed (no centered .wrap). See src/components/README.md for the tier discipline.
+ */
+import Layout from "../layouts/Layout.astro";
+import HeroSection from "@/sections/showcase/HeroSection.astro";
+import FeaturesSection from "@/sections/showcase/FeaturesSection.astro";
+import TechSection from "@/sections/showcase/TechSection.astro";
+import ChromeSection from "@/sections/showcase/ChromeSection.astro";
+import CtaSection from "@/sections/showcase/CtaSection.astro";
+
+export const prerender = true;
+---
+
+<!-- Layout now renders the tiered HeaderSection/FooterSection for every page; this page just supplies its content. -->
+<Layout
+  title="Showcase — saasuluk"
+  description="A page → section → block → component showcase, built with shadcn + Tailwind v4 on the Suluk stack."
+  bare
+>
+  <HeroSection />
+  <FeaturesSection />
+  <TechSection />
+  <ChromeSection />
+  <CtaSection />
+</Layout>

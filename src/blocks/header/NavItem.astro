@@ -1,0 +1,30 @@
+---
+/**
+ * NavItem (tier: SUB-BLOCK) — one primary-nav link. `i18nKey` adds the `data-i18n` hook so Layout's `__applyLang`
+ * re-translates it on a language switch, exactly like the rest of the site's chrome. Worker-served routes (e.g.
+ * /reference) get `data-astro-reload` + `data-astro-prefetch="false"` so the SPA router does a clean full nav and
+ * doesn't speculatively warm them.
+ */
+import { workerLinkAttrs } from "@/lib/worker-routes";
+
+interface Props {
+  href: string;
+  label: string;
+  i18nKey?: string;
+  active?: boolean;
+}
+const { href, label, i18nKey, active = false } = Astro.props;
+---
+
+<a
+  href={href}
+  data-i18n={i18nKey}
+  aria-current={active ? "page" : undefined}
+  class:list={[
+    "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+  ]}
+  {...workerLinkAttrs(href)}
+>
+  {label}
+</a>

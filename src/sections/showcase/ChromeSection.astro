@@ -1,0 +1,22 @@
+---
+/**
+ * ChromeSection (tier: SECTION) — demonstrates the reusable premium chrome components (scheme · language · theme ·
+ * cart), extracted from saasuluk into shadcn blocks. Owns the explanatory copy; renders the ChromeBar block as an
+ * island so the controls actually drive the page.
+ */
+import SectionBand from "@/blocks/shared/SectionBand.astro";
+import { ChromeBar } from "@/blocks/chrome/ChromeBar";
+---
+
+<SectionBand id="chrome" width="default">
+  <div class="flex flex-col items-center gap-5 text-center">
+    <h2 class="text-3xl font-bold tracking-tight text-balance sm:text-4xl">Reusable premium chrome</h2>
+    <p class="max-w-2xl text-base text-balance text-muted-foreground sm:text-lg">
+      The site's color scheme, light/dark theme, language and cart — extracted into reusable shadcn components. Try them right here: each
+      one drives the whole page.
+    </p>
+    <div class="mt-2 inline-flex items-center gap-2 rounded-2xl border border-border bg-card p-3 shadow-sm">
+      <ChromeBar client:visible />
+    </div>
+  </div>
+</SectionBand>

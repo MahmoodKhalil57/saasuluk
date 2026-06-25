@@ -1,0 +1,27 @@
+---
+/**
+ * SiteFooter (tier: BLOCK) — the full site footer: brand block + the link columns + the bottom bar. Composes the
+ * footer sub-blocks from the shared FOOTER_COLUMNS map.
+ */
+import FooterBrand from "./FooterBrand.astro";
+import FooterColumn from "./FooterColumn.astro";
+import FooterBottom from "./FooterBottom.astro";
+import { FOOTER_COLUMNS } from "@/lib/site-nav";
+
+interface Props {
+  columns?: typeof FOOTER_COLUMNS;
+}
+const { columns = FOOTER_COLUMNS } = Astro.props;
+---
+
+<div class="sk-tw mx-auto w-full max-w-6xl px-5 py-14 sm:px-8">
+  <div class="flex flex-col gap-10 lg:flex-row lg:justify-between">
+    <FooterBrand />
+    <div class="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-10">
+      {columns.map((c) => <FooterColumn head={c.head} links={c.links} />)}
+    </div>
+  </div>
+  <div class="mt-12">
+    <FooterBottom />
+  </div>
+</div>

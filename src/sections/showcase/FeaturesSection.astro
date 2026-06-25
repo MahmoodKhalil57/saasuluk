@@ -1,0 +1,64 @@
+---
+/**
+ * FeaturesSection (tier: SECTION) — owns the feature + stat copy; composes the SectionBand shell with a grid of
+ * FeatureCardBlocks and a StatBlock row. The blocks are generic; this section is where saasuluk's business content
+ * lives.
+ */
+import SectionBand from "@/blocks/shared/SectionBand.astro";
+import FeatureCardBlock from "@/blocks/showcase/FeatureCardBlock.astro";
+import StatBlock from "@/blocks/showcase/StatBlock.astro";
+
+const FEATURES = [
+  {
+    icon: "material-symbols:lock-outline",
+    title: "Real auth, wired in",
+    body: "Email + password, magic links, OAuth and sessions via Better Auth — already connected to the contract.",
+  },
+  {
+    icon: "material-symbols:payments-outline",
+    title: "Payments + metering",
+    body: "Stripe checkout, a billing portal and usage metering, with cost tracked per request.",
+  },
+  {
+    icon: "material-symbols:shopping-bag-outline",
+    title: "eCommerce built in",
+    body: "Catalog, cart, discount codes, orders and fulfilment — server-authoritative pricing throughout.",
+  },
+  {
+    icon: "material-symbols:api-rounded",
+    title: "A typed API + docs",
+    body: "One OpenAPI v4 contract projects the SDK, Scalar docs and conformance tests automatically.",
+  },
+  {
+    icon: "material-symbols:dashboard-outline",
+    title: "Admin cockpit",
+    body: "A role-aware /panel for owners and customers, plus a superadmin console for raw CRUD.",
+  },
+  {
+    icon: "material-symbols:bolt-rounded",
+    title: "Edge-native",
+    body: "Runs on Cloudflare Workers + D1 from the same registry the dev server uses — no drift.",
+  },
+];
+
+const STATS = [
+  { value: "1", label: "source of truth" },
+  { value: "30+", label: "@suluk packages" },
+  { value: "300+", label: "edge cities" },
+];
+---
+
+<SectionBand id="features" width="wide">
+  <div class="flex flex-col items-center gap-3 text-center">
+    <h2 class="text-3xl font-bold tracking-tight text-balance sm:text-4xl">Everything a SaaS needs, from one contract</h2>
+    <p class="max-w-2xl text-base text-balance text-muted-foreground sm:text-lg">
+      Declare the contract once; the API, docs, admin, SDK and tests all derive from it.
+    </p>
+  </div>
+  <div class="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {FEATURES.map((f) => <FeatureCardBlock icon={f.icon} title={f.title} body={f.body} />)}
+  </div>
+  <div class="mt-14 grid grid-cols-3 gap-6 border-t border-border pt-10">
+    {STATS.map((s) => <StatBlock value={s.value} label={s.label} />)}
+  </div>
+</SectionBand>

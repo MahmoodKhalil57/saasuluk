@@ -1,0 +1,17 @@
+---
+/**
+ * NavBlock (tier: BLOCK) — the primary desktop nav, composing NavItem sub-blocks from the shared SITE_NAV map. Pass
+ * `current` to highlight the active route.
+ */
+import NavItem from "./NavItem.astro";
+import { SITE_NAV } from "@/lib/site-nav";
+
+interface Props {
+  current?: string;
+}
+const { current } = Astro.props;
+---
+
+<nav class="flex items-center gap-0.5" aria-label="Primary">
+  {SITE_NAV.map((it) => <NavItem href={it.href} label={it.label} i18nKey={it.i18nKey} active={it.href === current} />)}
+</nav>

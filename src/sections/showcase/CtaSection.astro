@@ -1,0 +1,24 @@
+---
+/**
+ * CtaSection (tier: SECTION) — closing call-to-action + newsletter signup. Composes the SectionBand shell, the static
+ * CtaBannerBlock, and the interactive SignupBlock island. Owns the business copy; the blocks stay generic.
+ */
+import SectionBand from "@/blocks/shared/SectionBand.astro";
+import CtaBannerBlock from "@/blocks/showcase/CtaBannerBlock.astro";
+import { SignupBlock } from "@/blocks/showcase/SignupBlock";
+
+const DEFAULTS = {
+  title: "Start with the contract, ship the rest",
+  subtitle: "Browse the live store, read the typed docs, or get product updates in your inbox.",
+  ctaLabel: "Browse the store",
+  ctaHref: "/products",
+};
+const props = { ...DEFAULTS, ...Astro.props };
+---
+
+<SectionBand tone="soft" width="default">
+  <CtaBannerBlock {...props} />
+  <div class="mt-9">
+    <SignupBlock client:visible ctaLabel="Subscribe" />
+  </div>
+</SectionBand>

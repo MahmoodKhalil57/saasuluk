@@ -1,0 +1,21 @@
+---
+/**
+ * FooterColumn (tier: SUB-BLOCK) — a titled column of footer links, composing FooterLink. Generic; the SiteFooter
+ * passes the heading + link list.
+ */
+import FooterLink from "./FooterLink.astro";
+import type { NavLink } from "@/lib/site-nav";
+
+interface Props {
+  head: string;
+  links: NavLink[];
+}
+const { head, links } = Astro.props;
+---
+
+<div class="flex flex-col gap-3">
+  <div class="text-xs font-semibold tracking-wider text-muted-foreground/80 uppercase">{head}</div>
+  <ul class="flex flex-col gap-2">
+    {links.map((l) => <FooterLink href={l.href} label={l.label} i18nKey={l.i18nKey} />)}
+  </ul>
+</div>

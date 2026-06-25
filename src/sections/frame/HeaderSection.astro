@@ -1,0 +1,18 @@
+---
+/**
+ * HeaderSection (tier: SECTION) — the sticky, glassy header band that wraps SiteHeader and places the chrome at the top
+ * of the page frame. Composes the SiteHeader block. Rendered by Layout for every page.
+ */
+import SiteHeader from "@/blocks/header/SiteHeader.astro";
+
+interface Props {
+  current?: string;
+}
+const { current } = Astro.props;
+---
+
+<header
+  class="sk-tw sticky top-0 z-40 w-full border-b border-border bg-[color-mix(in_oklab,var(--color-background)_82%,transparent)] backdrop-blur-md"
+>
+  <SiteHeader current={current} />
+</header>

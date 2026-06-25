@@ -1,0 +1,35 @@
+---
+/**
+ * TechStripBlock (tier: BLOCK) — a centered, wrapping row of brand/tech logos with labels, rendered via astro-icon.
+ * Generic: the section supplies which logos. This is where the devicon set earns its place (full-color brand marks,
+ * inlined at build), alongside the material-symbols + line-md glyphs used elsewhere.
+ */
+import { Icon } from "astro-icon/components";
+
+interface Item {
+  icon: string;
+  label: string;
+}
+interface Props {
+  items?: Item[];
+}
+const {
+  items = [
+    { icon: "devicon:astro", label: "Astro" },
+    { icon: "devicon:react", label: "React" },
+  ],
+} = Astro.props;
+---
+
+<ul class="flex flex-wrap items-center justify-center gap-x-9 gap-y-5">
+  {
+    items.map((it) => (
+      <li class="flex items-center gap-2.5 text-sm font-medium text-muted-foreground transition-opacity hover:opacity-80">
+        <span class="[&_svg]:size-7">
+          <Icon name={it.icon} />
+        </span>
+        {it.label}
+      </li>
+    ))
+  }
+</ul>

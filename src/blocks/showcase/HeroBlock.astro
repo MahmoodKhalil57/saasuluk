@@ -1,0 +1,54 @@
+---
+/**
+ * HeroBlock (tier: BLOCK) — eyebrow + headline + subtitle + two CTAs, centered. Generic defaults; the section supplies
+ * the real copy. Composes base ui only: the badge + button cva variants (applied to native elements so the static
+ * Astro markup stays light) and astro-icon.
+ */
+import { badgeVariants } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Icon } from "astro-icon/components";
+
+interface Props {
+  eyebrow?: string;
+  title?: string;
+  titleAccent?: string;
+  subtitle?: string;
+  primaryLabel?: string;
+  primaryHref?: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+}
+const {
+  eyebrow = "New",
+  title = "A headline that",
+  titleAccent = "sells itself.",
+  subtitle = "A short, punchy line that explains the value in one breath.",
+  primaryLabel = "Get started",
+  primaryHref = "#",
+  secondaryLabel = "Learn more",
+  secondaryHref = "#",
+} = Astro.props;
+---
+
+<div class="flex flex-col items-center gap-6 text-center">
+  {
+    eyebrow && (
+      <span class={badgeVariants({ variant: "accent" })}>
+        <Icon name="material-symbols:bolt-rounded" />
+        {eyebrow}
+      </span>
+    )
+  }
+  <h1 class="max-w-3xl text-4xl font-extrabold tracking-tight text-balance sm:text-5xl md:text-6xl">
+    {title}{" "}
+    <span class="bg-gradient-to-r from-primary to-[var(--accent-2)] bg-clip-text text-transparent">{titleAccent}</span>
+  </h1>
+  <p class="max-w-xl text-base text-balance text-muted-foreground sm:text-lg">{subtitle}</p>
+  <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+    <a href={primaryHref} class={buttonVariants({ size: "lg" })}>
+      {primaryLabel}
+      <Icon name="material-symbols:arrow-forward-rounded" />
+    </a>
+    <a href={secondaryHref} class={buttonVariants({ variant: "outline", size: "lg" })}>{secondaryLabel}</a>
+  </div>
+</div>

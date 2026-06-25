@@ -8,6 +8,14 @@ import { renderBaseCss } from "@suluk/theme";
 import { BUILD_ID } from "../build-id";
 import { Icon } from "astro-icon/components";
 import { ICON, iconSvg } from "../icons";
+// Tailwind v4 + shadcn tokens (Preflight-free, scoped to `.sk-tw`) — see src/styles/app.css. Vite bundles it; it adds
+// the shadcn token bridge + utilities without touching the legacy hand-styled pages.
+import "../styles/app.css";
+// The tiered (page → section → block → component) site frame. Rendered for EVERY page; the legacy inline chrome below
+// is hidden (kept in the DOM so its no-flash scripts bind harmlessly) + the legacy ⌘K palette import is dropped — the
+// React SearchButton owns search now. See src/components/README.md.
+import HeaderSection from "@/sections/frame/HeaderSection.astro";
+import FooterSection from "@/sections/frame/FooterSection.astro";
 // theme-toggle icons resolved to SVG strings at build (the toggle swaps innerHTML per light/dark/system in JS) — see #6
 const themeIcons = { light: iconSvg(ICON.themeLight, 22), dark: iconSvg(ICON.themeDark, 22), system: iconSvg(ICON.themeSystem, 22) };
 const schemeCss = altSchemesCss(); // @suluk/theme projects the alternate schemes at build time (no client cost)
@@ -22,6 +30,9 @@ const {
   ogType,
   noindex,
   jsonLd: pageNodes,
+  // `bare`: render the page slot WITHOUT the centered `.wrap` container, so a page can lay out its own full-bleed
+  // sections (e.g. the shadcn page→section→block→component showcase, whose SectionBands span the viewport).
+  bare = false,
 } = Astro.props;
 // SEO is PROJECTED from @suluk/seo (one toolkit → robots, sitemap, schema, meta, og, llms, skew). seoTags emits the
 // full title/description/canonical/og/twitter/robots set; the schema.org @graph carries Organization + WebSite
@@ -1824,8 +1835,9 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       }
     </style>
   </head>
-  <body>
+  <body class="sk-no-chrome">
     <a class="skip-link" href="#main-content" data-i18n="skipToContent">Skip to content</a>
+    <HeaderSection current={Astro.url.pathname} transition:persist="tiered-header" />
     <div id="promo-bar" class="promo-bar" transition:persist="promo-bar">
       <span>🎉 Launch week — use code <b>LAUNCH30</b> at checkout for 30% off your order.</span>
       <button id="promo-dismiss" type="button" aria-label="Dismiss announcement">×</button>
@@ -1966,7 +1978,18 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
       </div>
       <div id="scheme-grid" class="scheme-grid" role="listbox" aria-label="Schemes"></div>
     </div>
-    <main id="main-content"><div class="wrap"><slot /></div></main>
+    <main id="main-content">
+      {
+        bare ? (
+          <slot />
+        ) : (
+          <div class="wrap">
+            <slot />
+          </div>
+        )
+      }
+    </main>
+    <FooterSection transition:persist="tiered-footer" />
     <footer class="site" transition:persist="site-footer">
       <div class="wrap">
         <div class="newsletter">
@@ -2180,8 +2203,23 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
     <script>
       import "../client/ux";
     </script>
-    <script>
-      import "../client/palette";
+    <script is:inline>
+      /* The tiered header is `transition:persist`ed (it survives soft navs without re-hydrating), so its active-nav
+         highlight must be refreshed per navigation against the new pathname. */
+      (function () {
+        function syncTieredNav() {
+          var path = location.pathname;
+          document.querySelectorAll("header.sk-tw nav a[href]").forEach(function (a) {
+            var on = a.getAttribute("href") === path;
+            if (on) a.setAttribute("aria-current", "page");
+            else a.removeAttribute("aria-current");
+            a.classList.toggle("text-foreground", on);
+            a.classList.toggle("text-muted-foreground", !on);
+          });
+        }
+        document.addEventListener("astro:page-load", syncTieredNav);
+        syncTieredNav();
+      })();
     </script>
     <script is:inline set:html={`window.__schemes=${JSON.stringify(SCHEME_SWATCHES)}`} />
     <script is:inline define:vars={{ themeIcons }}>
@@ -2596,8 +2634,8 @@ const navAttrs = (href: string) => (isWorker(href) ? { "data-astro-reload": true
             description: "Open the cart drawer so the user can review their items.",
             parameters: { type: "object", properties: {} },
             run: function () {
-              var b = document.getElementById("cartbtn");
-              if (b) b.click();
+              // The live cart is the React CartButton (the legacy #cartbtn is hidden chrome now); it opens on this event.
+              window.dispatchEvent(new Event("su:cart:open"));
             },
           },
           {

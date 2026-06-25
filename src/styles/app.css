@@ -1,0 +1,146 @@
+/**
+ * Tailwind v4 + shadcn tokens for saasuluk — WITHOUT global Preflight.
+ *
+ * saasuluk is NOT a Tailwind-from-scratch app: it has 43 hand-styled pages driven by CSS variables (--bg, --accent,
+ * …) + a 43-scheme system (src/themes/project.ts projects each scheme onto those vars via @suluk/theme). Tailwind's
+ * default Preflight is a GLOBAL reset (zeroes margins, unstyles headings/lists, …) that would visually break every one
+ * of those legacy pages. So we import Tailwind's theme + utilities layers but DELIBERATELY OMIT preflight.css, and
+ * apply the small reset shadcn actually needs SCOPED to `.sk-tw` (the boundary every tiered section/block lives under).
+ * Existing pages stay pixel-identical; the new page → section → block → component tier only opts in under `.sk-tw`.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+/* enter/exit animation utilities (animate-in, fade-in, zoom-in, slide-in-from-*) for the shadcn overlays
+   (dropdown-menu, popover, sheet). CSS-only; no runtime cost. */
+@import "tw-animate-css";
+
+/* shadcn's `dark:` utilities follow saasuluk's existing `data-theme` switch (set on <html> by the theme toggle), so a
+   dark theme flips the CSS vars AND the dark variants together — same trick the reference (sandook-tasali) uses. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/* Tiered chrome mode (`body.sk-no-chrome`, set by Layout) — the legacy inline promo banner + header + footer + the
+   legacy overlays (scheme popover, cart drawer, mobile nav, command palette) are REPLACED by the React chrome
+   (SiteHeader/SiteFooter + the chrome blocks). They stay in the DOM so their no-flash scripts bind harmlessly; they're
+   just never shown. !important so it wins regardless of cascade layer. */
+body.sk-no-chrome > #promo-bar,
+body.sk-no-chrome > header.site,
+body.sk-no-chrome > footer.site,
+body.sk-no-chrome > #schemepop,
+body.sk-no-chrome > #schemeback,
+body.sk-no-chrome > #cartdrawer,
+body.sk-no-chrome > #cartback,
+body.sk-no-chrome > #mobilenav,
+body.sk-no-chrome > #navback,
+body.sk-no-chrome > #palette,
+body.sk-no-chrome > #paletteback {
+  display: none !important;
+}
+
+/* The BRIDGE: map shadcn's semantic token names onto saasuluk's own palette variables. Because the values are
+   `var(--bg)` etc. (live, per-scheme), every shadcn component automatically follows the active scheme + light/dark —
+   no second source of truth, no hand-synced globals. (Note: shadcn `--primary` = brand → our `--accent`; shadcn
+   `--accent` = a subtle hover SURFACE → our `--bg-soft`.) */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--panel);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--bg-soft);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--bg-soft);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--bg-soft);
+  --color-accent-foreground: var(--fg);
+  --color-destructive: var(--sk-destructive);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+  --color-link: var(--link);
+
+  --radius-sm: calc(var(--sk-radius) - 4px);
+  --radius-md: calc(var(--sk-radius) - 2px);
+  --radius-lg: var(--sk-radius);
+  --radius-xl: calc(var(--sk-radius) + 4px);
+  --radius-2xl: calc(var(--sk-radius) + 8px);
+}
+
+/* Tokens shadcn needs that saasuluk's vocabulary doesn't carry — derived once, scheme-agnostic. */
+:root {
+  --sk-radius: 0.7rem;
+  --sk-destructive: #e5484d;
+}
+[data-theme="dark"] {
+  --sk-destructive: #f2555a;
+}
+
+/* The shadcn reset Preflight would normally provide — SCOPED to `.sk-tw` so it never reaches the legacy pages. Covers
+   exactly what shadcn primitives assume: border-box, a default solid border (Tailwind's `border` utility only sets
+   width, so without this `border` renders invisible), zeroed element margins/heading sizes (the tier uses explicit
+   `text-*`/`font-*` utilities), and form-control font inheritance. */
+@layer base {
+  .sk-tw,
+  .sk-tw *,
+  .sk-tw *::before,
+  .sk-tw *::after {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: var(--color-border);
+  }
+  .sk-tw h1,
+  .sk-tw h2,
+  .sk-tw h3,
+  .sk-tw h4,
+  .sk-tw h5,
+  .sk-tw h6,
+  .sk-tw p,
+  .sk-tw figure,
+  .sk-tw blockquote,
+  .sk-tw dl,
+  .sk-tw dd {
+    margin: 0;
+  }
+  .sk-tw h1,
+  .sk-tw h2,
+  .sk-tw h3,
+  .sk-tw h4,
+  .sk-tw h5,
+  .sk-tw h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  .sk-tw ul,
+  .sk-tw ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .sk-tw button,
+  .sk-tw input,
+  .sk-tw select,
+  .sk-tw textarea {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+  .sk-tw button {
+    background-color: transparent;
+    background-image: none;
+  }
+  .sk-tw img,
+  .sk-tw svg,
+  .sk-tw video {
+    display: block;
+    max-width: 100%;
+  }
+  .sk-tw a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+}
